@@ -128,13 +128,12 @@ function saveData() {
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
     updateDashboardInfo(); 
     
-    // Đồng bộ lên Cloud - Đợi 3 giây mới đẩy để gom thao tác
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
             const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
             setDoc(docRef, appData).then(() => {
-                console.log("☁️ Đã đồng bộ nền lên Firebase thành công (Tiết kiệm Write)!");
+                console.log("☁️ Đã đồng bộ nền lên Firebase thành công!");
             }).catch(e => console.error("Lỗi đồng bộ mây:", e));
         }, 3000);
     }
@@ -374,33 +373,6 @@ function addHoliday() {
     saveData(); renderSetupData(); showToast("Đã thêm ngày nghỉ!");
 }
 
-let currentImportType = '';
-function triggerImport(type) { currentImportType = type; document.getElementById('general-import-file').click(); }
-function handleGeneralImport(e) {
-    const file = e.target.files[0]; if (!file) return; const reader = new FileReader();
-    reader.onload = (ev) => {
-        try {
-            const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' });
-            let rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            let count = 0;
-            rows.forEach(r => {
-                if(currentImportType === 'tkb' && (r['Thứ'] || r['Thu']) && (r['Tiết'] || r['Tiet']) && r['Lớp']) {
-                    appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(r['Thứ']||r['Thu']), period: parseInt(r['Tiết']||r['Tiet']), className: String(r['Lớp']||r['Lop']), subject: String(r['Môn']||r['Mon']) }); count++;
-                }
-                else if(currentImportType === 'ppct' && r['Lớp'] && r['Môn'] && r['Tiết'] && (r['Nội dung']||r['Noi dung'])) {
-                    appData.scheduleSetup.ppct.push({ className: String(r['Lớp']||r['Lop']), subject: String(r['Môn']||r['Mon']), ppct: parseInt(r['Tiết']), content: String(r['Nội dung']||r['Noi dung']) }); count++;
-                }
-                else if(currentImportType === 'holidays' && r['Từ ngày'] && r['Đến ngày'] && r['Sự kiện']) {
-                    let sd = new Date(r['Từ ngày']); let ed = new Date(r['Đến ngày']);
-                    if(!isNaN(sd)) { appData.scheduleSetup.holidays.push({ start: sd.toISOString().split('T')[0], end: ed.toISOString().split('T')[0], name: r['Sự kiện'] }); count++; }
-                }
-            });
-            saveData(); renderSetupData(); showToast(`Đã import thành công ${count} dòng!`); e.target.value = "";
-        } catch (error) { showToast("Lỗi định dạng file Excel!", "error"); }
-    };
-    reader.readAsArrayBuffer(file);
-}
-
 function checkIsHoliday(dateStr) {
     let d = new Date(dateStr);
     for(let h of appData.scheduleSetup.holidays) {
@@ -554,36 +526,109 @@ function saveStudent() {
 function editStudent(id) { const stu = appData.students.find(s => s.id === id); if(stu) { document.getElementById('stu-id').value = stu.id; document.getElementById('stu-name').value = stu.name; document.getElementById('stu-gender').value = stu.gender || 'Nam'; let fDob = stu.dob || ''; if(fDob.includes('/')) { const p = fDob.split('/'); if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; } document.getElementById('stu-dob').value = fDob; document.getElementById('stu-phone').value = stu.phone || ''; openModal('modal-add-student'); } }
 function deleteStudent(id) { if(confirm("Xác nhận xóa?")) { appData.students = appData.students.filter(s => s.id !== id); saveData(); renderStudents(); showToast("Đã xóa"); } }
 
+// TÍNH NĂNG IMPORT EXCEL THÔNG MINH
 let rawExcelData = [], parsedStudents = [], excelHeaders = [];
-function openImportModal() { document.getElementById('import-step-1').style.display = 'block'; document.getElementById('import-step-2').style.display = 'none'; document.getElementById('import-step-2-footer').style.display = 'none'; document.getElementById('excel-file').value = ""; rawExcelData = []; parsedStudents = []; openModal('modal-import-excel'); }
+let currentHeaderRowIndex = 0; 
+
+function openImportModal() { 
+    document.getElementById('import-step-1').style.display = 'block'; 
+    document.getElementById('import-step-2').style.display = 'none'; 
+    document.getElementById('import-step-2-footer').style.display = 'none'; 
+    document.getElementById('excel-file').value = ""; 
+    rawExcelData = []; parsedStudents = []; currentHeaderRowIndex = 0; 
+    openModal('modal-import-excel'); 
+}
+
 function handleExcelUpload(event) {
     const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); rawExcelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false });
+            const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); 
+            rawExcelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: "" });
+            
             if (rawExcelData.length < 2) return showToast("File trống!", "error");
-            excelHeaders = rawExcelData[0].map(h => (h || '').toString().trim());
+            
+            // Quét tìm dòng tiêu đề thực sự
+            currentHeaderRowIndex = 0;
+            for(let i = 0; i < Math.min(15, rawExcelData.length); i++) {
+                let rowStr = rawExcelData[i].join('').toLowerCase();
+                if(rowStr.includes('họ và tên') || rowStr.includes('họ tên') || rowStr.includes('stt')) {
+                    currentHeaderRowIndex = i;
+                    break;
+                }
+            }
+
+            excelHeaders = rawExcelData[currentHeaderRowIndex].map(h => (h || '').toString().trim());
+            
             const selects = ['map-name', 'map-gender', 'map-dob', 'map-phone'];
-            selects.forEach(id => { const sel = document.getElementById(id); sel.innerHTML = '<option value="-1">-- Bỏ qua --</option>'; excelHeaders.forEach((h, i) => { sel.innerHTML += `<option value="${i}">${h || `Cột ${i+1}`}</option>`; }); });
-            excelHeaders.forEach((h, i) => { let low = h.toLowerCase(); if(low.includes('tên')||low.includes('name')) document.getElementById('map-name').value = i; else if(low.includes('giới')||low==='gt') document.getElementById('map-gender').value = i; else if(low.includes('sinh')||low.includes('date')) document.getElementById('map-dob').value = i; else if(low.includes('sđt')||low.includes('thoại')) document.getElementById('map-phone').value = i; });
-            document.getElementById('import-step-1').style.display = 'none'; document.getElementById('import-step-2').style.display = 'block'; document.getElementById('import-step-2-footer').style.display = 'flex'; processParsedData();
-        } catch (error) { showToast("Lỗi đọc file!", "error"); }
-    }; reader.readAsArrayBuffer(file);
+            selects.forEach(id => { 
+                const sel = document.getElementById(id); 
+                sel.innerHTML = '<option value="-1">-- Bỏ qua --</option>'; 
+                excelHeaders.forEach((h, i) => { 
+                    if(h) sel.innerHTML += `<option value="${i}">${h}</option>`; 
+                }); 
+            });
+            
+            // Tự động chọn đúng cột
+            excelHeaders.forEach((h, i) => { 
+                if(!h) return;
+                let low = h.toLowerCase(); 
+                if(low.includes('tên')||low.includes('name')) document.getElementById('map-name').value = i; 
+                else if(low.includes('giới')||low==='gt') document.getElementById('map-gender').value = i; 
+                else if(low.includes('sinh')||low.includes('date')) document.getElementById('map-dob').value = i; 
+                else if(low.includes('sđt')||low.includes('thoại')||low.includes('sll')) document.getElementById('map-phone').value = i; 
+            });
+            
+            document.getElementById('import-step-1').style.display = 'none'; 
+            document.getElementById('import-step-2').style.display = 'block'; 
+            document.getElementById('import-step-2-footer').style.display = 'flex'; 
+            processParsedData();
+        } catch (error) { 
+            showToast("Lỗi đọc file!", "error"); console.error(error);
+        }
+    }; 
+    reader.readAsArrayBuffer(file);
 }
+
 function processParsedData() {
-    const mapName = parseInt(document.getElementById('map-name').value), mapGender = parseInt(document.getElementById('map-gender').value), mapDob = parseInt(document.getElementById('map-dob').value), mapPhone = parseInt(document.getElementById('map-phone').value);
+    const mapName = parseInt(document.getElementById('map-name').value), 
+          mapGender = parseInt(document.getElementById('map-gender').value), 
+          mapDob = parseInt(document.getElementById('map-dob').value), 
+          mapPhone = parseInt(document.getElementById('map-phone').value);
+          
     parsedStudents = []; let dupCount = 0;
-    for (let i = 1; i < rawExcelData.length; i++) {
+    
+    for (let i = currentHeaderRowIndex + 1; i < rawExcelData.length; i++) {
         const row = rawExcelData[i]; if (!row || !row.length) continue;
-        let name = mapName !== -1 ? (row[mapName] || '').toString().trim() : ''; if (!name) continue;
-        let stu = { name: name, gender: mapGender !== -1 ? (row[mapGender] || 'Nam').toString().trim() : 'Nam', dob: mapDob !== -1 ? (row[mapDob] || '').toString().trim() : '', phone: mapPhone !== -1 ? (row[mapPhone] || '').toString().trim() : '' };
-        stu.isDup = appData.students.some(s => s.name.toLowerCase() === stu.name.toLowerCase()); if(stu.isDup) dupCount++; parsedStudents.push(stu);
+        
+        let name = mapName !== -1 ? (row[mapName] || '').toString().trim() : ''; 
+        if (!name || name === '' || name.toLowerCase().includes('tổng')) continue;
+        
+        let phoneVal = mapPhone !== -1 ? (row[mapPhone] || '').toString().trim() : '';
+        if(phoneVal.endsWith('.0')) phoneVal = phoneVal.replace('.0', ''); 
+
+        let stu = { 
+            name: name, 
+            gender: mapGender !== -1 ? (row[mapGender] || 'Nam').toString().trim() : 'Nam', 
+            dob: mapDob !== -1 ? (row[mapDob] || '').toString().trim() : '', 
+            phone: phoneVal 
+        };
+        
+        stu.isDup = appData.students.some(s => s.name.toLowerCase() === stu.name.toLowerCase()); 
+        if(stu.isDup) dupCount++; 
+        parsedStudents.push(stu);
     }
+    
     const tbody = document.getElementById('preview-tbody'); tbody.innerHTML = '';
-    parsedStudents.slice(0, 20).forEach((stu, i) => { tbody.innerHTML += `<tr ${stu.isDup?'style="background:#fef3c7"':''}><td>${i+1}</td><td>${stu.name}</td><td>${stu.phone}</td></tr>`; });
+    parsedStudents.slice(0, 20).forEach((stu, i) => { 
+        tbody.innerHTML += `<tr ${stu.isDup?'style="background:#fef3c7"':''}><td>${i+1}</td><td>${stu.name}</td><td>${stu.phone}</td></tr>`; 
+    });
     if(parsedStudents.length>20) tbody.innerHTML += `<tr><td colspan="3" class="text-center text-muted">... và ${parsedStudents.length-20} HS khác</td></tr>`;
-    document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
+    
+    document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; 
+    document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
 }
+
 function confirmImport() { let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "" }); c++; }); saveData(); renderStudents(); closeModal('modal-import-excel'); showToast(`Đã nhập ${c} HS!`); }
 function exportExcel() { if(appData.students.length === 0) return showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); showToast("Đã xuất Excel!"); }
 function downloadTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); showToast("Đã tải!"); }
