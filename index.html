@@ -10,10 +10,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- THƯ VIỆN EXCEL & ẢNH -->
+    <!-- THƯ VIỆN EXCEL, WORD & CHỤP ẢNH -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- THÊM THƯ VIỆN ĐỌC FILE WORD (.DOCX) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
     
     <link rel="stylesheet" href="style.css">
@@ -325,6 +324,7 @@
     <div id="modal-edit-theme" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi Chủ điểm tháng</h3><div class="close" onclick="closeModal('modal-edit-theme')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tháng</label><input type="number" id="edit-theme-month" min="1" max="12"></div><div class="input-group mb-0"><label>Tên Chủ điểm</label><input type="text" id="edit-theme-name" placeholder="VD: VĂN MINH - XANH - AN TOÀN"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveMonthlyTheme()">Lưu thay đổi</button></div></div></div>
     
     <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
+    
     <div id="modal-import-excel" class="modal"><div class="modal-content" style="max-height: 95vh;"><div class="modal-header"><h3>📥 Nhập danh sách</h3><div class="close" onclick="closeModal('modal-import-excel')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 15px;"><div id="import-step-1"><div class="drop-zone" id="drop-zone" onclick="document.getElementById('excel-file').click()"><div class="drop-icon"><i class="fas fa-cloud-upload-alt"></i></div><h4>Kéo thả hoặc Nhấn chọn</h4><input type="file" id="excel-file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelUpload(event)"></div></div><div id="import-step-2" style="display: none;"><div class="mapping-section"><h4>Xác nhận cột:</h4><div class="mapping-grid"><div class="map-group"><label>Họ tên</label><select id="map-name" onchange="processParsedData()"></select></div><div class="map-group"><label>Giới tính</label><select id="map-gender" onchange="processParsedData()"></select></div><div class="map-group"><label>Ngày sinh</label><select id="map-dob" onchange="processParsedData()"></select></div><div class="map-group"><label>SĐT</label><select id="map-phone" onchange="processParsedData()"></select></div></div></div><div id="import-warnings"></div><div class="table-responsive"><table class="preview-table"><thead><tr><th>STT</th><th>Họ tên</th><th>SĐT</th></tr></thead><tbody id="preview-tbody"></tbody></table></div></div></div><div class="modal-footer" id="import-step-2-footer" style="display: none; gap:10px;"><button class="btn-outline w-full" onclick="resetImport()">Quay lại</button><button class="btn-primary w-full" id="btn-confirm-import" onclick="confirmImport()">✅ Xác nhận</button></div></div></div>
     
     <div id="modal-record-behavior" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Ghi nhận Nề nếp</h3><div class="close" onclick="closeModal('modal-record-behavior')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0;"><div class="behavior-student-info" id="behavior-target-name"></div><div class="tab-container"><div class="tab-btn active" onclick="switchBehaviorTab('negative', this)">🔴 VI PHẠM</div><div class="tab-btn" onclick="switchBehaviorTab('positive', this)">🟢 BIỂU DƯƠNG</div></div><div class="quick-tag-grid" id="quick-tag-list" style="padding: 20px;"></div></div></div></div>
@@ -371,7 +371,7 @@
         </div>
     </div>
 
-    <!-- CẬP NHẬT THÀNH DẠNG MODULE -->
+    <!-- SCRIPT DẠNG MODULE LÀ BẮT BUỘC ĐỂ FIREBASE HOẠT ĐỘNG -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
