@@ -33,7 +33,6 @@ onAuthStateChanged(auth, async (user) => {
         currentUser = user;
         if(loginScreen) loginScreen.style.display = 'none';
 
-        // 1. KIỂM TRA BẢN QUYỀN APP GVCN
         const userRef = doc(firestoreDb, 'khach_hang_gvcn', user.uid);
         let hasAccess = true;
 
@@ -42,7 +41,6 @@ onAuthStateChanged(auth, async (user) => {
             const ngayHienTai = new Date();
 
             if (!docUserSnap.exists()) {
-                // Tặng 30 ngày cho tài khoản mới
                 let ngayHetHan = new Date();
                 ngayHetHan.setDate(ngayHienTai.getDate() + 30);
                 await setDoc(userRef, { email: user.email, ngay_dang_ky: ngayHienTai.toISOString(), ngay_het_han: ngayHetHan.toISOString() });
@@ -58,7 +56,6 @@ onAuthStateChanged(auth, async (user) => {
             }
         } catch (error) { console.log("Lỗi kiểm tra bản quyền:", error); }
 
-        // 2. KÉO DỮ LIỆU TỪ MÂY XUỐNG
         if (hasAccess) {
             const docRef = doc(firestoreDb, "DuLieuGVCN", user.uid);
             const docSnap = await getDoc(docRef);
@@ -67,8 +64,7 @@ onAuthStateChanged(auth, async (user) => {
             } else {
                 await setDoc(docRef, appData); 
             }
-            // Render lại toàn bộ giao diện sau khi tải mây
-            updateDashboardInfo(); renderStudents(); loadSettings(); renderKanban(); renderDocs(); renderSetupData();
+            window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
         }
     } else {
         currentUser = null;
@@ -76,7 +72,6 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// TÍNH NĂNG ĐĂNG XUẤT
 window.logoutApp = function() {
     if(confirm("Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?")) {
         signOut(auth).then(() => {
@@ -113,28 +108,22 @@ function initData() {
         };
         localStorage.setItem('gvcnData_v4', JSON.stringify(v4Data));
     } else {
-        if (!v4Data.settings.monthlyThemes) {
-            v4Data.settings.monthlyThemes = { "8": "VĂN MINH - XANH - AN TOÀN" };
-        }
+        if (!v4Data.settings.monthlyThemes) { v4Data.settings.monthlyThemes = { "8": "VĂN MINH - XANH - AN TOÀN" }; }
     }
     return v4Data;
 }
 
 let appData = initData();
-
-// TỐI ƯU CHI PHÍ SERVER (Gom lệnh lưu lên mây)
 let syncTimeout = null;
-function saveData() { 
+
+window.saveData = function() { 
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
-    updateDashboardInfo(); 
-    
+    window.updateDashboardInfo(); 
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
             const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
-            setDoc(docRef, appData).then(() => {
-                console.log("☁️ Đã đồng bộ nền lên Firebase thành công!");
-            }).catch(e => console.error("Lỗi đồng bộ mây:", e));
+            setDoc(docRef, appData).then(() => { console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); }).catch(e => console.error("Lỗi đồng bộ mây:", e));
         }, 3000);
     }
 }
@@ -146,39 +135,37 @@ function addDays(dateStr, days) { let d = new Date(dateStr); d.setDate(d.getDate
 // ================= INDEXED DB (LƯU FILE THẬT) =================
 const DB_NAME = 'GVCN_Docs_DB'; const DB_VERSION = 1; let db;
 function initIndexedDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(); request.onsuccess = (e) => { db = e.target.result; resolve(db); }; request.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' }); }; }); }
-function saveFileToDB(id, file) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').put({ id: id, blob: file }); req.onsuccess = resolve; req.onerror = reject; }); }
-function getFileFromDB(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readonly').objectStore('files').get(id); req.onsuccess = (e) => resolve(e.target.result ? e.target.result.blob : null); req.onerror = reject; }); }
-function deleteFileFromDB(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').delete(id); req.onsuccess = resolve; req.onerror = reject; }); }
+window.saveFileToDB = function(id, file) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').put({ id: id, blob: file }); req.onsuccess = resolve; req.onerror = reject; }); }
+window.getFileFromDB = function(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readonly').objectStore('files').get(id); req.onsuccess = (e) => resolve(e.target.result ? e.target.result.blob : null); req.onerror = reject; }); }
+window.deleteFileFromDB = function(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').delete(id); req.onsuccess = resolve; req.onerror = reject; }); }
 
 window.onload = async () => {
     await initIndexedDB(); 
     document.getElementById('today-date').innerText = new Date().toLocaleDateString('vi-VN');
     document.getElementById('attendance-date').value = getTodayStr();
-    updateDashboardInfo(); renderStudents(); loadSettings(); renderKanban(); renderDocs(); renderSetupData();
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
-    }
+    window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err)); }
 };
 
-function showToast(message, type = 'success') {
+window.showToast = function(message, type = 'success') {
     const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`;
     toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> <span>${message}</span>`; container.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-20px)'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
-function switchView(viewId, navElement = null) {
+window.switchView = function(viewId, navElement = null) {
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     document.getElementById(viewId).classList.add('active'); window.scrollTo(0, 0);
     if (navElement) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); navElement.classList.add('active'); }
-    if(viewId === 'view-settings') loadSettings(); if(viewId === 'view-attendance') renderAttendance(); if(viewId === 'view-discipline') renderDisciplineStudents();
-    if(viewId === 'view-announcements') renderNotifies(); if(viewId === 'view-plans') renderKanban(); if(viewId === 'view-docs') renderDocs();
-    if(viewId === 'view-lesson-log') initLessonLogView();
+    if(viewId === 'view-settings') window.loadSettings(); if(viewId === 'view-attendance') window.renderAttendance(); if(viewId === 'view-discipline') window.renderDisciplineStudents();
+    if(viewId === 'view-announcements') window.renderNotifies(); if(viewId === 'view-plans') window.renderKanban(); if(viewId === 'view-docs') window.renderDocs();
+    if(viewId === 'view-lesson-log') window.initLessonLogView();
 }
-function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+window.openModal = function(id) { document.getElementById(id).style.display = 'flex'; }
+window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
 
 // ================= DASHBOARD & LOGIC TÍNH TOÁN =================
-function updateDashboardInfo() {
+window.updateDashboardInfo = function() {
     const s = appData.settings;
     document.getElementById('dash-teacher').innerText = s.teacherName; document.getElementById('dash-class').innerText = s.className; document.getElementById('dash-year').innerText = s.year;
     
@@ -197,11 +184,11 @@ function updateDashboardInfo() {
     let todaysLessons = appData.scheduleRecords.filter(r => r.date === today);
     document.getElementById('dash-ll-date').innerText = new Date().toLocaleDateString('vi-VN');
     if(todaysLessons.length === 0) {
-        llList.innerHTML = `<div class="text-center w-full" style="font-size:0.85rem; opacity:0.8;">Hôm nay không có tiết dạy nào.</div>`;
+        llList.innerHTML = `<div class="text-center w-full" style="font-size:0.85rem; opacity:0.8; color: white;">Hôm nay không có tiết dạy nào.</div>`;
     } else {
         todaysLessons.sort((a,b) => a.period - b.period).forEach(l => {
             let stIcon = l.status === 'off' ? 'fa-times text-red' : (l.status === 'completed' ? 'fa-check text-green' : 'fa-clock text-blue');
-            llList.innerHTML += `<div class="ll-item"><div class="ll-period"><span>Tiết</span>${l.period}</div><div class="ll-content"><h4>${l.subject} - ${l.className}</h4><p>${l.content}</p></div><i class="fas ${stIcon}"></i></div>`;
+            llList.innerHTML += `<div class="ll-item"><div class="ll-period"><span>Tiết</span>${l.period}</div><div class="ll-content"><h4>${l.subject} - ${l.className}</h4><p>${l.content}</p></div><i class="fas ${stIcon}" style="background: white; padding: 5px; border-radius: 50%;"></i></div>`;
         });
     }
     
@@ -209,26 +196,11 @@ function updateDashboardInfo() {
     let weekLessons = appData.scheduleRecords.filter(r => r.week == currentWeek && r.status !== 'off').length;
     document.getElementById('dash-ll-week-count').innerText = weekLessons;
 
-    const alertsHtml = document.getElementById('dash-alerts'); 
-    if (alertsHtml) {
-        alertsHtml.innerHTML = '';
-        let stuMap = {}; appData.students.forEach(st => { stuMap[st.id] = { name: st.name, absent: 0, points: 0 }; });
-        Object.values(appData.attendance).forEach(day => { Object.keys(day).forEach(sid => { if(day[sid] === 'unexcused' && stuMap[sid]) stuMap[sid].absent++; }); });
-        appData.behaviorRecords.forEach(r => { if(stuMap[r.studentId]) stuMap[r.studentId].points += Number(r.snapshotPoints); });
-        let hasAlert = false;
-        Object.keys(stuMap).forEach(sid => {
-            let stu = stuMap[sid];
-            if(stu.absent >= s.warnAbsent) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item yellow"><div class="alert-icon"><i class="fas fa-calendar-times"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Nghỉ không phép ${stu.absent} buổi</p></div></div>`; }
-            if(stu.points <= s.warnBehavior) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item red"><div class="alert-icon"><i class="fas fa-exclamation"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Điểm thi đua chạm mốc ${stu.points} điểm</p></div></div>`; }
-        });
-        if(!hasAlert) alertsHtml.innerHTML = '<div class="text-center text-muted" style="padding: 10px;">Lớp đang hoạt động rất tốt! 🎉</div>';
-    }
-
-    updateLeaderboard();
+    window.updateLeaderboard();
 }
 
 // ================= MODULE SỔ BÁO GIẢNG =================
-function initLessonLogView() {
+window.initLessonLogView = function() {
     const sel = document.getElementById('ll-week-select'); sel.innerHTML = '';
     let maxWeek = 1;
     appData.scheduleRecords.forEach(r => { if(r.week > maxWeek) maxWeek = r.week; });
@@ -238,10 +210,10 @@ function initLessonLogView() {
     let todayRecord = appData.scheduleRecords.find(r => r.date === today);
     if(todayRecord) sel.value = todayRecord.week;
     
-    renderSchedule();
+    window.renderSchedule();
 }
 
-function renderSchedule() {
+window.renderSchedule = function() {
     const w = parseInt(document.getElementById('ll-week-select').value) || 1;
     const list = document.getElementById('ll-schedule-list'); list.innerHTML = '';
     let records = appData.scheduleRecords.filter(r => r.week == w);
@@ -265,7 +237,7 @@ function renderSchedule() {
 
     Object.keys(byDate).sort().forEach(dateStr => {
         let dObj = new Date(dateStr); let dayName = daysOfWeek[dObj.getDay()];
-        let dateHeader = `<div style="background:var(--primary); color:white; padding:8px 15px; border-radius:10px; font-weight:700; font-size:0.9rem; margin-top:10px;">📅 ${dayName} - ${dObj.toLocaleDateString('vi-VN')}</div>`;
+        let dateHeader = `<div style="background:var(--primary); color:white; padding:8px 15px; border-radius:10px; font-weight:700; font-size:0.9rem; margin-top:10px; box-shadow: var(--shadow-sm);">📅 ${dayName} - ${dObj.toLocaleDateString('vi-VN')}</div>`;
         list.innerHTML += dateHeader;
 
         byDate[dateStr].sort((a,b) => a.period - b.period).forEach(r => {
@@ -276,7 +248,7 @@ function renderSchedule() {
 
             list.innerHTML += `
                 <div class="sched-card ${cardClass}">
-                    <div class="sched-top"><span>Tiết ${r.period} | ${r.className}</span> <span>PPCT: ${r.ppct}</span></div>
+                    <div class="sched-top"><span>Tiết ${r.period} | ${r.className}</span> <span style="background: #f1f5f9; padding: 2px 8px; border-radius: 8px;">PPCT: ${r.ppct}</span></div>
                     <div class="sched-mid">
                         <div class="sched-info"><h4>${r.subject}</h4><p>${r.content}</p></div>
                     </div>
@@ -290,40 +262,40 @@ function renderSchedule() {
     });
 }
 
-function toggleScheduleStatus(id) {
+window.toggleScheduleStatus = function(id) {
     let r = appData.scheduleRecords.find(x => x.id == id);
-    if(r) { r.status = (r.status === 'completed') ? 'scheduled' : 'completed'; saveData(); renderSchedule(); }
+    if(r) { r.status = (r.status === 'completed') ? 'scheduled' : 'completed'; window.saveData(); window.renderSchedule(); }
 }
 
-function openAdjustSchedule(id) {
+window.openAdjustSchedule = function(id) {
     let r = appData.scheduleRecords.find(x => x.id == id); if(!r) return;
     document.getElementById('adj-sched-id').value = r.id;
     document.getElementById('adj-sched-info').innerHTML = `Đang chỉnh sửa: <b>${r.subject} ${r.className} (Tiết ${r.period})</b> - PPCT: ${r.ppct}`;
     document.getElementById('adj-sched-date').value = r.date;
     document.getElementById('adj-sched-period').value = r.period;
     document.getElementById('adj-sched-note').value = r.note || '';
-    openModal('modal-adjust-schedule');
+    window.openModal('modal-adjust-schedule');
 }
 
-function saveAdjustedSchedule() {
+window.saveAdjustedSchedule = function() {
     let id = document.getElementById('adj-sched-id').value; let r = appData.scheduleRecords.find(x => x.id == id);
     if(r) {
         let nDate = document.getElementById('adj-sched-date').value; let nPeriod = document.getElementById('adj-sched-period').value;
-        if(!nDate || !nPeriod) return showToast("Nhập đủ ngày và tiết!", "error");
+        if(!nDate || !nPeriod) return window.showToast("Nhập đủ ngày và tiết!", "error");
         
         let dObj = new Date(nDate); let dow = dObj.getDay() === 0 ? 8 : dObj.getDay() + 1; 
         
         if(nDate !== r.date) { r.note = `${document.getElementById('adj-sched-note').value || 'Dạy bù'} (Dời từ ${new Date(r.date).toLocaleDateString('vi-VN')})`; r.date = nDate; r.dayOfWeek = dow; }
         else { r.note = document.getElementById('adj-sched-note').value; }
         r.period = parseInt(nPeriod);
-        saveData(); closeModal('modal-adjust-schedule'); renderSchedule(); showToast("Đã cập nhật lịch dạy!");
+        window.saveData(); window.closeModal('modal-adjust-schedule'); window.renderSchedule(); window.showToast("Đã cập nhật lịch dạy!");
     }
 }
 
-function exportScheduleExcel() {
+window.exportScheduleExcel = function() {
     const w = parseInt(document.getElementById('ll-week-select').value);
     let records = appData.scheduleRecords.filter(r => r.week == w);
-    if(records.length === 0) return showToast("Tuần này trống!", "error");
+    if(records.length === 0) return window.showToast("Tuần này trống!", "error");
     
     let ws_data = [["Tuần", "Ngày", "Thứ", "Tiết", "Lớp", "Môn", "PPCT", "Nội dung", "Trạng thái", "Ghi chú"]];
     records.sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(r => {
@@ -331,11 +303,11 @@ function exportScheduleExcel() {
         ws_data.push([r.week, new Date(r.date).toLocaleDateString('vi-VN'), r.dayOfWeek, r.period, r.className, r.subject, r.ppct, r.content, st, r.note||""]);
     });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "SoBaoGiang");
-    XLSX.writeFile(wb, `So_Bao_Giang_Tuan_${w}.xlsx`); showToast("Đã xuất Excel!");
+    XLSX.writeFile(wb, `So_Bao_Giang_Tuan_${w}.xlsx`); window.showToast("Đã xuất Excel!");
 }
 
 // ================= CẤU HÌNH SỔ BÁO GIẢNG =================
-function renderSetupData() {
+window.renderSetupData = function() {
     let stp = appData.scheduleSetup;
     document.getElementById('setup-week1-date').value = stp.week1Start;
     document.getElementById('setup-tkb-count').innerText = stp.tkb.length + " bản ghi";
@@ -352,28 +324,121 @@ function renderSetupData() {
     stp.holidays.forEach((h, i) => { tbodyHol.innerHTML += `<tr><td>${h.start}</td><td>${h.end}</td><td>${h.name}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('holidays', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
 }
 
-function delSetupData(type, index) { appData.scheduleSetup[type].splice(index, 1); saveData(); renderSetupData(); }
+window.delSetupData = function(type, index) { appData.scheduleSetup[type].splice(index, 1); window.saveData(); window.renderSetupData(); }
 
-function addTKB() {
+window.addTKB = function() {
     let d = document.getElementById('add-tkb-day').value, p = document.getElementById('add-tkb-period').value, c = document.getElementById('add-tkb-class').value, s = document.getElementById('add-tkb-subject').value;
-    if(!d || !p || !c || !s) return showToast("Nhập đủ thông tin!", "error");
+    if(!d || !p || !c || !s) return window.showToast("Nhập đủ thông tin!", "error");
     appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(d), period: parseInt(p), className: c.trim(), subject: s.trim() });
-    saveData(); renderSetupData(); showToast("Đã thêm TKB!");
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm TKB!");
 }
-function addPPCT() {
+window.addPPCT = function() {
     let c = document.getElementById('add-ppct-class').value, s = document.getElementById('add-ppct-subject').value, p = document.getElementById('add-ppct-period').value, n = document.getElementById('add-ppct-content').value;
-    if(!c || !s || !p || !n) return showToast("Nhập đủ thông tin!", "error");
+    if(!c || !s || !p || !n) return window.showToast("Nhập đủ thông tin!", "error");
     appData.scheduleSetup.ppct.push({ className: c.trim(), subject: s.trim(), ppct: parseInt(p), content: n.trim() });
-    saveData(); renderSetupData(); showToast("Đã thêm PPCT!");
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm PPCT!");
 }
-function addHoliday() {
+window.addHoliday = function() {
     let s = document.getElementById('add-hol-start').value, e = document.getElementById('add-hol-end').value, n = document.getElementById('add-hol-name').value;
-    if(!s || !e || !n) return showToast("Nhập đủ thông tin!", "error");
+    if(!s || !e || !n) return window.showToast("Nhập đủ thông tin!", "error");
     appData.scheduleSetup.holidays.push({ start: s, end: e, name: n.trim() });
-    saveData(); renderSetupData(); showToast("Đã thêm ngày nghỉ!");
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm ngày nghỉ!");
 }
 
-function checkIsHoliday(dateStr) {
+// IMPORT THÔNG MINH EXCEL / WORD CHO CẢ TKB, PPCT, LỊCH NGHỈ
+let currentImportType = '';
+window.triggerImport = function(type) { 
+    currentImportType = type; 
+    document.getElementById('general-import-file').click(); 
+}
+
+window.handleGeneralImport = function(event) {
+    const file = event.target.files[0]; 
+    if (!file) return; 
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    if (ext === 'docx') {
+        if (typeof mammoth === 'undefined') { window.showToast("Thư viện Word chưa được tải!", "error"); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            mammoth.convertToHtml({arrayBuffer: ev.target.result}).then(function(result) {
+                let html = result.value;
+                let parser = new DOMParser();
+                let doc = parser.parseFromString(html, 'text/html');
+                let tables = doc.querySelectorAll('table');
+                let count = 0;
+                
+                let targetClass = document.getElementById('add-ppct-class').value || "Chung";
+                let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+                
+                tables.forEach(table => {
+                    let rows = table.querySelectorAll('tr');
+                    let tietIdx = -1, ndIdx = -1;
+                    
+                    rows.forEach((tr) => {
+                        let cells = Array.from(tr.querySelectorAll('th, td')).map(c => c.innerText.trim());
+                        if (tietIdx === -1) {
+                            cells.forEach((txt, i) => {
+                                let low = txt.toLowerCase();
+                                if(low === 'tiết' || low === 'tiết ppct' || low === 'tiết học') tietIdx = i;
+                                else if(low.includes('nội dung') || low.includes('tên bài') || low.includes('bài dạy')) ndIdx = i;
+                            });
+                            if(tietIdx === -1 && cells.length >= 2) {
+                                if(cells[0].toLowerCase().includes('tiết')) { tietIdx = 0; ndIdx = 1; }
+                                else if(cells[1].toLowerCase().includes('tiết')) { tietIdx = 1; ndIdx = 2; }
+                            }
+                        } else {
+                            if (cells.length > Math.max(tietIdx, ndIdx) && ndIdx !== -1) {
+                                let tiet = parseInt(cells[tietIdx]);
+                                let nd = cells[ndIdx];
+                                if(!isNaN(tiet) && nd) {
+                                    appData.scheduleSetup.ppct.push({ className: targetClass, subject: targetSubject, ppct: tiet, content: nd });
+                                    count++;
+                                }
+                            }
+                        }
+                    });
+                });
+                window.saveData(); window.renderSetupData(); window.showToast(`Đã import thành công ${count} tiết PPCT từ Word!`);
+            }).catch(e => { window.showToast("Lỗi đọc file Word!", "error"); });
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' });
+                let rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                let count = 0;
+                
+                let targetClass = document.getElementById('add-ppct-class').value || "Chung";
+                let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+
+                rows.forEach(r => {
+                    if(currentImportType === 'tkb' && (r['Thứ'] || r['Thu']) && (r['Tiết'] || r['Tiet']) && r['Lớp']) {
+                        appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(r['Thứ']||r['Thu']), period: parseInt(r['Tiết']||r['Tiet']), className: String(r['Lớp']||r['Lop']), subject: String(r['Môn']||r['Mon']) }); count++;
+                    }
+                    else if(currentImportType === 'ppct' && (r['Tiết'] || r['Tiet'])) {
+                        let p = parseInt(r['Tiết'] || r['Tiet']);
+                        let n = String(r['Nội dung'] || r['Noi dung'] || r['Tên bài'] || r['Ten bai'] || r['Chủ đề'] || '');
+                        if(!isNaN(p) && n) {
+                            appData.scheduleSetup.ppct.push({ className: String(r['Lớp']||r['Lop']||targetClass), subject: String(r['Môn']||r['Mon']||targetSubject), ppct: p, content: n }); count++;
+                        }
+                    }
+                    else if(currentImportType === 'holidays' && r['Từ ngày'] && r['Đến ngày'] && r['Sự kiện']) {
+                        let sd = new Date(r['Từ ngày']); let ed = new Date(r['Đến ngày']);
+                        if(!isNaN(sd)) { appData.scheduleSetup.holidays.push({ start: sd.toISOString().split('T')[0], end: ed.toISOString().split('T')[0], name: r['Sự kiện'] }); count++; }
+                    }
+                });
+                window.saveData(); window.renderSetupData(); window.showToast(`Đã import thành công ${count} dòng!`); 
+            } catch (error) { window.showToast("Lỗi định dạng file Excel!", "error"); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    event.target.value = "";
+}
+
+window.checkIsHoliday = function(dateStr) {
     let d = new Date(dateStr);
     for(let h of appData.scheduleSetup.holidays) {
         if(d >= new Date(h.start) && d <= new Date(h.end)) return h;
@@ -381,18 +446,16 @@ function checkIsHoliday(dateStr) {
     return null;
 }
 
-function generateAutoSchedule() {
+window.generateAutoSchedule = function() {
     let startDate = document.getElementById('setup-week1-date').value;
-    if(!startDate) return showToast("Vui lòng thiết lập Ngày bắt đầu Tuần 1!", "error");
+    if(!startDate) return window.showToast("Vui lòng thiết lập Ngày bắt đầu Tuần 1!", "error");
     
     if(appData.scheduleRecords.length > 0) {
         if(!confirm("CẢNH BÁO: Thao tác này sẽ TẠO LẠI TOÀN BỘ SỔ BÁO GIẢNG và ghi đè các tiết chưa hoàn thành. Các tiết Đã Dạy sẽ được bảo lưu. Bạn chắc chắn chứ?")) return;
     }
 
     appData.scheduleSetup.week1Start = startDate;
-
-    let records = [];
-    let ppctQueues = {}; 
+    let records = []; let ppctQueues = {}; 
     appData.scheduleSetup.ppct.sort((a,b) => a.ppct - b.ppct).forEach(p => {
         let key = `${p.subject.toLowerCase()}-${p.className.toLowerCase()}`;
         if(!ppctQueues[key]) ppctQueues[key] = [];
@@ -404,23 +467,19 @@ function generateAutoSchedule() {
     for(let w = 1; w <= 35; w++) {
         for(let d = 2; d <= 7; d++) {
             let dateStr = currentDate.toISOString().split('T')[0];
-            let holiday = checkIsHoliday(dateStr);
+            let holiday = window.checkIsHoliday(dateStr);
 
             let dayTKB = appData.scheduleSetup.tkb.filter(t => t.dayOfWeek == d);
             dayTKB.sort((a,b) => a.period - b.period);
 
             dayTKB.forEach(tItem => {
                 let qKey = `${tItem.subject.toLowerCase()}-${tItem.className.toLowerCase()}`;
-                
                 let oldR = appData.scheduleRecords.find(x => x.date === dateStr && x.period === tItem.period && x.className === tItem.className);
                 if(oldR && (oldR.status === 'completed' || oldR.note)) {
                     records.push(oldR);
-                    if(oldR.status === 'completed' && ppctQueues[qKey] && ppctQueues[qKey].length>0 && ppctQueues[qKey][0].ppct == oldR.ppct) {
-                        ppctQueues[qKey].shift();
-                    }
+                    if(oldR.status === 'completed' && ppctQueues[qKey] && ppctQueues[qKey].length>0 && ppctQueues[qKey][0].ppct == oldR.ppct) { ppctQueues[qKey].shift(); }
                     return; 
                 }
-
                 if (holiday) {
                     records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "NGHỈ LỄ - " + holiday.name, status: "off" });
                 } else {
@@ -437,49 +496,31 @@ function generateAutoSchedule() {
         currentDate.setDate(currentDate.getDate() + 1); 
     }
     
-    appData.scheduleRecords = records; saveData(); closeModal('modal-setup-lesson-log'); initLessonLogView(); showToast("🎉 Đã tự động sinh Sổ Báo Giảng cho cả năm học!");
+    appData.scheduleRecords = records; window.saveData(); window.closeModal('modal-setup-lesson-log'); window.initLessonLogView(); window.showToast("🎉 Đã tự động sinh Sổ Báo Giảng cho cả năm học!");
 }
 
 // ================= TÍNH NĂNG TẠO PHIẾU LIÊN LẠC ẢNH =================
-async function generateReportCard(stuId) {
-    showToast("Đang tạo ảnh Phiếu liên lạc...", "success");
+window.generateReportCard = async function(stuId) {
+    window.showToast("Đang tạo ảnh Phiếu liên lạc...", "success");
     const stu = appData.students.find(s => s.id == stuId);
     if (!stu) return;
 
     let currentMonth = new Date().getMonth() + 1;
-    let points = 0;
-    let absent = 0;
+    let points = 0; let absent = 0;
 
-    appData.behaviorRecords.forEach(r => {
-        let rMonth = new Date(r.date).getMonth() + 1;
-        if (rMonth === currentMonth && r.studentId == stu.id) points += Number(r.snapshotPoints);
-    });
+    appData.behaviorRecords.forEach(r => { let rMonth = new Date(r.date).getMonth() + 1; if (rMonth === currentMonth && r.studentId == stu.id) points += Number(r.snapshotPoints); });
+    Object.values(appData.attendance).forEach(dayRecord => { if (dayRecord[stu.id] === 'unexcused') absent++; });
 
-    Object.values(appData.attendance).forEach(dayRecord => {
-        if (dayRecord[stu.id] === 'unexcused') absent++;
-    });
-
-    let classification = "Đạt";
-    let badgeBg = "#f59e0b"; 
+    let classification = "Đạt"; let badgeBg = "#ffc107"; 
     let feedback = "Con hoàn thành nhiệm vụ học tập. Cần cố gắng phát huy thêm trong tháng tới.";
     
-    if (points >= 15) { 
-        classification = "Xuất sắc"; badgeBg = "#10b981"; 
-        feedback = "Con đi học chuyên cần, ngoan ngoãn và hăng hái phát biểu xây dựng bài. Thành tích rất đáng tự hào!";
-    } else if (points >= 5) { 
-        classification = "Khá"; badgeBg = "#3b82f6"; 
-        feedback = "Con có ý thức học tập tốt, ngoan ngoãn. Gia đình tiếp tục động viên con nhé!";
-    } else if (points < 0) { 
-        classification = "Cần cố gắng"; badgeBg = "#ef4444"; 
-        feedback = "Tháng này con còn vi phạm một số nội quy và chưa tập trung. Gia đình cần phối hợp nhắc nhở con sát sao hơn.";
-    }
-
-    if (absent >= 3) {
-        feedback += " (Lưu ý: Số buổi vắng không phép của con đang hơi nhiều).";
-    }
+    if (points >= 15) { classification = "Xuất sắc"; badgeBg = "#198754"; feedback = "Con đi học chuyên cần, ngoan ngoãn và hăng hái phát biểu xây dựng bài. Thành tích rất đáng tự hào!"; } 
+    else if (points >= 5) { classification = "Khá"; badgeBg = "#0d6efd"; feedback = "Con có ý thức học tập tốt, ngoan ngoãn. Gia đình tiếp tục động viên con nhé!"; } 
+    else if (points < 0) { classification = "Cần cố gắng"; badgeBg = "#dc3545"; feedback = "Tháng này con còn vi phạm một số nội quy và chưa tập trung. Gia đình cần phối hợp nhắc nhở con sát sao hơn."; }
+    if (absent >= 3) { feedback += " (Lưu ý: Số buổi vắng không phép của con đang hơi nhiều)."; }
 
     document.getElementById('rc-month-class').innerText = `Tháng ${currentMonth} - Lớp ${appData.settings.className}`;
-    document.getElementById('rc-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(stu.name)}&background=eff6ff&color=2563eb&bold=true`;
+    document.getElementById('rc-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(stu.name)}&background=e0ecff&color=0d6efd&bold=true`;
     document.getElementById('rc-name').innerText = stu.name;
     document.getElementById('rc-classification').innerText = `Xếp loại: ${classification}`;
     document.getElementById('rc-classification').style.background = badgeBg;
@@ -489,151 +530,85 @@ async function generateReportCard(stuId) {
     document.getElementById('rc-teacher').innerText = appData.settings.teacherName;
 
     const cardEl = document.getElementById('report-card-template');
-    cardEl.style.left = '0px'; 
-    cardEl.style.zIndex = '-1';
+    cardEl.style.left = '0px'; cardEl.style.zIndex = '-1';
     
     try {
         const canvas = await html2canvas(cardEl, { scale: 2, backgroundColor: null });
         const imgData = canvas.toDataURL("image/jpeg", 1.0);
-        
-        const link = document.createElement('a');
-        link.download = `Phieu_Lien_Lac_${stu.name.replace(/ /g, '_')}_T${currentMonth}.jpg`;
-        link.href = imgData;
-        link.click();
-        
-        showToast("✅ Đã tải ảnh Phiếu liên lạc thành công!");
-    } catch(e) {
-        console.error(e);
-        showToast("Lỗi khi tạo ảnh!", "error");
-    } finally {
-        cardEl.style.left = '-9999px'; 
-    }
+        const link = document.createElement('a'); link.download = `Phieu_Lien_Lac_${stu.name.replace(/ /g, '_')}_T${currentMonth}.jpg`; link.href = imgData; link.click();
+        window.showToast("✅ Đã tải ảnh Phiếu liên lạc thành công!");
+    } catch(e) { console.error(e); window.showToast("Lỗi khi tạo ảnh!", "error"); } finally { cardEl.style.left = '-9999px'; }
 }
 
 // ================= CÁC CHỨC NĂNG CŨ =================
-function renderStudents(filterText = "") {
+window.renderStudents = function(filterText = "") {
     const list = document.getElementById('student-list'); list.innerHTML = ''; let filtered = appData.students.filter(s => s.name.toLowerCase().includes(filterText.toLowerCase()));
     if(filtered.length === 0) { list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy!</h4></div>'; return; }
-    filtered.forEach((stu, index) => { list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:#8b5cf6; border-color:#e2e8f0;" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; });
+    filtered.forEach((stu, index) => { list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; });
 }
-function saveStudent() {
+window.saveStudent = function() {
     const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
-    if(!name) return showToast("Nhập tên!", "error");
+    if(!name) return window.showToast("Nhập tên!", "error");
     const obj = { id: id ? parseInt(id) : Date.now(), name: name, gender: document.getElementById('stu-gender').value, dob: document.getElementById('stu-dob').value, phone: document.getElementById('stu-phone').value };
-    if(id) { appData.students[appData.students.findIndex(s => s.id == id)] = obj; showToast("Đã cập nhật!"); } else { appData.students.push(obj); showToast("Đã thêm!"); }
-    saveData(); renderStudents(); closeModal('modal-add-student');
+    if(id) { appData.students[appData.students.findIndex(s => s.id == id)] = obj; window.showToast("Đã cập nhật!"); } else { appData.students.push(obj); window.showToast("Đã thêm!"); }
+    window.saveData(); window.renderStudents(); window.closeModal('modal-add-student');
 }
-function editStudent(id) { const stu = appData.students.find(s => s.id === id); if(stu) { document.getElementById('stu-id').value = stu.id; document.getElementById('stu-name').value = stu.name; document.getElementById('stu-gender').value = stu.gender || 'Nam'; let fDob = stu.dob || ''; if(fDob.includes('/')) { const p = fDob.split('/'); if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; } document.getElementById('stu-dob').value = fDob; document.getElementById('stu-phone').value = stu.phone || ''; openModal('modal-add-student'); } }
-function deleteStudent(id) { if(confirm("Xác nhận xóa?")) { appData.students = appData.students.filter(s => s.id !== id); saveData(); renderStudents(); showToast("Đã xóa"); } }
+window.editStudent = function(id) { const stu = appData.students.find(s => s.id === id); if(stu) { document.getElementById('stu-id').value = stu.id; document.getElementById('stu-name').value = stu.name; document.getElementById('stu-gender').value = stu.gender || 'Nam'; let fDob = stu.dob || ''; if(fDob.includes('/')) { const p = fDob.split('/'); if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; } document.getElementById('stu-dob').value = fDob; document.getElementById('stu-phone').value = stu.phone || ''; window.openModal('modal-add-student'); } }
+window.deleteStudent = function(id) { if(confirm("Xác nhận xóa?")) { appData.students = appData.students.filter(s => s.id !== id); window.saveData(); window.renderStudents(); window.showToast("Đã xóa"); } }
 
-// TÍNH NĂNG IMPORT EXCEL THÔNG MINH
-let rawExcelData = [], parsedStudents = [], excelHeaders = [];
-let currentHeaderRowIndex = 0; 
+let rawExcelData = [], parsedStudents = [], excelHeaders = []; let currentHeaderRowIndex = 0; 
+window.openImportModal = function() { document.getElementById('import-step-1').style.display = 'block'; document.getElementById('import-step-2').style.display = 'none'; document.getElementById('import-step-2-footer').style.display = 'none'; document.getElementById('excel-file').value = ""; rawExcelData = []; parsedStudents = []; currentHeaderRowIndex = 0; window.openModal('modal-import-excel'); }
 
-function openImportModal() { 
-    document.getElementById('import-step-1').style.display = 'block'; 
-    document.getElementById('import-step-2').style.display = 'none'; 
-    document.getElementById('import-step-2-footer').style.display = 'none'; 
-    document.getElementById('excel-file').value = ""; 
-    rawExcelData = []; parsedStudents = []; currentHeaderRowIndex = 0; 
-    openModal('modal-import-excel'); 
-}
-
-function handleExcelUpload(event) {
+window.handleExcelUpload = function(event) {
     const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
     reader.onload = (e) => {
         try {
             const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); 
             rawExcelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: "" });
-            
-            if (rawExcelData.length < 2) return showToast("File trống!", "error");
-            
-            // Quét tìm dòng tiêu đề thực sự
+            if (rawExcelData.length < 2) return window.showToast("File trống!", "error");
             currentHeaderRowIndex = 0;
             for(let i = 0; i < Math.min(15, rawExcelData.length); i++) {
                 let rowStr = rawExcelData[i].join('').toLowerCase();
-                if(rowStr.includes('họ và tên') || rowStr.includes('họ tên') || rowStr.includes('stt')) {
-                    currentHeaderRowIndex = i;
-                    break;
-                }
+                if(rowStr.includes('họ và tên') || rowStr.includes('họ tên') || rowStr.includes('stt')) { currentHeaderRowIndex = i; break; }
             }
-
             excelHeaders = rawExcelData[currentHeaderRowIndex].map(h => (h || '').toString().trim());
-            
             const selects = ['map-name', 'map-gender', 'map-dob', 'map-phone'];
-            selects.forEach(id => { 
-                const sel = document.getElementById(id); 
-                sel.innerHTML = '<option value="-1">-- Bỏ qua --</option>'; 
-                excelHeaders.forEach((h, i) => { 
-                    if(h) sel.innerHTML += `<option value="${i}">${h}</option>`; 
-                }); 
-            });
-            
-            // Tự động chọn đúng cột
+            selects.forEach(id => { const sel = document.getElementById(id); sel.innerHTML = '<option value="-1">-- Bỏ qua --</option>'; excelHeaders.forEach((h, i) => { if(h) sel.innerHTML += `<option value="${i}">${h}</option>`; }); });
             excelHeaders.forEach((h, i) => { 
-                if(!h) return;
-                let low = h.toLowerCase(); 
+                if(!h) return; let low = h.toLowerCase(); 
                 if(low.includes('tên')||low.includes('name')) document.getElementById('map-name').value = i; 
                 else if(low.includes('giới')||low==='gt') document.getElementById('map-gender').value = i; 
                 else if(low.includes('sinh')||low.includes('date')) document.getElementById('map-dob').value = i; 
                 else if(low.includes('sđt')||low.includes('thoại')||low.includes('sll')) document.getElementById('map-phone').value = i; 
             });
-            
-            document.getElementById('import-step-1').style.display = 'none'; 
-            document.getElementById('import-step-2').style.display = 'block'; 
-            document.getElementById('import-step-2-footer').style.display = 'flex'; 
-            processParsedData();
-        } catch (error) { 
-            showToast("Lỗi đọc file!", "error"); console.error(error);
-        }
-    }; 
-    reader.readAsArrayBuffer(file);
+            document.getElementById('import-step-1').style.display = 'none'; document.getElementById('import-step-2').style.display = 'block'; document.getElementById('import-step-2-footer').style.display = 'flex'; window.processParsedData();
+        } catch (error) { window.showToast("Lỗi đọc file!", "error"); console.error(error); }
+    }; reader.readAsArrayBuffer(file);
 }
 
-function processParsedData() {
-    const mapName = parseInt(document.getElementById('map-name').value), 
-          mapGender = parseInt(document.getElementById('map-gender').value), 
-          mapDob = parseInt(document.getElementById('map-dob').value), 
-          mapPhone = parseInt(document.getElementById('map-phone').value);
-          
+window.processParsedData = function() {
+    const mapName = parseInt(document.getElementById('map-name').value), mapGender = parseInt(document.getElementById('map-gender').value), mapDob = parseInt(document.getElementById('map-dob').value), mapPhone = parseInt(document.getElementById('map-phone').value);
     parsedStudents = []; let dupCount = 0;
-    
     for (let i = currentHeaderRowIndex + 1; i < rawExcelData.length; i++) {
         const row = rawExcelData[i]; if (!row || !row.length) continue;
-        
         let name = mapName !== -1 ? (row[mapName] || '').toString().trim() : ''; 
         if (!name || name === '' || name.toLowerCase().includes('tổng')) continue;
-        
         let phoneVal = mapPhone !== -1 ? (row[mapPhone] || '').toString().trim() : '';
         if(phoneVal.endsWith('.0')) phoneVal = phoneVal.replace('.0', ''); 
-
-        let stu = { 
-            name: name, 
-            gender: mapGender !== -1 ? (row[mapGender] || 'Nam').toString().trim() : 'Nam', 
-            dob: mapDob !== -1 ? (row[mapDob] || '').toString().trim() : '', 
-            phone: phoneVal 
-        };
-        
-        stu.isDup = appData.students.some(s => s.name.toLowerCase() === stu.name.toLowerCase()); 
-        if(stu.isDup) dupCount++; 
-        parsedStudents.push(stu);
+        let stu = { name: name, gender: mapGender !== -1 ? (row[mapGender] || 'Nam').toString().trim() : 'Nam', dob: mapDob !== -1 ? (row[mapDob] || '').toString().trim() : '', phone: phoneVal };
+        stu.isDup = appData.students.some(s => s.name.toLowerCase() === stu.name.toLowerCase()); if(stu.isDup) dupCount++; parsedStudents.push(stu);
     }
-    
     const tbody = document.getElementById('preview-tbody'); tbody.innerHTML = '';
-    parsedStudents.slice(0, 20).forEach((stu, i) => { 
-        tbody.innerHTML += `<tr ${stu.isDup?'style="background:#fef3c7"':''}><td>${i+1}</td><td>${stu.name}</td><td>${stu.phone}</td></tr>`; 
-    });
+    parsedStudents.slice(0, 20).forEach((stu, i) => { tbody.innerHTML += `<tr ${stu.isDup?'style="background:#fef3c7"':''}><td>${i+1}</td><td>${stu.name}</td><td>${stu.phone}</td></tr>`; });
     if(parsedStudents.length>20) tbody.innerHTML += `<tr><td colspan="3" class="text-center text-muted">... và ${parsedStudents.length-20} HS khác</td></tr>`;
-    
-    document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; 
-    document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
+    document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
 }
 
-function confirmImport() { let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "" }); c++; }); saveData(); renderStudents(); closeModal('modal-import-excel'); showToast(`Đã nhập ${c} HS!`); }
-function exportExcel() { if(appData.students.length === 0) return showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); showToast("Đã xuất Excel!"); }
-function downloadTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); showToast("Đã tải!"); }
+window.confirmImport = function() { let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "" }); c++; }); window.saveData(); window.renderStudents(); window.closeModal('modal-import-excel'); window.showToast(`Đã nhập ${c} HS!`); }
+window.exportExcel = function() { if(appData.students.length === 0) return window.showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); window.showToast("Đã xuất Excel!"); }
+window.downloadTemplate = function() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); window.showToast("Đã tải!"); }
 
-function renderAttendance() {
+window.renderAttendance = function() {
     const date = document.getElementById('attendance-date').value; const list = document.getElementById('attendance-list'); list.innerHTML = '';
     if(!appData.attendance[date]) { appData.attendance[date] = {}; appData.students.forEach(s => appData.attendance[date][s.id] = 'present'); }
     let stats = { present: 0, excused: 0, unexcused: 0 }; const records = appData.attendance[date];
@@ -643,69 +618,68 @@ function renderAttendance() {
     });
     document.getElementById('attendance-summary').innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Có mặt: ${stats.present}</span><span style="color:var(--warning)"><i class="fas fa-exclamation-circle"></i> Phép: ${stats.excused}</span><span style="color:var(--danger)"><i class="fas fa-times-circle"></i> K.Phép: ${stats.unexcused}</span>`;
 }
-function setAtt(btn, stuId, status) {
+window.setAtt = function(btn, stuId, status) {
     const parent = btn.parentElement; parent.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
     const date = document.getElementById('attendance-date').value; appData.attendance[date][stuId] = status;
-    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); if(tag) autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); }
-    renderAttendance(); 
+    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); if(tag) window.autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); }
+    window.renderAttendance(); 
 }
-function saveAttendance() { saveData(); showToast("✅ Đã lưu Điểm danh!"); switchView('view-home'); }
+window.saveAttendance = function() { window.saveData(); window.showToast("✅ Đã lưu Điểm danh!"); window.switchView('view-home'); }
 
 let currentDiscStuId = null, currentBehaviorTab = 'negative';
-function renderDisciplineStudents() {
+window.renderDisciplineStudents = function() {
     const txt = document.getElementById('search-disc-student').value.toLowerCase(); const list = document.getElementById('discipline-student-list'); list.innerHTML = '';
     let ptsMap = {}; appData.behaviorRecords.forEach(r => { ptsMap[r.studentId] = (ptsMap[r.studentId] || 0) + Number(r.snapshotPoints); });
     appData.students.filter(s => s.name.toLowerCase().includes(txt)).forEach(stu => {
         let pts = ptsMap[stu.id] || 0; let color = pts > 0 ? 'var(--success)' : (pts < 0 ? 'var(--danger)' : 'var(--text-muted)');
-        list.innerHTML += `<div class="list-item" style="cursor:pointer;" onclick="openRecordBehavior(${stu.id}, '${stu.name}')"><div class="list-item-info"><strong>${stu.name}</strong></div><div><span style="color:${color}; font-weight:800;">${pts > 0 ? '+'+pts : pts} đ</span> <i class="fas fa-chevron-right text-muted ml-2"></i></div></div>`;
+        list.innerHTML += `<div class="list-item" style="cursor:pointer;" onclick="openRecordBehavior(${stu.id}, '${stu.name}')"><div class="list-item-info"><strong>${stu.name}</strong></div><div><span style="color:${color}; font-weight:800; font-size:1.1rem;">${pts > 0 ? '+'+pts : pts} đ</span> <i class="fas fa-chevron-right text-muted ml-2"></i></div></div>`;
     });
 }
-function openRecordBehavior(stuId, stuName) { currentDiscStuId = stuId; document.getElementById('behavior-target-name').innerText = `Đang chọn: ${stuName}`; renderQuickTags(); openModal('modal-record-behavior'); }
-function switchBehaviorTab(type, element) { currentBehaviorTab = type; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); element.classList.add('active'); renderQuickTags(); }
-function renderQuickTags() {
+window.openRecordBehavior = function(stuId, stuName) { currentDiscStuId = stuId; document.getElementById('behavior-target-name').innerText = `Đang chọn: ${stuName}`; window.renderQuickTags(); window.openModal('modal-record-behavior'); }
+window.switchBehaviorTab = function(type, element) { currentBehaviorTab = type; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); element.classList.add('active'); window.renderQuickTags(); }
+window.renderQuickTags = function() {
     const grid = document.getElementById('quick-tag-list'); grid.innerHTML = '';
     appData.behaviorTags.filter(t => t.type === currentBehaviorTab && t.enabled).forEach(t => { grid.innerHTML += `<div class="quick-tag-btn ${t.color}" onclick="confirmTagRecord('${t.id}')"><div class="tag-icon"><i class="fas ${t.icon}"></i></div><div class="tag-name">${t.name}</div><div class="tag-pts">${t.currentPoints > 0 ? '+' : ''}${t.currentPoints}</div></div>`; });
 }
-function confirmTagRecord(tagId) { const tag = appData.behaviorTags.find(t => t.id === tagId); if(!tag) return; document.getElementById('conf-tag-id').value = tag.id; document.getElementById('conf-stu-id').value = currentDiscStuId; document.getElementById('conf-tag-display').innerHTML = `<strong>Hành vi:</strong> ${tag.name} (Gốc: ${tag.currentPoints})`; document.getElementById('conf-points').value = tag.currentPoints; document.getElementById('conf-note').value = ''; openModal('modal-confirm-tag'); }
-function submitBehaviorRecord() {
+window.confirmTagRecord = function(tagId) { const tag = appData.behaviorTags.find(t => t.id === tagId); if(!tag) return; document.getElementById('conf-tag-id').value = tag.id; document.getElementById('conf-stu-id').value = currentDiscStuId; document.getElementById('conf-tag-display').innerHTML = `<strong>Hành vi:</strong> ${tag.name} (Gốc: ${tag.currentPoints})`; document.getElementById('conf-points').value = tag.currentPoints; document.getElementById('conf-note').value = ''; window.openModal('modal-confirm-tag'); }
+window.submitBehaviorRecord = function() {
     const tag = appData.behaviorTags.find(t => t.id === document.getElementById('conf-tag-id').value);
     appData.behaviorRecords.push({ id: Date.now(), studentId: parseInt(document.getElementById('conf-stu-id').value), tagId: tag.id, snapshotName: tag.name, snapshotPoints: parseInt(document.getElementById('conf-points').value), type: tag.type, date: getTodayStr(), time: formatDateTime(), note: document.getElementById('conf-note').value });
-    saveData(); closeModal('modal-confirm-tag'); closeModal('modal-record-behavior'); showToast(`✅ Đã ghi nhận: ${tag.name}`); renderDisciplineStudents(); 
+    window.saveData(); window.closeModal('modal-confirm-tag'); window.closeModal('modal-record-behavior'); window.showToast(`✅ Đã ghi nhận: ${tag.name}`); window.renderDisciplineStudents(); 
 }
-function autoCreateBehavior(stuId, tag, date, note) { if(!appData.behaviorRecords.find(r => r.studentId === stuId && r.date === date && r.tagId === tag.id && r.note.includes("Hệ thống"))) { appData.behaviorRecords.push({ id: Date.now() + Math.random(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: tag.currentPoints, type: tag.type, date: date, time: formatDateTime(), note: note }); saveData(); } }
-function renderManageTags() {
+window.autoCreateBehavior = function(stuId, tag, date, note) { if(!appData.behaviorRecords.find(r => r.studentId === stuId && r.date === date && r.tagId === tag.id && r.note.includes("Hệ thống"))) { appData.behaviorRecords.push({ id: Date.now() + Math.random(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: tag.currentPoints, type: tag.type, date: date, time: formatDateTime(), note: note }); window.saveData(); } }
+window.renderManageTags = function() {
     const list = document.getElementById('manage-tag-list'); list.innerHTML = '';
     appData.behaviorTags.forEach(t => {
         let toggleClr = t.enabled ? 'var(--success)' : '#cbd5e1'; let actionBtn = !t.isSystem ? `<button class="btn-outline-action ml-2" style="color:var(--danger)" onclick="deleteTag('${t.id}')"><i class="fas fa-trash"></i></button>` : '';
         list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${t.name}</strong><small>Điểm: <b>${t.currentPoints}</b> | ${t.type==='negative'?'Trừ':'Cộng'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:${toggleClr}" onclick="toggleTag('${t.id}')"><i class="fas ${t.enabled ? 'fa-eye' : 'fa-eye-slash'}"></i></button>${actionBtn}</div></div>`;
     });
 }
-function toggleTag(id) { const t = appData.behaviorTags.find(x => x.id === id); if(t) { t.enabled = !t.enabled; saveData(); renderManageTags(); } }
-function deleteTag(id) { if(confirm("Xóa hành vi này?")) { appData.behaviorTags = appData.behaviorTags.filter(x => x.id !== id); saveData(); renderManageTags(); } }
-function saveTag() { const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); saveData(); renderManageTags(); closeModal('modal-add-tag'); showToast("Đã thêm!"); }
-document.querySelector('button[onclick="openModal(\'modal-manage-tags\')"]').addEventListener('click', renderManageTags);
+window.toggleTag = function(id) { const t = appData.behaviorTags.find(x => x.id === id); if(t) { t.enabled = !t.enabled; window.saveData(); window.renderManageTags(); } }
+window.deleteTag = function(id) { if(confirm("Xóa hành vi này?")) { appData.behaviorTags = appData.behaviorTags.filter(x => x.id !== id); window.saveData(); window.renderManageTags(); } }
+window.saveTag = function() { const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return window.showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); window.saveData(); window.renderManageTags(); window.closeModal('modal-add-tag'); window.showToast("Đã thêm!"); }
 
-function applyNotifyTemplate() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
-function generateAINotify() { if(!document.getElementById('ai-prompt').value) return showToast("Nhập nội dung cần nhờ AI", "error"); document.getElementById('notify-content').value = "⚠️ Chưa cấu hình API. Thêm API Key vào mã nguồn để sử dụng."; }
-function copyNotifyToZalo() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return showToast("Nhập đủ nội dung!", "error"); navigator.clipboard.writeText(`📢 [${appData.settings.className}] - ${t}\n\n${c}`).then(() => { showToast("✅ Đã copy! Có thể Paste vào Zalo."); }); }
-function saveNotify() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return showToast("Nhập đủ thông tin!", "error"); appData.notifications.push({ id: Date.now(), title: t, content: c, createdAt: formatDateTime() }); saveData(); closeModal('modal-compose-notify'); renderNotifies(); showToast("Đã lưu TB!"); }
-function renderNotifies() { const list = document.getElementById('notify-list'); list.innerHTML = ''; let arr = [...appData.notifications].reverse(); if(arr.length===0) list.innerHTML = '<div class="empty-state">Chưa có thông báo</div>'; arr.forEach(n => { list.innerHTML += `<div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px;"><div class="w-full" style="display:flex; justify-content:space-between;"><strong>📢 ${n.title}</strong><small class="text-muted">${n.createdAt}</small></div><div style="font-size:0.85rem; color:var(--text-muted); white-space:pre-wrap;">${n.content}</div></div>`; }); }
+window.applyNotifyTemplate = function() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
+window.generateAINotify = function() { if(!document.getElementById('ai-prompt').value) return window.showToast("Nhập nội dung cần nhờ AI", "error"); document.getElementById('notify-content').value = "⚠️ Chưa cấu hình API. Thêm API Key vào mã nguồn để sử dụng."; }
+window.copyNotifyToZalo = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ nội dung!", "error"); navigator.clipboard.writeText(`📢 [${appData.settings.className}] - ${t}\n\n${c}`).then(() => { window.showToast("✅ Đã copy! Có thể Paste vào Zalo."); }); }
+window.saveNotify = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ thông tin!", "error"); appData.notifications.push({ id: Date.now(), title: t, content: c, createdAt: formatDateTime() }); window.saveData(); window.closeModal('modal-compose-notify'); window.renderNotifies(); window.showToast("Đã lưu TB!"); }
+window.renderNotifies = function() { const list = document.getElementById('notify-list'); list.innerHTML = ''; let arr = [...appData.notifications].reverse(); if(arr.length===0) list.innerHTML = '<div class="empty-state">Chưa có thông báo</div>'; arr.forEach(n => { list.innerHTML += `<div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px;"><div class="w-full" style="display:flex; justify-content:space-between;"><strong>📢 ${n.title}</strong><small class="text-muted">${n.createdAt}</small></div><div style="font-size:0.85rem; color:var(--text-muted); white-space:pre-wrap;">${n.content}</div></div>`; }); }
 
-function saveTask() { const id = document.getElementById('task-id').value; const title = document.getElementById('task-title').value; const status = document.getElementById('task-status').value; const prio = document.getElementById('task-priority').value; if(!title) return showToast("Nhập tiêu đề!", "error"); if(id) { let t = appData.tasks.find(x => x.id == id); t.title = title; t.status = status; t.priority = prio; } else { appData.tasks.push({ id: Date.now(), title: title, status: status, priority: prio }); } saveData(); closeModal('modal-add-task'); renderKanban(); }
-function moveTask(id, newStatus) { let t = appData.tasks.find(x => x.id == id); if(t) { t.status = newStatus; saveData(); renderKanban(); } }
-function renderKanban() { const todo = document.getElementById('kb-todo'), doing = document.getElementById('kb-doing'), done = document.getElementById('kb-done'); todo.innerHTML = ''; doing.innerHTML = ''; done.innerHTML = ''; appData.tasks.forEach(t => { let prioIcon = t.priority==='high' ? '🔴' : (t.priority==='medium'?'🟡':'🟢'); let nextBtn = t.status === 'todo' ? `<button class="btn-outline-action text-blue" onclick="moveTask(${t.id}, 'doing')"><i class="fas fa-arrow-right"></i></button>` : (t.status === 'doing' ? `<button class="btn-outline-action text-green" onclick="moveTask(${t.id}, 'done')"><i class="fas fa-check"></i></button>` : `<button class="btn-outline-action text-muted" onclick="moveTask(${t.id}, 'todo')"><i class="fas fa-undo"></i></button>`); let html = `<div class="kanban-card"><h4>${t.title}</h4><div class="kanban-meta"><span>Ưu tiên: ${prioIcon}</span></div><div class="kanban-actions"><button class="btn-outline-action text-red" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button>${nextBtn}</div></div>`; if(t.status === 'todo') todo.innerHTML += html; else if(t.status === 'doing') doing.innerHTML += html; else done.innerHTML += html; }); }
-function deleteTask(id) { if(confirm("Xóa công việc này?")) { appData.tasks = appData.tasks.filter(x => x.id != id); saveData(); renderKanban(); } }
+window.saveTask = function() { const id = document.getElementById('task-id').value; const title = document.getElementById('task-title').value; const status = document.getElementById('task-status').value; const prio = document.getElementById('task-priority').value; if(!title) return window.showToast("Nhập tiêu đề!", "error"); if(id) { let t = appData.tasks.find(x => x.id == id); t.title = title; t.status = status; t.priority = prio; } else { appData.tasks.push({ id: Date.now(), title: title, status: status, priority: prio }); } window.saveData(); window.closeModal('modal-add-task'); window.renderKanban(); }
+window.moveTask = function(id, newStatus) { let t = appData.tasks.find(x => x.id == id); if(t) { t.status = newStatus; window.saveData(); window.renderKanban(); } }
+window.renderKanban = function() { const todo = document.getElementById('kb-todo'), doing = document.getElementById('kb-doing'), done = document.getElementById('kb-done'); todo.innerHTML = ''; doing.innerHTML = ''; done.innerHTML = ''; appData.tasks.forEach(t => { let prioIcon = t.priority==='high' ? '🔴' : (t.priority==='medium'?'🟡':'🟢'); let nextBtn = t.status === 'todo' ? `<button class="btn-outline-action text-blue" onclick="moveTask(${t.id}, 'doing')"><i class="fas fa-arrow-right"></i></button>` : (t.status === 'doing' ? `<button class="btn-outline-action text-green" onclick="moveTask(${t.id}, 'done')"><i class="fas fa-check"></i></button>` : `<button class="btn-outline-action text-muted" onclick="moveTask(${t.id}, 'todo')"><i class="fas fa-undo"></i></button>`); let html = `<div class="kanban-card"><h4>${t.title}</h4><div class="kanban-meta"><span>Ưu tiên: ${prioIcon}</span></div><div class="kanban-actions"><button class="btn-outline-action text-red" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button>${nextBtn}</div></div>`; if(t.status === 'todo') todo.innerHTML += html; else if(t.status === 'doing') doing.innerHTML += html; else done.innerHTML += html; }); }
+window.deleteTask = function(id) { if(confirm("Xóa công việc này?")) { appData.tasks = appData.tasks.filter(x => x.id != id); window.saveData(); window.renderKanban(); } }
 
 // Kho tài liệu
 let currentFolderFilter = 'all';
-async function saveDoc() {
-    const folder = document.getElementById('doc-folder').value; const fileInput = document.getElementById('doc-file'); if(fileInput.files.length === 0) return showToast("Chưa chọn file!", "error");
-    const file = fileInput.files[0]; if (file.size > 20 * 1024 * 1024) return showToast("File quá lớn (>20MB)!", "error");
+window.saveDoc = async function() {
+    const folder = document.getElementById('doc-folder').value; const fileInput = document.getElementById('doc-file'); if(fileInput.files.length === 0) return window.showToast("Chưa chọn file!", "error");
+    const file = fileInput.files[0]; if (file.size > 20 * 1024 * 1024) return window.showToast("File quá lớn (>20MB)!", "error");
     const docId = Date.now();
-    try { await saveFileToDB(docId, file); appData.documents.push({ id: docId, name: file.name, folder: folder, type: file.type || file.name.split('.').pop(), size: (file.size / 1024 / 1024).toFixed(2) + ' MB', date: getTodayStr() }); saveData(); closeModal('modal-upload-doc'); renderDocs(); showToast("Đã tải lên và lưu file an toàn!"); fileInput.value = ""; } catch (err) { showToast("Lỗi lưu file!", "error"); }
+    try { await window.saveFileToDB(docId, file); appData.documents.push({ id: docId, name: file.name, folder: folder, type: file.type || file.name.split('.').pop(), size: (file.size / 1024 / 1024).toFixed(2) + ' MB', date: getTodayStr() }); window.saveData(); window.closeModal('modal-upload-doc'); window.renderDocs(); window.showToast("Đã tải lên và lưu file an toàn!"); fileInput.value = ""; } catch (err) { window.showToast("Lỗi lưu file!", "error"); }
 }
-function filterDocs(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); renderDocs(); }
-function renderDocs() {
+window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
+window.renderDocs = function() {
     const txt = document.getElementById('search-doc') ? document.getElementById('search-doc').value.toLowerCase() : ''; const list = document.getElementById('doc-list'); if(!list) return; list.innerHTML = '';
     let docs = appData.documents.filter(d => d.name.toLowerCase().includes(txt)); if(currentFolderFilter !== 'all') docs = docs.filter(d => d.folder === currentFolderFilter);
     if(docs.length === 0) { list.innerHTML = '<div class="empty-state">Thư mục trống</div>'; return; }
@@ -717,29 +691,29 @@ function renderDocs() {
     });
 }
 let currentObjectURL = null;
-async function previewDoc(id) {
-    const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await getFileFromDB(id); if (!blob) return showToast("Không tìm thấy file gốc!", "error");
+window.previewDoc = async function(id) {
+    const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error");
     if (currentObjectURL) URL.revokeObjectURL(currentObjectURL); currentObjectURL = URL.createObjectURL(blob);
     const previewContainer = document.getElementById('preview-container'); previewContainer.innerHTML = '';
     if (docInfo.type.includes('pdf') || docInfo.name.toLowerCase().endsWith('.pdf')) { previewContainer.innerHTML = `<iframe src="${currentObjectURL}#toolbar=0" style="width:100%; flex:1; border:none; display:block;"></iframe>`; } else { previewContainer.innerHTML = `<img src="${currentObjectURL}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block; margin: auto;">`; }
-    document.getElementById('preview-doc-title').innerText = docInfo.name; openModal('modal-preview-doc');
+    document.getElementById('preview-doc-title').innerText = docInfo.name; window.openModal('modal-preview-doc');
 }
-function closePreviewModal() { closeModal('modal-preview-doc'); document.getElementById('preview-container').innerHTML = ''; }
-async function downloadDoc(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await getFileFromDB(id); if (!blob) return showToast("Không tìm thấy file gốc!", "error"); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = docInfo.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); showToast(`Đang tải: ${docInfo.name}`); }
-function renameDocUI(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; document.getElementById('rename-doc-id').value = id; document.getElementById('rename-doc-name').value = docInfo.name; openModal('modal-rename-doc'); }
-function saveRenameDoc() { const id = parseInt(document.getElementById('rename-doc-id').value); const newName = document.getElementById('rename-doc-name').value.trim(); if (!newName) return showToast("Nhập tên file!", "error"); const docInfo = appData.documents.find(d => d.id === id); if (docInfo) { docInfo.name = newName; saveData(); renderDocs(); closeModal('modal-rename-doc'); showToast("Đã cập nhật!"); } }
-async function deleteDoc(id) { if(confirm("Xóa tài liệu vĩnh viễn?")) { appData.documents = appData.documents.filter(x => x.id != id); saveData(); renderDocs(); try { await deleteFileFromDB(id); showToast("Đã xóa file!"); } catch(e) {} } }
+window.closePreviewModal = function() { window.closeModal('modal-preview-doc'); document.getElementById('preview-container').innerHTML = ''; }
+window.downloadDoc = async function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error"); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = docInfo.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); window.showToast(`Đang tải: ${docInfo.name}`); }
+window.renameDocUI = function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; document.getElementById('rename-doc-id').value = id; document.getElementById('rename-doc-name').value = docInfo.name; window.openModal('modal-rename-doc'); }
+window.saveRenameDoc = function() { const id = parseInt(document.getElementById('rename-doc-id').value); const newName = document.getElementById('rename-doc-name').value.trim(); if (!newName) return window.showToast("Nhập tên file!", "error"); const docInfo = appData.documents.find(d => d.id === id); if (docInfo) { docInfo.name = newName; window.saveData(); window.renderDocs(); window.closeModal('modal-rename-doc'); window.showToast("Đã cập nhật!"); } }
+window.deleteDoc = async function(id) { if(confirm("Xóa tài liệu vĩnh viễn?")) { appData.documents = appData.documents.filter(x => x.id != id); window.saveData(); window.renderDocs(); try { await window.deleteFileFromDB(id); window.showToast("Đã xóa file!"); } catch(e) {} } }
 
-function loadSettings() {
+window.loadSettings = function() {
     const s = appData.settings; document.getElementById('set-teacher').value = s.teacherName; document.getElementById('set-class').value = s.className; document.getElementById('set-year').value = s.year;
     document.getElementById('set-auto-absent').checked = s.autoAbsentDisc; document.getElementById('set-auto-late').checked = s.autoLateDisc; document.getElementById('set-warn-absent').value = s.warnAbsent; document.getElementById('set-warn-behavior').value = s.warnBehavior;
 }
-function saveSettings() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; saveData(); showToast("✅ Đã lưu cài đặt!"); }
-function saveConfig() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; saveData(); showToast("Đã lưu cấu hình tự động!"); }
-function resetData() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
+window.saveSettings = function() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; window.saveData(); window.showToast("✅ Đã lưu cài đặt!"); }
+window.saveConfig = function() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; window.saveData(); window.showToast("Đã lưu cấu hình tự động!"); }
+window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
 // ================= TÍNH NĂNG SAO LƯU & KHÔI PHỤC =================
-function backupData() {
+window.backupData = function() {
     let dataStr = JSON.stringify(appData); 
     let blob = new Blob([dataStr], {type: "application/json"}); 
     let url = URL.createObjectURL(blob); 
@@ -751,10 +725,10 @@ function backupData() {
     a.click(); 
     document.body.removeChild(a); 
     URL.revokeObjectURL(url); 
-    showToast("Đã tải bản sao lưu (File .json) xuống máy!");
+    window.showToast("Đã tải bản sao lưu (File .json) xuống máy!");
 }
 
-function restoreData(event) {
+window.restoreData = function(event) {
     let file = event.target.files[0]; 
     if(!file) return; 
     let reader = new FileReader();
@@ -764,15 +738,15 @@ function restoreData(event) {
             if(parsed.students && parsed.settings && parsed.attendance) { 
                 if(confirm("CẢNH BÁO: Dữ liệu hiện tại trên trình duyệt sẽ bị GHI ĐÈ hoàn toàn bởi dữ liệu từ file này. Bạn có chắc chắn muốn khôi phục?")) { 
                     appData = parsed; 
-                    saveData(); 
-                    showToast("Khôi phục thành công! Đang tải lại..."); 
+                    window.saveData(); 
+                    window.showToast("Khôi phục thành công! Đang tải lại..."); 
                     setTimeout(() => location.reload(), 1500); 
                 }
             } else { 
-                showToast("File khôi phục không hợp lệ!", "error"); 
+                window.showToast("File khôi phục không hợp lệ!", "error"); 
             }
         } catch(err) { 
-            showToast("Lỗi đọc file!", "error"); 
+            window.showToast("Lỗi đọc file!", "error"); 
         }
     };
     reader.readAsText(file); 
@@ -780,7 +754,7 @@ function restoreData(event) {
 }
 
 // ================= TÍNH NĂNG CHỦ ĐIỂM & NGÔI SAO =================
-function renderMonthlyTheme() {
+window.renderMonthlyTheme = function() {
     let currentMonth = new Date().getMonth() + 1;
     let selectedMonth = document.getElementById('rank-month-select') ? document.getElementById('rank-month-select').value : currentMonth;
     
@@ -797,30 +771,30 @@ function renderMonthlyTheme() {
     if(document.getElementById('theme-name-display')) document.getElementById('theme-name-display').innerText = themeName;
 }
 
-function saveMonthlyTheme() {
+window.saveMonthlyTheme = function() {
     let m = document.getElementById('edit-theme-month').value;
     let n = document.getElementById('edit-theme-name').value;
-    if(!m || !n) return showToast("Vui lòng nhập đủ thông tin!", "error");
+    if(!m || !n) return window.showToast("Vui lòng nhập đủ thông tin!", "error");
     
     if(!appData.settings.monthlyThemes) appData.settings.monthlyThemes = {};
     appData.settings.monthlyThemes[m] = n.toUpperCase();
-    saveData();
-    closeModal('modal-edit-theme');
+    window.saveData();
+    window.closeModal('modal-edit-theme');
     
     document.getElementById('rank-month-select').value = m;
-    updateLeaderboard();
-    showToast("Đã cập nhật Chủ điểm!");
+    window.updateLeaderboard();
+    window.showToast("Đã cập nhật Chủ điểm!");
 }
 
-function updateLeaderboard() {
-    renderMonthlyTheme();
+window.updateLeaderboard = function() {
+    window.renderMonthlyTheme();
     let month = parseInt(document.getElementById('rank-month-select').value);
     const list = document.getElementById('honor-roll-list');
     list.innerHTML = '';
 
     let stuPoints = {};
     appData.students.forEach(s => { 
-        stuPoints[s.id] = { id: s.id, name: s.name, points: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=random&color=fff&bold=true` }; 
+        stuPoints[s.id] = { id: s.id, name: s.name, points: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=e0ecff&color=0d6efd&bold=true` }; 
     });
 
     appData.behaviorRecords.forEach(r => {
@@ -863,14 +837,8 @@ function updateLeaderboard() {
     list.innerHTML = htmlContent;
 }
 
-const originalUpdateDashboardInfo = updateDashboardInfo;
-updateDashboardInfo = function() {
-    originalUpdateDashboardInfo();
-    updateLeaderboard();
-};
-
 // ================= BẢNG XẾP LOẠI CHI TIẾT =================
-function renderRankingList() {
+window.renderRankingList = function() {
     let period = document.getElementById('full-rank-period-select').value;
     const list = document.getElementById('full-ranking-list');
     list.innerHTML = '';
@@ -908,18 +876,18 @@ function renderRankingList() {
             <div class="list-item" style="display:flex; align-items:center; gap:12px; padding: 12px 15px;">
                 <div style="width: 25px; font-weight:900; font-size: 1.1rem; color: ${rank <= 3 ? 'var(--warning)' : 'var(--text-muted)'}; text-align:center;">#${rank}</div>
                 <div style="flex:1;"><strong style="font-size:0.95rem; color:var(--text-main);">${stu.name}</strong><div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Tổng điểm: <b class="${stu.points >= 0 ? 'text-green' : 'text-red'}">${stu.points > 0 ? '+'+stu.points : stu.points}</b></div></div>
-                <div class="star-badge ${badgeClass}" style="margin:0; padding:6px 12px; font-size:0.75rem; border-radius: 8px;">${classification}</div>
+                <div class="star-badge ${badgeClass}" style="margin:0; padding:6px 12px; font-size:0.75rem; border-radius: 8px; color:white;">${classification}</div>
             </div>
         `;
     });
 }
 
-function exportRankingExcel() {
+window.exportRankingExcel = function() {
     let selectEl = document.getElementById('full-rank-period-select');
     let periodName = selectEl.options[selectEl.selectedIndex].text;
     let periodVal = selectEl.value;
 
-    if (appData.students.length === 0) return showToast("Lớp chưa có học sinh!", "error");
+    if (appData.students.length === 0) return window.showToast("Lớp chưa có học sinh!", "error");
 
     let stuPoints = {};
     appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; });
@@ -958,72 +926,5 @@ function exportRankingExcel() {
     var ws = XLSX.utils.aoa_to_sheet(ws_data);
     XLSX.utils.book_append_sheet(wb, ws, "Xep_Loai");
     XLSX.writeFile(wb, `Bang_Xep_Loai_${periodVal}.xlsx`); 
-    showToast("Đã xuất file Excel Báo Cáo!");
+    window.showToast("Đã xuất file Excel Báo Cáo!");
 }
-
-// ================= MỞ KHÓA HÀM CHO GIAO DIỆN (MODULE) =================
-window.switchView = switchView;
-window.openModal = openModal;
-window.closeModal = closeModal;
-window.saveData = saveData;
-window.updateDashboardInfo = updateDashboardInfo;
-window.renderStudents = renderStudents;
-window.saveStudent = saveStudent;
-window.editStudent = editStudent;
-window.deleteStudent = deleteStudent;
-window.openImportModal = openImportModal;
-window.handleExcelUpload = handleExcelUpload;
-window.processParsedData = processParsedData;
-window.confirmImport = confirmImport;
-window.exportExcel = exportExcel;
-window.downloadTemplate = downloadTemplate;
-window.renderAttendance = renderAttendance;
-window.setAtt = setAtt;
-window.saveAttendance = saveAttendance;
-window.renderDisciplineStudents = renderDisciplineStudents;
-window.openRecordBehavior = openRecordBehavior;
-window.switchBehaviorTab = switchBehaviorTab;
-window.confirmTagRecord = confirmTagRecord;
-window.submitBehaviorRecord = submitBehaviorRecord;
-window.deleteTag = deleteTag;
-window.saveTag = saveTag;
-window.toggleTag = toggleTag;
-window.applyNotifyTemplate = applyNotifyTemplate;
-window.generateAINotify = generateAINotify;
-window.copyNotifyToZalo = copyNotifyToZalo;
-window.saveNotify = saveNotify;
-window.saveTask = saveTask;
-window.moveTask = moveTask;
-window.deleteTask = deleteTask;
-window.saveDoc = saveDoc;
-window.filterDocs = filterDocs;
-window.previewDoc = previewDoc;
-window.closePreviewModal = closePreviewModal;
-window.downloadDoc = downloadDoc;
-window.renameDocUI = renameDocUI;
-window.saveRenameDoc = saveRenameDoc;
-window.deleteDoc = deleteDoc;
-window.saveSettings = saveSettings;
-window.saveConfig = saveConfig;
-window.resetData = resetData;
-window.initLessonLogView = initLessonLogView;
-window.renderSchedule = renderSchedule;
-window.toggleScheduleStatus = toggleScheduleStatus;
-window.openAdjustSchedule = openAdjustSchedule;
-window.saveAdjustedSchedule = saveAdjustedSchedule;
-window.exportScheduleExcel = exportScheduleExcel;
-window.delSetupData = delSetupData;
-window.addTKB = addTKB;
-window.addPPCT = addPPCT;
-window.addHoliday = addHoliday;
-window.triggerImport = triggerImport;
-window.handleGeneralImport = handleGeneralImport;
-window.generateAutoSchedule = generateAutoSchedule;
-window.updateLeaderboard = updateLeaderboard;
-window.saveMonthlyTheme = saveMonthlyTheme;
-window.renderRankingList = renderRankingList;
-window.exportRankingExcel = exportRankingExcel;
-window.logoutApp = logoutApp;
-window.generateReportCard = generateReportCard;
-window.backupData = backupData;
-window.restoreData = restoreData;
