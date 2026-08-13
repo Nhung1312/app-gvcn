@@ -95,7 +95,7 @@ const defaultTags = [
     { id: "t6", name: "Làm việc tốt", type: "positive", defaultPoints: 2, currentPoints: 2, isSystem: true, enabled: true, icon: "fa-heart", color: "qt-positive" },
     { id: "t7", name: "Đạt thành tích", type: "positive", defaultPoints: 3, currentPoints: 3, isSystem: true, enabled: true, icon: "fa-medal", color: "qt-positive" }
 ];
-const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5 };
+const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default" };
 
 function initData() {
     let v4Data = JSON.parse(localStorage.getItem('gvcnData_v4'));
@@ -113,6 +113,7 @@ function initData() {
         localStorage.setItem('gvcnData_v4', JSON.stringify(v4Data));
     } else {
         if (!v4Data.settings.monthlyThemes) { v4Data.settings.monthlyThemes = { "8": "VĂN MINH - XANH - AN TOÀN" }; }
+        if (!v4Data.settings.theme) { v4Data.settings.theme = "default"; }
     }
     return v4Data;
 }
@@ -134,7 +135,6 @@ window.saveData = function() {
 
 function getTodayStr() { return new Date().toISOString().split('T')[0]; }
 function formatDateTime() { const d = new Date(); return `${d.toLocaleDateString('vi-VN')} ${d.getHours()}:${d.getMinutes()}`; }
-function addDays(dateStr, days) { let d = new Date(dateStr); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0]; }
 
 const DB_NAME = 'GVCN_Docs_DB'; const DB_VERSION = 1; let db;
 function initIndexedDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(); request.onsuccess = (e) => { db = e.target.result; resolve(db); }; request.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' }); }; }); }
@@ -166,6 +166,38 @@ window.switchView = function(viewId, navElement = null) {
 }
 window.openModal = function(id) { document.getElementById(id).style.display = 'flex'; }
 window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
+
+// ================= TÍNH NĂNG ĐỔI GIAO DIỆN =================
+window.changeTheme = function(themeName, element) {
+    document.body.className = themeName === 'default' ? '' : themeName;
+    document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+    if(element) element.classList.add('active');
+    appData.settings.theme = themeName;
+    window.saveData();
+    window.showToast("Đã đổi màu giao diện!", "success");
+}
+
+window.loadSettings = function() { 
+    const s = appData.settings; 
+    document.getElementById('set-teacher').value = s.teacherName; 
+    document.getElementById('set-class').value = s.className; 
+    document.getElementById('set-year').value = s.year; 
+    document.getElementById('set-auto-absent').checked = s.autoAbsentDisc; 
+    document.getElementById('set-auto-late').checked = s.autoLateDisc; 
+    document.getElementById('set-warn-absent').value = s.warnAbsent; 
+    document.getElementById('set-warn-behavior').value = s.warnBehavior; 
+
+    let currentTheme = s.theme || 'default';
+    document.body.className = currentTheme === 'default' ? '' : currentTheme;
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('onclick').includes(currentTheme)) btn.classList.add('active');
+    });
+}
+window.saveSettings = function() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; window.saveData(); window.showToast("✅ Đã lưu cài đặt!"); }
+window.saveConfig = function() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; window.saveData(); window.showToast("Đã lưu cấu hình tự động!"); }
+window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
+
 
 // ================= DASHBOARD =================
 window.updateDashboardInfo = function() {
@@ -610,10 +642,8 @@ window.moveTask = function(id, newStatus) { let t = appData.tasks.find(x => x.id
 window.renderKanban = function() { const todo = document.getElementById('kb-todo'), doing = document.getElementById('kb-doing'), done = document.getElementById('kb-done'); todo.innerHTML = ''; doing.innerHTML = ''; done.innerHTML = ''; appData.tasks.forEach(t => { let prioIcon = t.priority==='high' ? '🔴' : (t.priority==='medium'?'🟡':'🟢'); let nextBtn = t.status === 'todo' ? `<button class="btn-outline-action text-blue" onclick="moveTask(${t.id}, 'doing')"><i class="fas fa-arrow-right"></i></button>` : (t.status === 'doing' ? `<button class="btn-outline-action text-green" onclick="moveTask(${t.id}, 'done')"><i class="fas fa-check"></i></button>` : `<button class="btn-outline-action text-muted" onclick="moveTask(${t.id}, 'todo')"><i class="fas fa-undo"></i></button>`); let html = `<div class="kanban-card"><h4>${t.title}</h4><div class="kanban-meta"><span>Ưu tiên: ${prioIcon}</span></div><div class="kanban-actions"><button class="btn-outline-action text-red" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button>${nextBtn}</div></div>`; if(t.status === 'todo') todo.innerHTML += html; else if(t.status === 'doing') doing.innerHTML += html; else done.innerHTML += html; }); }
 window.deleteTask = function(id) { if(confirm("Xóa công việc này?")) { appData.tasks = appData.tasks.filter(x => x.id != id); window.saveData(); window.renderKanban(); } }
 
-// Kho tài liệu
-let currentFolderFilter = 'all';
 window.saveDoc = async function() { const folder = document.getElementById('doc-folder').value; const fileInput = document.getElementById('doc-file'); if(fileInput.files.length === 0) return window.showToast("Chưa chọn file!", "error"); const file = fileInput.files[0]; if (file.size > 20 * 1024 * 1024) return window.showToast("File quá lớn (>20MB)!", "error"); const docId = Date.now(); try { await window.saveFileToDB(docId, file); appData.documents.push({ id: docId, name: file.name, folder: folder, type: file.type || file.name.split('.').pop(), size: (file.size / 1024 / 1024).toFixed(2) + ' MB', date: getTodayStr() }); window.saveData(); window.closeModal('modal-upload-doc'); window.renderDocs(); window.showToast("Đã tải lên và lưu file an toàn!"); fileInput.value = ""; } catch (err) { window.showToast("Lỗi lưu file!", "error"); } }
-window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
+let currentFolderFilter = 'all'; window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
 window.renderDocs = function() { const txt = document.getElementById('search-doc') ? document.getElementById('search-doc').value.toLowerCase() : ''; const list = document.getElementById('doc-list'); if(!list) return; list.innerHTML = ''; let docs = appData.documents.filter(d => d.name.toLowerCase().includes(txt)); if(currentFolderFilter !== 'all') docs = docs.filter(d => d.folder === currentFolderFilter); if(docs.length === 0) { list.innerHTML = '<div class="empty-state">Thư mục trống</div>'; return; } docs.forEach(d => { let icon = d.name.toLowerCase().includes('.pdf') ? 'fa-file-pdf text-red' : (d.name.toLowerCase().includes('.xls') ? 'fa-file-excel text-green' : (d.name.toLowerCase().includes('.doc') ? 'fa-file-word text-blue' : 'fa-file-alt')); let isViewable = d.type.includes('pdf') || d.type.includes('image') || d.name.toLowerCase().endsWith('.png') || d.name.toLowerCase().endsWith('.jpg'); let viewBtn = isViewable ? `<button class="btn-outline-action text-blue" onclick="previewDoc(${d.id})" title="Xem file"><i class="fas fa-eye"></i></button>` : ''; list.innerHTML += `<div class="doc-card"><div class="doc-card-header"><div class="doc-icon"><i class="fas ${icon}"></i></div><div class="doc-info"><h4>${d.name}</h4><p>${d.size} • ${d.folder} • ${d.date}</p></div></div><div class="doc-actions">${viewBtn}<button class="btn-outline-action text-green" onclick="downloadDoc(${d.id})" title="Tải xuống"><i class="fas fa-download"></i></button><button class="btn-outline-action text-orange" onclick="renameDocUI(${d.id})" title="Đổi tên"><i class="fas fa-pen"></i></button><button class="btn-outline-action text-red" onclick="deleteDoc(${d.id})" title="Xóa"><i class="fas fa-trash"></i></button></div></div>`; }); }
 let currentObjectURL = null; window.previewDoc = async function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error"); if (currentObjectURL) URL.revokeObjectURL(currentObjectURL); currentObjectURL = URL.createObjectURL(blob); const previewContainer = document.getElementById('preview-container'); previewContainer.innerHTML = ''; if (docInfo.type.includes('pdf') || docInfo.name.toLowerCase().endsWith('.pdf')) { previewContainer.innerHTML = `<iframe src="${currentObjectURL}#toolbar=0" style="width:100%; flex:1; border:none; display:block;"></iframe>`; } else { previewContainer.innerHTML = `<img src="${currentObjectURL}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block; margin: auto;">`; } document.getElementById('preview-doc-title').innerText = docInfo.name; window.openModal('modal-preview-doc'); }
 window.closePreviewModal = function() { window.closeModal('modal-preview-doc'); document.getElementById('preview-container').innerHTML = ''; }
@@ -621,11 +651,6 @@ window.downloadDoc = async function(id) { const docInfo = appData.documents.find
 window.renameDocUI = function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; document.getElementById('rename-doc-id').value = id; document.getElementById('rename-doc-name').value = docInfo.name; window.openModal('modal-rename-doc'); }
 window.saveRenameDoc = function() { const id = parseInt(document.getElementById('rename-doc-id').value); const newName = document.getElementById('rename-doc-name').value.trim(); if (!newName) return window.showToast("Nhập tên file!", "error"); const docInfo = appData.documents.find(d => d.id === id); if (docInfo) { docInfo.name = newName; window.saveData(); window.renderDocs(); window.closeModal('modal-rename-doc'); window.showToast("Đã cập nhật!"); } }
 window.deleteDoc = async function(id) { if(confirm("Xóa tài liệu vĩnh viễn?")) { appData.documents = appData.documents.filter(x => x.id != id); window.saveData(); window.renderDocs(); try { await window.deleteFileFromDB(id); window.showToast("Đã xóa file!"); } catch(e) {} } }
-
-window.loadSettings = function() { const s = appData.settings; document.getElementById('set-teacher').value = s.teacherName; document.getElementById('set-class').value = s.className; document.getElementById('set-year').value = s.year; document.getElementById('set-auto-absent').checked = s.autoAbsentDisc; document.getElementById('set-auto-late').checked = s.autoLateDisc; document.getElementById('set-warn-absent').value = s.warnAbsent; document.getElementById('set-warn-behavior').value = s.warnBehavior; }
-window.saveSettings = function() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; window.saveData(); window.showToast("✅ Đã lưu cài đặt!"); }
-window.saveConfig = function() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; window.saveData(); window.showToast("Đã lưu cấu hình tự động!"); }
-window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
 window.backupData = function() { let dataStr = JSON.stringify(appData); let blob = new Blob([dataStr], {type: "application/json"}); let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; let date = new Date().toISOString().split('T')[0]; a.download = `DuLieu_GVCN_${date}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); window.showToast("Đã tải bản sao lưu (File .json) xuống máy!"); }
 window.restoreData = function(event) { let file = event.target.files[0]; if(!file) return; let reader = new FileReader(); reader.onload = function(e) { try { let parsed = JSON.parse(e.target.result); if(parsed.students && parsed.settings && parsed.attendance) { if(confirm("CẢNH BÁO: Dữ liệu hiện tại trên trình duyệt sẽ bị GHI ĐÈ hoàn toàn bởi dữ liệu từ file này. Bạn có chắc chắn muốn khôi phục?")) { appData = parsed; window.saveData(); window.showToast("Khôi phục thành công! Đang tải lại..."); setTimeout(() => location.reload(), 1500); } } else { window.showToast("File khôi phục không hợp lệ!", "error"); } } catch(err) { window.showToast("Lỗi đọc file!", "error"); } }; reader.readAsText(file); event.target.value = ''; }

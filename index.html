@@ -15,7 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <div id="toast-container"></div>
@@ -257,6 +257,19 @@
                     <button class="btn-outline w-full" onclick="saveConfig()">Lưu cấu hình</button>
                 </div>
 
+                <!-- CHỌN MÀU SẮC GIAO DIỆN -->
+                <div class="section-title"><h3>🎨 Màu sắc & Giao diện</h3></div>
+                <div class="settings-card mb-20">
+                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Cá nhân hóa tông màu chủ đạo của App theo sở thích của bạn.</p>
+                    <div style="display: flex; gap: 15px; justify-content: center; padding: 10px 0;">
+                        <!-- Các nút chọn màu -->
+                        <div class="theme-btn active" style="background: #0d6efd;" onclick="changeTheme('default', this)" title="Xanh dương"></div>
+                        <div class="theme-btn" style="background: #10b981;" onclick="changeTheme('theme-green', this)" title="Xanh lá"></div>
+                        <div class="theme-btn" style="background: #8b5cf6;" onclick="changeTheme('theme-purple', this)" title="Tím Pastel"></div>
+                        <div class="theme-btn" style="background: #ec4899;" onclick="changeTheme('theme-pink', this)" title="Hồng Ruby"></div>
+                    </div>
+                </div>
+
                 <!-- Sao lưu & Khôi phục -->
                 <div class="section-title"><h3>Sao lưu & Khôi phục (Thủ công)</h3></div>
                 <div class="settings-card mb-20">
@@ -305,7 +318,7 @@
                     <div class="setup-card" onclick="openModal('modal-setup-ppct')"><div class="setup-icon text-green"><i class="fas fa-list-ol"></i></div><div class="setup-info"><h4>Phân phối chương trình</h4><p id="setup-ppct-count">0 bài dạy</p></div><i class="fas fa-chevron-right text-muted"></i></div>
                     <div class="setup-card" onclick="openModal('modal-setup-holidays')"><div class="setup-icon text-red"><i class="fas fa-umbrella-beach"></i></div><div class="setup-info"><h4>Lịch Nghỉ & Sự kiện</h4><p id="setup-holidays-count">0 ngày nghỉ</p></div><i class="fas fa-chevron-right text-muted"></i></div>
                 </div>
-                <button class="btn-primary btn-large w-full mt-20 shadow-lg" style="background: linear-gradient(135deg, #2563eb, #8b5cf6);" onclick="generateAutoSchedule()"><i class="fas fa-magic"></i> 🤖 TỰ ĐỘNG TẠO SỔ BÁO GIẢNG</button>
+                <button class="btn-primary btn-large w-full mt-20 shadow-lg" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));" onclick="generateAutoSchedule()"><i class="fas fa-magic"></i> 🤖 TỰ ĐỘNG TẠO SỔ BÁO GIẢNG</button>
             </div>
         </div>
     </div>
