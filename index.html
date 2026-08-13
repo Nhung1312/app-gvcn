@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>APP GVCN - Trợ lý đắc lực</title>
-    <!-- THÊM MANIFEST ĐỂ CÀI ĐẶT THÀNH APP -->
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- THÊM THƯ VIỆN CHỤP ẢNH PHIẾU LIÊN LẠC -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -315,6 +316,38 @@
     <div id="modal-upload-doc" class="modal"><div class="modal-content"><div class="modal-header"><h3>Tải lên tài liệu</h3><div class="close" onclick="closeModal('modal-upload-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn thư mục</label><select id="doc-folder"><option value="Giáo án">Giáo án</option><option value="Biên bản">Biên bản họp</option><option value="Khác">Khác</option></select></div><div class="input-group"><label>Chọn File *</label><input type="file" id="doc-file" style="padding: 8px;"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDoc()"><i class="fas fa-cloud-upload-alt"></i> Lưu file</button></div></div></div>
     <div id="modal-preview-doc" class="modal"><div class="modal-content" style="height: 90vh; max-width: 800px; display: flex; flex-direction: column;"><div class="modal-header"><h3 id="preview-doc-title">Đang xem</h3><div class="close" onclick="closePreviewModal()"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0; background: #e2e8f0; flex: 1; display: flex; flex-direction: column;" id="preview-container"></div></div></div>
     <div id="modal-rename-doc" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi tên</h3><div class="close" onclick="closeModal('modal-rename-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="rename-doc-id"><div class="input-group mb-0"><label>Tên mới</label><input type="text" id="rename-doc-name"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveRenameDoc()"><i class="fas fa-save"></i> Cập nhật</button></div></div></div>
+
+    <!-- KHUNG ẨN CHỨA THIẾT KẾ PHIẾU LIÊN LẠC ẢNH -->
+    <div id="report-card-template" style="position: absolute; left: -9999px; top: -9999px; width: 400px; background: linear-gradient(135deg, #eff6ff, #ffffff); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 2px solid #bfdbfe; font-family: 'Plus Jakarta Sans', sans-serif;">
+        <div style="text-align: center; border-bottom: 2px dashed #93c5fd; padding-bottom: 15px; margin-bottom: 15px;">
+            <h2 style="color: #1d4ed8; font-size: 1.4rem; font-weight: 800; margin-bottom: 5px; text-transform: uppercase;">PHIẾU LIÊN LẠC</h2>
+            <p style="color: #3b82f6; font-weight: 700; font-size: 0.9rem;" id="rc-month-class">Tháng 8 - Lớp 8A1</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <img id="rc-avatar" src="" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #3b82f6;">
+            <div>
+                <h3 id="rc-name" style="color: #0f172a; font-size: 1.2rem; font-weight: 800; margin-bottom: 4px;">Tên Học Sinh</h3>
+                <span id="rc-classification" style="background: #10b981; color: white; padding: 3px 10px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">Hạnh kiểm: Tốt</span>
+            </div>
+        </div>
+        <div style="background: #f8fafc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="color: #64748b; font-weight: 600; font-size: 0.9rem;">Điểm thi đua:</span>
+                <strong id="rc-points" style="color: #2563eb; font-size: 1.1rem;">+15</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #64748b; font-weight: 600; font-size: 0.9rem;">Vắng không phép:</span>
+                <strong id="rc-absent" style="color: #ef4444; font-size: 1rem;">0 buổi</strong>
+            </div>
+        </div>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px;">
+            <p style="color: #b45309; font-size: 0.85rem; font-style: italic; font-weight: 600; margin: 0; line-height: 1.5;" id="rc-feedback">"Con đi học chuyên cần, ngoan ngoãn."</p>
+        </div>
+        <div style="text-align: right; margin-top: 20px;">
+            <p style="color: #0f172a; font-weight: 700; font-size: 0.9rem; margin-bottom: 2px;">Giáo viên chủ nhiệm</p>
+            <p style="color: #3b82f6; font-weight: 800; font-size: 1rem;" id="rc-teacher">Nguyễn Thu Hà</p>
+        </div>
+    </div>
 
     <!-- CẬP NHẬT THÀNH DẠNG MODULE -->
     <script type="module" src="script.js"></script>

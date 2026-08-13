@@ -122,14 +122,21 @@ function initData() {
 
 let appData = initData();
 
+// TỐI ƯU CHI PHÍ SERVER (Gom lệnh lưu lên mây)
+let syncTimeout = null;
 function saveData() { 
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
     updateDashboardInfo(); 
     
-    // Đồng bộ lên Cloud
+    // Đồng bộ lên Cloud - Đợi 3 giây mới đẩy để gom thao tác
     if (currentUser) {
-        const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
-        setDoc(docRef, appData).catch(e => console.error("Lỗi đồng bộ mây:", e));
+        if (syncTimeout) clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+            const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
+            setDoc(docRef, appData).then(() => {
+                console.log("☁️ Đã đồng bộ nền lên Firebase thành công (Tiết kiệm Write)!");
+            }).catch(e => console.error("Lỗi đồng bộ mây:", e));
+        }, 3000);
     }
 }
 
@@ -149,6 +156,9 @@ window.onload = async () => {
     document.getElementById('today-date').innerText = new Date().toLocaleDateString('vi-VN');
     document.getElementById('attendance-date').value = getTodayStr();
     updateDashboardInfo(); renderStudents(); loadSettings(); renderKanban(); renderDocs(); renderSetupData();
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+    }
 };
 
 function showToast(message, type = 'success') {
@@ -184,7 +194,6 @@ function updateDashboardInfo() {
     document.getElementById('dash-task-count').innerText = appData.tasks.length + " việc";
     document.getElementById('dash-doc-count').innerText = appData.documents.length + " file";
 
-    // Dashboard Lesson Log (Hôm nay)
     const llList = document.getElementById('dash-ll-list'); llList.innerHTML = '';
     let todaysLessons = appData.scheduleRecords.filter(r => r.date === today);
     document.getElementById('dash-ll-date').innerText = new Date().toLocaleDateString('vi-VN');
@@ -201,7 +210,6 @@ function updateDashboardInfo() {
     let weekLessons = appData.scheduleRecords.filter(r => r.week == currentWeek && r.status !== 'off').length;
     document.getElementById('dash-ll-week-count').innerText = weekLessons;
 
-    // Alerts
     const alertsHtml = document.getElementById('dash-alerts'); 
     if (alertsHtml) {
         alertsHtml.innerHTML = '';
@@ -217,7 +225,6 @@ function updateDashboardInfo() {
         if(!hasAlert) alertsHtml.innerHTML = '<div class="text-center text-muted" style="padding: 10px;">Lớp đang hoạt động rất tốt! 🎉</div>';
     }
 
-    // Cập nhật Bảng Vàng & Ngôi Sao
     updateLeaderboard();
 }
 
@@ -461,11 +468,81 @@ function generateAutoSchedule() {
     appData.scheduleRecords = records; saveData(); closeModal('modal-setup-lesson-log'); initLessonLogView(); showToast("🎉 Đã tự động sinh Sổ Báo Giảng cho cả năm học!");
 }
 
-// ================= CÁC CHỨC NĂNG CŨ GIỮ NGUYÊN =================
+// ================= TÍNH NĂNG TẠO PHIẾU LIÊN LẠC ẢNH =================
+async function generateReportCard(stuId) {
+    showToast("Đang tạo ảnh Phiếu liên lạc...", "success");
+    const stu = appData.students.find(s => s.id == stuId);
+    if (!stu) return;
+
+    let currentMonth = new Date().getMonth() + 1;
+    let points = 0;
+    let absent = 0;
+
+    appData.behaviorRecords.forEach(r => {
+        let rMonth = new Date(r.date).getMonth() + 1;
+        if (rMonth === currentMonth && r.studentId == stu.id) points += Number(r.snapshotPoints);
+    });
+
+    Object.values(appData.attendance).forEach(dayRecord => {
+        if (dayRecord[stu.id] === 'unexcused') absent++;
+    });
+
+    let classification = "Đạt";
+    let badgeBg = "#f59e0b"; 
+    let feedback = "Con hoàn thành nhiệm vụ học tập. Cần cố gắng phát huy thêm trong tháng tới.";
+    
+    if (points >= 15) { 
+        classification = "Xuất sắc"; badgeBg = "#10b981"; 
+        feedback = "Con đi học chuyên cần, ngoan ngoãn và hăng hái phát biểu xây dựng bài. Thành tích rất đáng tự hào!";
+    } else if (points >= 5) { 
+        classification = "Khá"; badgeBg = "#3b82f6"; 
+        feedback = "Con có ý thức học tập tốt, ngoan ngoãn. Gia đình tiếp tục động viên con nhé!";
+    } else if (points < 0) { 
+        classification = "Cần cố gắng"; badgeBg = "#ef4444"; 
+        feedback = "Tháng này con còn vi phạm một số nội quy và chưa tập trung. Gia đình cần phối hợp nhắc nhở con sát sao hơn.";
+    }
+
+    if (absent >= 3) {
+        feedback += " (Lưu ý: Số buổi vắng không phép của con đang hơi nhiều).";
+    }
+
+    document.getElementById('rc-month-class').innerText = `Tháng ${currentMonth} - Lớp ${appData.settings.className}`;
+    document.getElementById('rc-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(stu.name)}&background=eff6ff&color=2563eb&bold=true`;
+    document.getElementById('rc-name').innerText = stu.name;
+    document.getElementById('rc-classification').innerText = `Xếp loại: ${classification}`;
+    document.getElementById('rc-classification').style.background = badgeBg;
+    document.getElementById('rc-points').innerText = points > 0 ? `+${points}` : points;
+    document.getElementById('rc-absent').innerText = `${absent} buổi`;
+    document.getElementById('rc-feedback').innerText = `"${feedback}"`;
+    document.getElementById('rc-teacher').innerText = appData.settings.teacherName;
+
+    const cardEl = document.getElementById('report-card-template');
+    cardEl.style.left = '0px'; 
+    cardEl.style.zIndex = '-1';
+    
+    try {
+        const canvas = await html2canvas(cardEl, { scale: 2, backgroundColor: null });
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+        
+        const link = document.createElement('a');
+        link.download = `Phieu_Lien_Lac_${stu.name.replace(/ /g, '_')}_T${currentMonth}.jpg`;
+        link.href = imgData;
+        link.click();
+        
+        showToast("✅ Đã tải ảnh Phiếu liên lạc thành công!");
+    } catch(e) {
+        console.error(e);
+        showToast("Lỗi khi tạo ảnh!", "error");
+    } finally {
+        cardEl.style.left = '-9999px'; 
+    }
+}
+
+// ================= CÁC CHỨC NĂNG CŨ =================
 function renderStudents(filterText = "") {
     const list = document.getElementById('student-list'); list.innerHTML = ''; let filtered = appData.students.filter(s => s.name.toLowerCase().includes(filterText.toLowerCase()));
     if(filtered.length === 0) { list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy!</h4></div>'; return; }
-    filtered.forEach((stu, index) => { list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions"><button class="btn-outline-action" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; });
+    filtered.forEach((stu, index) => { list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:#8b5cf6; border-color:#e2e8f0;" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; });
 }
 function saveStudent() {
     const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
@@ -614,9 +691,9 @@ function loadSettings() {
 }
 function saveSettings() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; saveData(); showToast("✅ Đã lưu cài đặt!"); }
 function saveConfig() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; saveData(); showToast("Đã lưu cấu hình tự động!"); }
-function resetData() { if(confirm("XÓA TOÀN BỘ DỮ LIỆU HIỆN TẠI LƯU TRÊN MÁY NÀY?")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
+function resetData() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
-// ================= TÍNH NĂNG CHỦ ĐIỂM & NGÔI SAO LỚP HỌC =================
+// ================= TÍNH NĂNG CHỦ ĐIỂM & NGÔI SAO =================
 function renderMonthlyTheme() {
     let currentMonth = new Date().getMonth() + 1;
     let selectedMonth = document.getElementById('rank-month-select') ? document.getElementById('rank-month-select').value : currentMonth;
@@ -657,12 +734,7 @@ function updateLeaderboard() {
 
     let stuPoints = {};
     appData.students.forEach(s => { 
-        stuPoints[s.id] = { 
-            id: s.id, 
-            name: s.name, 
-            points: 0, 
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=random&color=fff&bold=true` 
-        }; 
+        stuPoints[s.id] = { id: s.id, name: s.name, points: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=random&color=fff&bold=true` }; 
     });
 
     appData.behaviorRecords.forEach(r => {
@@ -697,14 +769,7 @@ function updateLeaderboard() {
         let stu = topStudents[i];
         if (stu.points > 0) { 
             let rank = i + 1;
-            htmlContent += `
-                <div class="star-item">
-                    <div class="star-rank r${rank}">${rank}</div>
-                    <img src="${stu.avatar}" class="star-avatar">
-                    <div class="star-name">${stu.name}</div>
-                    <div class="star-pts">+${stu.points}</div>
-                </div>
-            `;
+            htmlContent += `<div class="star-item"><div class="star-rank r${rank}">${rank}</div><img src="${stu.avatar}" class="star-avatar"><div class="star-name">${stu.name}</div><div class="star-pts">+${stu.points}</div></div>`;
         }
     }
     
@@ -718,16 +783,14 @@ updateDashboardInfo = function() {
     updateLeaderboard();
 };
 
-// ================= BẢNG XẾP LOẠI CHI TIẾT (THÁNG/KỲ/NĂM) =================
+// ================= BẢNG XẾP LOẠI CHI TIẾT =================
 function renderRankingList() {
     let period = document.getElementById('full-rank-period-select').value;
     const list = document.getElementById('full-ranking-list');
     list.innerHTML = '';
 
     let stuPoints = {};
-    appData.students.forEach(s => { 
-        stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; 
-    });
+    appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; });
 
     appData.behaviorRecords.forEach(r => {
         let recordMonth = new Date(r.date).getMonth() + 1;
@@ -745,13 +808,10 @@ function renderRankingList() {
 
     let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points);
     
-    if (rankedStudents.length === 0) {
-        list.innerHTML = '<div class="empty-state">Chưa có học sinh nào trong lớp.</div>'; return;
-    }
+    if (rankedStudents.length === 0) { list.innerHTML = '<div class="empty-state">Chưa có học sinh nào.</div>'; return; }
 
     rankedStudents.forEach((stu, index) => {
         let rank = index + 1;
-        
         let classification = "Đạt"; let badgeClass = "bg-orange";
         if (stu.points >= 15) { classification = "Tốt"; badgeClass = "bg-green"; }
         else if (stu.points >= 5) { classification = "Khá"; badgeClass = "bg-blue"; }
@@ -761,12 +821,7 @@ function renderRankingList() {
         list.innerHTML += `
             <div class="list-item" style="display:flex; align-items:center; gap:12px; padding: 12px 15px;">
                 <div style="width: 25px; font-weight:900; font-size: 1.1rem; color: ${rank <= 3 ? 'var(--warning)' : 'var(--text-muted)'}; text-align:center;">#${rank}</div>
-                <div style="flex:1;">
-                    <strong style="font-size:0.95rem; color:var(--text-main);">${stu.name}</strong>
-                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
-                        Tổng điểm: <b class="${stu.points >= 0 ? 'text-green' : 'text-red'}">${stu.points > 0 ? '+'+stu.points : stu.points}</b>
-                    </div>
-                </div>
+                <div style="flex:1;"><strong style="font-size:0.95rem; color:var(--text-main);">${stu.name}</strong><div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Tổng điểm: <b class="${stu.points >= 0 ? 'text-green' : 'text-red'}">${stu.points > 0 ? '+'+stu.points : stu.points}</b></div></div>
                 <div class="star-badge ${badgeClass}" style="margin:0; padding:6px 12px; font-size:0.75rem; border-radius: 8px;">${classification}</div>
             </div>
         `;
@@ -883,3 +938,4 @@ window.saveMonthlyTheme = saveMonthlyTheme;
 window.renderRankingList = renderRankingList;
 window.exportRankingExcel = exportRankingExcel;
 window.logoutApp = logoutApp;
+window.generateReportCard = generateReportCard;
