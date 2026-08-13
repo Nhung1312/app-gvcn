@@ -66,10 +66,8 @@ onAuthStateChanged(auth, async (user) => {
                     await setDoc(docRef, appData); 
                 }
             } catch(e) {
-                console.warn("Lỗi tải mây (Có thể do mạng hoặc phân quyền):", e);
+                console.warn("Lỗi tải mây:", e);
             }
-            
-            // Luôn gọi hiển thị giao diện dù mạng có lỗi
             window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
         }
     } else {
@@ -138,7 +136,6 @@ function getTodayStr() { return new Date().toISOString().split('T')[0]; }
 function formatDateTime() { const d = new Date(); return `${d.toLocaleDateString('vi-VN')} ${d.getHours()}:${d.getMinutes()}`; }
 function addDays(dateStr, days) { let d = new Date(dateStr); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0]; }
 
-// ================= INDEXED DB (LƯU FILE THẬT) =================
 const DB_NAME = 'GVCN_Docs_DB'; const DB_VERSION = 1; let db;
 function initIndexedDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(); request.onsuccess = (e) => { db = e.target.result; resolve(db); }; request.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' }); }; }); }
 window.saveFileToDB = function(id, file) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').put({ id: id, blob: file }); req.onsuccess = resolve; req.onerror = reject; }); }
@@ -170,7 +167,7 @@ window.switchView = function(viewId, navElement = null) {
 window.openModal = function(id) { document.getElementById(id).style.display = 'flex'; }
 window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
 
-// ================= DASHBOARD & LOGIC =================
+// ================= DASHBOARD =================
 window.updateDashboardInfo = function() {
     const s = appData.settings;
     document.getElementById('dash-teacher').innerText = s.teacherName; document.getElementById('dash-class').innerText = s.className; document.getElementById('dash-year').innerText = s.year;
@@ -201,6 +198,21 @@ window.updateDashboardInfo = function() {
     let currentWeek = todaysLessons.length > 0 ? todaysLessons[0].week : 1;
     let weekLessons = appData.scheduleRecords.filter(r => r.week == currentWeek && r.status !== 'off').length;
     document.getElementById('dash-ll-week-count').innerText = weekLessons;
+
+    const alertsHtml = document.getElementById('dash-alerts'); 
+    if (alertsHtml) {
+        alertsHtml.innerHTML = '';
+        let stuMap = {}; appData.students.forEach(st => { stuMap[st.id] = { name: st.name, absent: 0, points: 0 }; });
+        Object.values(appData.attendance).forEach(day => { Object.keys(day).forEach(sid => { if(day[sid] === 'unexcused' && stuMap[sid]) stuMap[sid].absent++; }); });
+        appData.behaviorRecords.forEach(r => { if(stuMap[r.studentId]) stuMap[r.studentId].points += Number(r.snapshotPoints); });
+        let hasAlert = false;
+        Object.keys(stuMap).forEach(sid => {
+            let stu = stuMap[sid];
+            if(stu.absent >= s.warnAbsent) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item yellow"><div class="alert-icon"><i class="fas fa-calendar-times"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Nghỉ không phép ${stu.absent} buổi</p></div></div>`; }
+            if(stu.points <= s.warnBehavior) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item red"><div class="alert-icon"><i class="fas fa-exclamation"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Điểm thi đua chạm mốc ${stu.points} điểm</p></div></div>`; }
+        });
+        if(!hasAlert) alertsHtml.innerHTML = '<div class="text-center text-muted" style="padding: 10px;">Lớp đang hoạt động rất tốt! 🎉</div>';
+    }
 
     window.updateLeaderboard();
 }
@@ -461,24 +473,18 @@ window.generateReportCard = async function(stuId) {
     } catch(e) { console.error(e); window.showToast("Lỗi khi tạo ảnh!", "error"); } finally { cardEl.style.left = '-9999px'; }
 }
 
-// CẬP NHẬT HÀM RENDER ĐỂ SỬA LỖI TRẮNG DANH SÁCH & HOÀN THIỆN ZALO
 window.renderStudents = function() {
     const list = document.getElementById('student-list'); list.innerHTML = ''; 
     const searchInput = document.getElementById('search-student');
     const filterText = searchInput ? searchInput.value.toLowerCase() : "";
-    
     let filtered = appData.students.filter(s => s.name.toLowerCase().includes(filterText));
     if(filtered.length === 0) { list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy!</h4></div>'; return; }
-    
     filtered.forEach((stu, index) => { 
-        // Lệnh fix cực mạnh: Ép chuỗi số điện thoại về dạng Text trước khi xử lý để chống sập App
         let cleanPhone = stu.phone ? String(stu.phone).replace(/[^0-9]/g, '') : '';
         let zaloBtn = cleanPhone ? `<button class="btn-outline-action" style="color:white; background:#0068ff; border-color:#0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);" onclick="window.open('https://zalo.me/${cleanPhone}', '_blank')" title="Nhắn Zalo cho Phụ huynh"><i class="fas fa-comment-dots"></i></button>` : '';
-        
         list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
     });
 }
-
 window.saveStudent = function() {
     const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
     if(!name) return window.showToast("Nhập tên!", "error");
@@ -541,13 +547,14 @@ window.confirmImport = function() { let c = 0; parsedStudents.forEach(stu => { a
 window.exportExcel = function() { if(appData.students.length === 0) return window.showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); window.showToast("Đã xuất Excel!"); }
 window.downloadTemplate = function() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); window.showToast("Đã tải!"); }
 
+// PHẦN SỬA LỖI MÀU SẮC NÚT BẤM ĐIỂM DANH: THÊM DATA-STATUS
 window.renderAttendance = function() {
     const date = document.getElementById('attendance-date').value; const list = document.getElementById('attendance-list'); list.innerHTML = '';
     if(!appData.attendance[date]) { appData.attendance[date] = {}; appData.students.forEach(s => appData.attendance[date][s.id] = 'present'); }
     let stats = { present: 0, excused: 0, unexcused: 0 }; const records = appData.attendance[date];
     appData.students.forEach((stu, index) => {
         const status = records[stu.id] || 'present'; stats[status]++;
-        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong></div><div class="attendance-opts"><button class="att-btn ${status === 'present' ? 'active' : ''}" onclick="setAtt(this, ${stu.id}, 'present')"><i class="fas fa-check"></i></button><button class="att-btn ${status === 'excused' ? 'active' : ''}" onclick="setAtt(this, ${stu.id}, 'excused')"><i class="fas fa-exclamation"></i></button><button class="att-btn ${status === 'unexcused' ? 'active' : ''}" onclick="setAtt(this, ${stu.id}, 'unexcused')"><i class="fas fa-times"></i></button></div></div>`;
+        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong></div><div class="attendance-opts"><button class="att-btn ${status === 'present' ? 'active' : ''}" data-status="present" onclick="setAtt(this, ${stu.id}, 'present')"><i class="fas fa-check"></i></button><button class="att-btn ${status === 'excused' ? 'active' : ''}" data-status="excused" onclick="setAtt(this, ${stu.id}, 'excused')"><i class="fas fa-exclamation"></i></button><button class="att-btn ${status === 'unexcused' ? 'active' : ''}" data-status="unexcused" onclick="setAtt(this, ${stu.id}, 'unexcused')"><i class="fas fa-times"></i></button></div></div>`;
     });
     document.getElementById('attendance-summary').innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Có mặt: ${stats.present}</span><span style="color:var(--warning)"><i class="fas fa-exclamation-circle"></i> Phép: ${stats.excused}</span><span style="color:var(--danger)"><i class="fas fa-times-circle"></i> K.Phép: ${stats.unexcused}</span>`;
 }
@@ -603,8 +610,10 @@ window.moveTask = function(id, newStatus) { let t = appData.tasks.find(x => x.id
 window.renderKanban = function() { const todo = document.getElementById('kb-todo'), doing = document.getElementById('kb-doing'), done = document.getElementById('kb-done'); todo.innerHTML = ''; doing.innerHTML = ''; done.innerHTML = ''; appData.tasks.forEach(t => { let prioIcon = t.priority==='high' ? '🔴' : (t.priority==='medium'?'🟡':'🟢'); let nextBtn = t.status === 'todo' ? `<button class="btn-outline-action text-blue" onclick="moveTask(${t.id}, 'doing')"><i class="fas fa-arrow-right"></i></button>` : (t.status === 'doing' ? `<button class="btn-outline-action text-green" onclick="moveTask(${t.id}, 'done')"><i class="fas fa-check"></i></button>` : `<button class="btn-outline-action text-muted" onclick="moveTask(${t.id}, 'todo')"><i class="fas fa-undo"></i></button>`); let html = `<div class="kanban-card"><h4>${t.title}</h4><div class="kanban-meta"><span>Ưu tiên: ${prioIcon}</span></div><div class="kanban-actions"><button class="btn-outline-action text-red" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button>${nextBtn}</div></div>`; if(t.status === 'todo') todo.innerHTML += html; else if(t.status === 'doing') doing.innerHTML += html; else done.innerHTML += html; }); }
 window.deleteTask = function(id) { if(confirm("Xóa công việc này?")) { appData.tasks = appData.tasks.filter(x => x.id != id); window.saveData(); window.renderKanban(); } }
 
+// Kho tài liệu
+let currentFolderFilter = 'all';
 window.saveDoc = async function() { const folder = document.getElementById('doc-folder').value; const fileInput = document.getElementById('doc-file'); if(fileInput.files.length === 0) return window.showToast("Chưa chọn file!", "error"); const file = fileInput.files[0]; if (file.size > 20 * 1024 * 1024) return window.showToast("File quá lớn (>20MB)!", "error"); const docId = Date.now(); try { await window.saveFileToDB(docId, file); appData.documents.push({ id: docId, name: file.name, folder: folder, type: file.type || file.name.split('.').pop(), size: (file.size / 1024 / 1024).toFixed(2) + ' MB', date: getTodayStr() }); window.saveData(); window.closeModal('modal-upload-doc'); window.renderDocs(); window.showToast("Đã tải lên và lưu file an toàn!"); fileInput.value = ""; } catch (err) { window.showToast("Lỗi lưu file!", "error"); } }
-let currentFolderFilter = 'all'; window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
+window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
 window.renderDocs = function() { const txt = document.getElementById('search-doc') ? document.getElementById('search-doc').value.toLowerCase() : ''; const list = document.getElementById('doc-list'); if(!list) return; list.innerHTML = ''; let docs = appData.documents.filter(d => d.name.toLowerCase().includes(txt)); if(currentFolderFilter !== 'all') docs = docs.filter(d => d.folder === currentFolderFilter); if(docs.length === 0) { list.innerHTML = '<div class="empty-state">Thư mục trống</div>'; return; } docs.forEach(d => { let icon = d.name.toLowerCase().includes('.pdf') ? 'fa-file-pdf text-red' : (d.name.toLowerCase().includes('.xls') ? 'fa-file-excel text-green' : (d.name.toLowerCase().includes('.doc') ? 'fa-file-word text-blue' : 'fa-file-alt')); let isViewable = d.type.includes('pdf') || d.type.includes('image') || d.name.toLowerCase().endsWith('.png') || d.name.toLowerCase().endsWith('.jpg'); let viewBtn = isViewable ? `<button class="btn-outline-action text-blue" onclick="previewDoc(${d.id})" title="Xem file"><i class="fas fa-eye"></i></button>` : ''; list.innerHTML += `<div class="doc-card"><div class="doc-card-header"><div class="doc-icon"><i class="fas ${icon}"></i></div><div class="doc-info"><h4>${d.name}</h4><p>${d.size} • ${d.folder} • ${d.date}</p></div></div><div class="doc-actions">${viewBtn}<button class="btn-outline-action text-green" onclick="downloadDoc(${d.id})" title="Tải xuống"><i class="fas fa-download"></i></button><button class="btn-outline-action text-orange" onclick="renameDocUI(${d.id})" title="Đổi tên"><i class="fas fa-pen"></i></button><button class="btn-outline-action text-red" onclick="deleteDoc(${d.id})" title="Xóa"><i class="fas fa-trash"></i></button></div></div>`; }); }
 let currentObjectURL = null; window.previewDoc = async function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error"); if (currentObjectURL) URL.revokeObjectURL(currentObjectURL); currentObjectURL = URL.createObjectURL(blob); const previewContainer = document.getElementById('preview-container'); previewContainer.innerHTML = ''; if (docInfo.type.includes('pdf') || docInfo.name.toLowerCase().endsWith('.pdf')) { previewContainer.innerHTML = `<iframe src="${currentObjectURL}#toolbar=0" style="width:100%; flex:1; border:none; display:block;"></iframe>`; } else { previewContainer.innerHTML = `<img src="${currentObjectURL}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block; margin: auto;">`; } document.getElementById('preview-doc-title').innerText = docInfo.name; window.openModal('modal-preview-doc'); }
 window.closePreviewModal = function() { window.closeModal('modal-preview-doc'); document.getElementById('preview-container').innerHTML = ''; }
