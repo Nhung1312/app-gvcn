@@ -253,6 +253,22 @@
                     <div class="input-group"><label>Cảnh báo nếu Điểm thi đua <=</label><input type="number" id="set-warn-behavior"></div>
                     <button class="btn-outline w-full" onclick="saveConfig()">Lưu cấu hình</button>
                 </div>
+
+                <!-- Bổ sung Sao lưu & Khôi phục -->
+                <div class="section-title"><h3>Sao lưu & Khôi phục (Thủ công)</h3></div>
+                <div class="settings-card mb-20">
+                    <div class="alert-item green mb-15"><div class="alert-info">Ngoài việc hệ thống tự động lưu lên mây, bạn có thể tải bản sao lưu dự phòng về máy.</div></div>
+                    
+                    <button class="btn-primary w-full btn-large mb-15" onclick="backupData()" style="font-weight: 800; font-size: 1.05rem;">
+                        <i class="fas fa-download"></i> TẢI XUỐNG BẢN SAO LƯU
+                    </button>
+                    
+                    <button class="btn-outline w-full btn-large" onclick="document.getElementById('restore-file').click()" style="color: var(--danger); border-color: var(--danger);">
+                        <i class="fas fa-upload"></i> KHÔI PHỤC TỪ FILE
+                    </button>
+                    <!-- Thẻ input ẩn để chọn file -->
+                    <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="restoreData(event)">
+                </div>
                 
                 <div class="settings-card">
                     <button class="btn-outline w-full mb-15" onclick="logoutApp()" style="color: #64748b; border-color: #cbd5e1; font-weight: 800;">

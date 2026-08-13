@@ -693,6 +693,47 @@ function saveSettings() { appData.settings.teacherName = document.getElementById
 function saveConfig() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; saveData(); showToast("Đã lưu cấu hình tự động!"); }
 function resetData() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
+// ================= TÍNH NĂNG SAO LƯU & KHÔI PHỤC =================
+function backupData() {
+    let dataStr = JSON.stringify(appData); 
+    let blob = new Blob([dataStr], {type: "application/json"}); 
+    let url = URL.createObjectURL(blob); 
+    let a = document.createElement('a'); 
+    a.href = url; 
+    let date = new Date().toISOString().split('T')[0]; 
+    a.download = `DuLieu_GVCN_${date}.json`; 
+    document.body.appendChild(a); 
+    a.click(); 
+    document.body.removeChild(a); 
+    URL.revokeObjectURL(url); 
+    showToast("Đã tải bản sao lưu (File .json) xuống máy!");
+}
+
+function restoreData(event) {
+    let file = event.target.files[0]; 
+    if(!file) return; 
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let parsed = JSON.parse(e.target.result);
+            if(parsed.students && parsed.settings && parsed.attendance) { 
+                if(confirm("CẢNH BÁO: Dữ liệu hiện tại trên trình duyệt sẽ bị GHI ĐÈ hoàn toàn bởi dữ liệu từ file này. Bạn có chắc chắn muốn khôi phục?")) { 
+                    appData = parsed; 
+                    saveData(); 
+                    showToast("Khôi phục thành công! Đang tải lại..."); 
+                    setTimeout(() => location.reload(), 1500); 
+                }
+            } else { 
+                showToast("File khôi phục không hợp lệ!", "error"); 
+            }
+        } catch(err) { 
+            showToast("Lỗi đọc file!", "error"); 
+        }
+    };
+    reader.readAsText(file); 
+    event.target.value = ''; 
+}
+
 // ================= TÍNH NĂNG CHỦ ĐIỂM & NGÔI SAO =================
 function renderMonthlyTheme() {
     let currentMonth = new Date().getMonth() + 1;
@@ -939,3 +980,5 @@ window.renderRankingList = renderRankingList;
 window.exportRankingExcel = exportRankingExcel;
 window.logoutApp = logoutApp;
 window.generateReportCard = generateReportCard;
+window.backupData = backupData;
+window.restoreData = restoreData;
