@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>APP GVCN - Trợ lý đắc lực</title>
+    <!-- THÊM MANIFEST ĐỂ CÀI ĐẶT THÀNH APP -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <!-- MÀN HÌNH ĐĂNG NHẬP -->
+    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <h2 style="color: #2563eb; margin-bottom: 10px; font-weight: 800; font-size: 2rem;">Trợ Lý GVCN Pro</h2>
+        <p style="color: #64748b; margin-bottom: 25px; font-weight: 600;">Đăng nhập để đồng bộ dữ liệu đám mây</p>
+        <button id="btn-login" style="padding: 14px 28px; font-size: 16px; font-weight: bold; background: white; color: #333; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 10px;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px;"> Đăng nhập bằng Google
+        </button>
+    </div>
+
+    <!-- MÀN HÌNH HẾT HẠN DÙNG THỬ -->
+    <div id="man-hinh-thu-phi" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(255, 255, 255, 0.98); z-index: 9999; text-align: center; padding-top: 5vh; font-family: 'Plus Jakarta Sans', sans-serif; overflow-y: auto;">
+        <h2 style="color: #ef4444; font-size: 26px; margin-bottom: 5px; font-weight: 800;">Đã hết 30 ngày trải nghiệm!</h2>
+        <p style="font-size: 15px; color: #64748b; margin-bottom: 25px; padding: 0 20px;">Vui lòng chọn gói gia hạn để tiếp tục đồng bộ và quản lý lớp học hiệu quả.</p>
+        
+        <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-bottom: 25px;">
+            <div style="border: 2px solid #10b981; border-radius: 16px; padding: 20px; width: 180px; background: #fff; position: relative; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.2);">
+                <span style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 4px 14px; border-radius: 12px; font-size: 11px; font-weight: 800; white-space: nowrap;">TIẾT KIỆM NHẤT</span>
+                <h3 style="margin-top: 5px; color: #333; font-weight: 800;">1 Năm học</h3>
+                <p style="font-size: 28px; color: #10b981; font-weight: 900; margin: 10px 0;">299K</p>
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 15px; font-weight: 600;">Chỉ ~25k/tháng</p>
+                <p style="font-size: 12px; color: #94a3b8; font-weight: 600;">Nội dung CK:<br><strong style="color: #10b981; font-size:14px;"><span class="email-user"></span> 1N</strong></p>
+            </div>
+        </div>
+
+        <div style="margin: 20px auto;">
+            <img src="qr-thu-phi.jpg" alt="Mã QR Thanh Toán" style="width: 220px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+        </div>
+        <p style="font-size: 13px; color: #64748b; padding: 0 20px; font-weight: 600;">Quét mã QR và nhập đúng <strong>Nội dung chuyển khoản</strong> để hệ thống nhận diện nhanh nhất.</p>
+        
+        <button onclick="logoutApp()" style="margin-top: 20px; padding: 10px 20px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; border-radius: 10px; font-weight: 700; cursor: pointer;">Đăng xuất tài khoản</button>
+    </div>
+
+    <div id="app">
+        <main id="main-content">
+            <!-- ================= TRANG CHỦ ================= -->
+            <section id="view-home" class="view active">
+                <header class="app-header">
+                    <div class="greeting">
+                        <h2>Xin chào, <span id="dash-teacher">Cô/Thầy</span>! 👋</h2>
+                        <p>Hôm nay là một ngày tuyệt vời ❤️</p>
+                    </div>
+                    <img src="https://ui-avatars.com/api/?name=GV&background=e0e7ff&color=4f46e5&bold=true" alt="Avatar" class="avatar">
+                </header>
+
+                <div class="lesson-log-hero" onclick="switchView('view-lesson-log')">
+                    <div class="ll-header">
+                        <div class="ll-title"><i class="fas fa-book-open"></i> Lịch dạy hôm nay</div>
+                        <div class="ll-date" id="dash-ll-date">--/--</div>
+                    </div>
+                    <div id="dash-ll-list" class="ll-list"></div>
+                    <div class="ll-footer">
+                        <span>Tuần này: <b id="dash-ll-week-count">0</b> tiết</span>
+                        <button class="btn-sm"><i class="fas fa-arrow-right"></i> Xem sổ</button>
+                    </div>
+                </div>
+
+                <div class="hero-card">
+                    <div class="hero-top">
+                        <div class="hero-class-name">🏫 Lớp <span id="dash-class">8A1</span></div>
+                        <div class="hero-badge" id="dash-year">2026 - 2027</div>
+                    </div>
+                    <div class="hero-bottom">
+                        <div class="hero-stat"><i class="fas fa-user-graduate"></i><span id="dash-count">-- HS</span></div>
+                        <div class="hero-stat"><i class="fas fa-chart-pie"></i><span>Chuyên cần: <strong id="dash-attendance-percent">--%</strong></span></div>
+                    </div>
+                    <div class="hero-bg-pattern"></div>
+                </div>
+
+                <!-- BANNER CHỦ ĐIỂM THÁNG -->
+                <div class="monthly-theme-banner mt-15" onclick="openModal('modal-edit-theme')">
+                    <div class="theme-subtitle">CHỦ ĐIỂM THÁNG <span id="theme-month-display">8</span></div>
+                    <div class="theme-title" id="theme-name-display">VĂN MINH - XANH - AN TOÀN</div>
+                    <i class="fas fa-edit edit-theme-icon"></i>
+                </div>
+
+                <!-- NGÔI SAO LỚP HỌC -->
+                <div class="stars-section mt-20">
+                    <div class="section-title mb-15">
+                        <h3 style="display: flex; gap: 8px; align-items: center; color: var(--primary-dark);">
+                            <i class="fas fa-medal text-orange"></i> NGÔI SAO THI ĐUA
+                        </h3>
+                        <select id="rank-month-select" class="month-select-light" onchange="updateLeaderboard()">
+                            <option value="8">Tháng 8</option>
+                            <option value="9">Tháng 9</option>
+                            <option value="10">Tháng 10</option>
+                            <option value="11">Tháng 11</option>
+                            <option value="12">Tháng 12</option>
+                            <option value="1">Tháng 1</option>
+                            <option value="2">Tháng 2</option>
+                            <option value="3">Tháng 3</option>
+                            <option value="4">Tháng 4</option>
+                            <option value="5">Tháng 5</option>
+                        </select>
+                    </div>
+                    <div id="honor-roll-list"></div>
+                    
+                    <button class="btn-outline w-full mt-15" onclick="switchView('view-ranking'); renderRankingList();" style="border-radius: 14px; font-weight: 700; color: var(--primary-dark); border-color: var(--primary-light); background: var(--primary-light);">
+                        <i class="fas fa-list-ol"></i> Xem Bảng Xếp Loại Toàn Lớp
+                    </button>
+                </div>
+
+                <div class="section-title mt-20"><h3>Hôm nay của lớp</h3><span class="date-badge" id="today-date">--/--</span></div>
+                <div class="today-stats-grid">
+                    <div class="stat-box"><div class="stat-icon" style="color:#3b82f6; background:#dbeafe;"><i class="fas fa-users"></i></div><div class="stat-num" id="stat-total">0</div><div class="stat-label">Sĩ số</div></div>
+                    <div class="stat-box"><div class="stat-icon" style="color:#10b981; background:#d1fae5;"><i class="fas fa-check-circle"></i></div><div class="stat-num" id="stat-present">0</div><div class="stat-label">Có mặt</div></div>
+                    <div class="stat-box"><div class="stat-icon" style="color:#ef4444; background:#fee2e2;"><i class="fas fa-times-circle"></i></div><div class="stat-num" id="stat-absent">0</div><div class="stat-label">Nghỉ</div></div>
+                    <div class="stat-box"><div class="stat-icon" style="color:#f59e0b; background:#fef3c7;"><i class="fas fa-star"></i></div><div class="stat-num" id="stat-good">0</div><div class="stat-label">Việc tốt</div></div>
+                </div>
+
+                <div class="section-title mt-20"><h3>Truy cập nhanh</h3></div>
+                <div class="dashboard-grid">
+                    <div class="menu-card" onclick="switchView('view-students')"><div class="menu-icon bg-blue"><i class="fas fa-users-cog"></i></div><div class="menu-info"><h4>Quản lý học sinh</h4><p>Hồ sơ & Danh sách</p></div></div>
+                    <div class="menu-card" onclick="switchView('view-attendance')"><div class="menu-icon bg-green"><i class="fas fa-calendar-check"></i></div><div class="menu-info"><h4>Điểm danh</h4><p>Cập nhật hôm nay</p></div></div>
+                    <div class="menu-card" onclick="switchView('view-discipline')"><div class="menu-icon bg-red"><i class="fas fa-clipboard-list"></i></div><div class="menu-info"><h4>Nề nếp</h4><p>Thi đua 1 chạm</p></div></div>
+                    <div class="menu-card" onclick="switchView('view-announcements')"><div class="menu-icon bg-purple"><i class="fas fa-bullhorn"></i></div><div class="menu-info"><h4>Thông báo</h4><p id="dash-notify-count">0 TB</p></div></div>
+                    <div class="menu-card" onclick="switchView('view-plans')"><div class="menu-icon bg-orange"><i class="fas fa-tasks"></i></div><div class="menu-info"><h4>Kế hoạch</h4><p id="dash-task-count">0 công việc</p></div></div>
+                    <div class="menu-card" onclick="switchView('view-docs')"><div class="menu-icon bg-slate"><i class="fas fa-folder-open"></i></div><div class="menu-info"><h4>Kho tài liệu</h4><p id="dash-doc-count">0 file</p></div></div>
+                </div>
+            </section>
+
+            <!-- ================= SỔ BÁO GIẢNG ================= -->
+            <section id="view-lesson-log" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📚 Sổ báo giảng</h2></div>
+                    <button class="btn-outline-action" onclick="openModal('modal-setup-lesson-log')" title="Cấu hình hệ thống"><i class="fas fa-cogs"></i></button>
+                </div>
+                
+                <div class="ll-controls">
+                    <div class="input-group mb-0" style="flex: 1;">
+                        <select id="ll-week-select" onchange="renderSchedule()"></select>
+                    </div>
+                    <button class="btn-outline text-green" onclick="exportScheduleExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
+                    <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
+                </div>
+
+                <div class="ll-stats-bar mt-15" id="ll-stats-container"></div>
+                <div id="ll-schedule-list" class="list-container mt-15" style="padding-bottom: 70px;"></div>
+            </section>
+
+            <!-- ================= BẢNG XẾP LOẠI CHI TIẾT ================= -->
+            <section id="view-ranking" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>🏆 Bảng xếp loại</h2></div>
+                    <button class="btn-outline-action text-blue" onclick="switchView('view-home')"><i class="fas fa-arrow-left"></i></button>
+                </div>
+                
+                <div class="search-bar mb-15">
+                    <select id="full-rank-period-select" class="month-select-light w-full" onchange="renderRankingList()" style="padding: 12px 15px; font-size: 1rem;">
+                        <option value="8">Tháng 8</option>
+                        <option value="9">Tháng 9</option>
+                        <option value="10">Tháng 10</option>
+                        <option value="11">Tháng 11</option>
+                        <option value="12">Tháng 12</option>
+                        <option value="1">Tháng 1</option>
+                        <option value="2">Tháng 2</option>
+                        <option value="3">Tháng 3</option>
+                        <option value="4">Tháng 4</option>
+                        <option value="5">Tháng 5</option>
+                        <option value="HK1" style="font-weight: bold; color: var(--primary);">Học kỳ 1 (T8 - T12)</option>
+                        <option value="HK2" style="font-weight: bold; color: var(--primary);">Học kỳ 2 (T1 - T5)</option>
+                        <option value="CA_NAM" style="font-weight: bold; color: var(--danger);">Cả Năm Học</option>
+                    </select>
+                </div>
+                
+                <button class="btn-outline text-green w-full mb-15" onclick="exportRankingExcel()"><i class="fas fa-file-excel"></i> Xuất Báo Cáo Excel</button>
+                <div id="full-ranking-list" class="list-container" style="padding-bottom: 70px;"></div>
+            </section>
+
+            <!-- QUẢN LÝ HỌC SINH -->
+            <section id="view-students" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>👥 Lớp học</h2></div><button class="btn-primary" onclick="openModal('modal-add-student')"><i class="fas fa-plus"></i></button></div>
+                <div class="excel-actions"><button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button><button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button><button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button></div>
+                <div class="search-bar mt-15"><i class="fas fa-search"></i><input type="text" id="search-student" placeholder="Tìm tên..." onkeyup="renderStudents()"></div>
+                <div id="student-list" class="list-container"></div>
+            </section>
+            
+            <!-- ĐIỂM DANH -->
+            <section id="view-attendance" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>📅 Điểm danh</h2></div><input type="date" id="attendance-date" class="date-picker" onchange="renderAttendance()"></div>
+                <div class="attendance-summary-card" id="attendance-summary"></div>
+                <div id="attendance-list" class="list-container" style="padding-bottom: 70px;"></div>
+                <div class="floating-action"><button class="btn-primary btn-large shadow-lg w-full" onclick="saveAttendance()">Lưu Điểm Danh</button></div>
+            </section>
+
+            <!-- NỀ NẾP -->
+            <section id="view-discipline" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>⚠️ Nề nếp</h2></div><button class="btn-outline-action" onclick="openModal('modal-manage-tags')"><i class="fas fa-cog"></i></button></div>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-disc-student" placeholder="Tìm học sinh..." onkeyup="renderDisciplineStudents()"></div>
+                <div id="discipline-student-list" class="list-container mb-20"></div>
+            </section>
+
+            <!-- THÔNG BÁO -->
+            <section id="view-announcements" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>📢 Thông báo</h2></div><button class="btn-primary" onclick="openModal('modal-compose-notify')"><i class="fas fa-plus"></i></button></div>
+                <div id="notify-list" class="list-container"></div>
+            </section>
+
+            <!-- KẾ HOẠCH -->
+            <section id="view-plans" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>📋 Kế hoạch</h2></div><button class="btn-primary" onclick="openModal('modal-add-task')"><i class="fas fa-plus"></i></button></div>
+                <div class="kanban-board">
+                    <div class="kanban-col"><div class="kanban-header text-orange"><i class="fas fa-thumbtack"></i> CẦN LÀM</div><div id="kb-todo" class="kanban-list"></div></div>
+                    <div class="kanban-col"><div class="kanban-header text-blue"><i class="fas fa-spinner"></i> ĐANG LÀM</div><div id="kb-doing" class="kanban-list"></div></div>
+                    <div class="kanban-col"><div class="kanban-header text-green"><i class="fas fa-check-double"></i> ĐÃ XONG</div><div id="kb-done" class="kanban-list"></div></div>
+                </div>
+            </section>
+
+            <!-- KHO TÀI LIỆU -->
+            <section id="view-docs" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>📁 Tài liệu</h2></div><button class="btn-primary" onclick="openModal('modal-upload-doc')"><i class="fas fa-upload"></i></button></div>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-doc" placeholder="Tìm tài liệu..." onkeyup="renderDocs()"></div>
+                <div class="doc-folders">
+                    <div class="doc-folder active" onclick="filterDocs('all', this)"><i class="fas fa-layer-group"></i> Tất cả</div>
+                    <div class="doc-folder" onclick="filterDocs('Giáo án', this)"><i class="fas fa-book"></i> Giáo án</div>
+                    <div class="doc-folder" onclick="filterDocs('Biên bản', this)"><i class="fas fa-file-signature"></i> Biên bản</div>
+                </div>
+                <div id="doc-list" class="doc-grid mt-15"></div>
+            </section>
+
+            <!-- CÀI ĐẶT -->
+            <section id="view-settings" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>⚙️ Cài đặt</h2></div></div>
+                <div class="settings-card mb-20">
+                    <div class="input-group"><label>Tên Giáo Viên</label><input type="text" id="set-teacher"></div>
+                    <div class="input-group"><label>Tên Lớp</label><input type="text" id="set-class"></div>
+                    <div class="input-group"><label>Năm học</label><input type="text" id="set-year"></div>
+                    <button class="btn-primary w-full mt-10" onclick="saveSettings()">Lưu cài đặt</button>
+                </div>
+                <div class="section-title"><h3>Tự động & Cảnh báo</h3></div>
+                <div class="settings-card mb-20">
+                    <label class="toggle-row"><span>Tự trừ điểm thi đua khi Vắng không phép</span><input type="checkbox" id="set-auto-absent"></label>
+                    <label class="toggle-row"><span>Tự trừ điểm thi đua khi Đi muộn</span><input type="checkbox" id="set-auto-late"></label>
+                    <div class="input-group mt-15"><label>Cảnh báo nếu Vắng (buổi) >=</label><input type="number" id="set-warn-absent"></div>
+                    <div class="input-group"><label>Cảnh báo nếu Điểm thi đua <=</label><input type="number" id="set-warn-behavior"></div>
+                    <button class="btn-outline w-full" onclick="saveConfig()">Lưu cấu hình</button>
+                </div>
+                
+                <div class="settings-card">
+                    <button class="btn-outline w-full mb-15" onclick="logoutApp()" style="color: #64748b; border-color: #cbd5e1; font-weight: 800;">
+                        <i class="fas fa-sign-out-alt"></i> ĐĂNG XUẤT TÀI KHOẢN
+                    </button>
+                    <button class="btn-danger w-full" onclick="resetData()">Xóa toàn bộ CSDL cục bộ</button>
+                </div>
+            </section>
+        </main>
+
+        <nav id="bottom-bar">
+            <div class="nav-item active" onclick="switchView('view-home', this)"><div class="nav-icon"><i class="fas fa-home"></i></div><span>Trang chủ</span></div>
+            <div class="nav-item" onclick="switchView('view-students', this)"><div class="nav-icon"><i class="fas fa-users"></i></div><span>Lớp học</span></div>
+            <div class="nav-item" onclick="switchView('view-lesson-log', this)"><div class="nav-icon"><i class="fas fa-book"></i></div><span>Sổ giảng</span></div>
+            <div class="nav-item" onclick="switchView('view-plans', this)"><div class="nav-icon"><i class="fas fa-tasks"></i></div><span>Kế hoạch</span></div>
+            <div class="nav-item" onclick="switchView('view-settings', this)"><div class="nav-icon"><i class="fas fa-cog"></i></div><span>Cài đặt</span></div>
+        </nav>
+    </div>
+
+    <!-- ================= MODALS ================= -->
+    <div id="modal-setup-lesson-log" class="modal">
+        <div class="modal-content" style="height: 95vh; background: #f8fafc;">
+            <div class="modal-header">
+                <h3>⚙️ Cấu hình Sổ báo giảng</h3>
+                <div class="close" onclick="closeModal('modal-setup-lesson-log')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body">
+                <div class="alert-item yellow" style="margin-bottom:15px;"><div class="alert-icon"><i class="fas fa-lightbulb"></i></div><div class="alert-info"><p>Cấu hình 1 lần, hệ thống tự động sinh lịch dạy cả năm!</p></div></div>
+                <div class="settings-card mb-20"><label>📅 Ngày bắt đầu Tuần 1 (Thứ 2)</label><input type="date" id="setup-week1-date" class="mb-0"></div>
+                <div class="setup-grid">
+                    <div class="setup-card" onclick="openModal('modal-setup-tkb')"><div class="setup-icon text-blue"><i class="fas fa-table"></i></div><div class="setup-info"><h4>Thời khóa biểu</h4><p id="setup-tkb-count">0 bản ghi</p></div><i class="fas fa-chevron-right text-muted"></i></div>
+                    <div class="setup-card" onclick="openModal('modal-setup-ppct')"><div class="setup-icon text-green"><i class="fas fa-list-ol"></i></div><div class="setup-info"><h4>Phân phối chương trình</h4><p id="setup-ppct-count">0 bài dạy</p></div><i class="fas fa-chevron-right text-muted"></i></div>
+                    <div class="setup-card" onclick="openModal('modal-setup-holidays')"><div class="setup-icon text-red"><i class="fas fa-umbrella-beach"></i></div><div class="setup-info"><h4>Lịch Nghỉ & Sự kiện</h4><p id="setup-holidays-count">0 ngày nghỉ</p></div><i class="fas fa-chevron-right text-muted"></i></div>
+                </div>
+                <button class="btn-primary btn-large w-full mt-20 shadow-lg" style="background: linear-gradient(135deg, #2563eb, #8b5cf6);" onclick="generateAutoSchedule()"><i class="fas fa-magic"></i> 🤖 TỰ ĐỘNG TẠO SỔ BÁO GIẢNG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals nhập TKB, PPCT, Holiday -->
+    <div id="modal-setup-tkb" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🕒 Thời khóa biểu</h3><div class="close" onclick="closeModal('modal-setup-tkb')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-blue w-full mb-15" onclick="triggerImport('tkb')"><i class="fas fa-file-excel"></i> Import TKB từ Excel</button><div class="form-row"><div class="input-group"><label>Thứ (2-7)</label><input type="number" id="add-tkb-day" min="2" max="7"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="add-tkb-period" min="1" max="10"></div></div><div class="form-row"><div class="input-group"><label>Lớp</label><input type="text" id="add-tkb-class"></div><div class="input-group"><label>Môn</label><input type="text" id="add-tkb-subject"></div></div><button class="btn-primary w-full mb-20" onclick="addTKB()">Thêm TKB</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Thứ</th><th>Tiết</th><th>Lớp</th><th>Môn</th><th>Xóa</th></tr></thead><tbody id="tkb-tbody"></tbody></table></div></div></div></div>
+    <div id="modal-setup-ppct" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>📚 Phân phối chương trình</h3><div class="close" onclick="closeModal('modal-setup-ppct')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-green w-full mb-15" onclick="triggerImport('ppct')"><i class="fas fa-file-excel"></i> Import PPCT từ Excel</button><div class="form-row"><div class="input-group"><label>Lớp</label><input type="text" id="add-ppct-class"></div><div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject"></div></div><div class="form-row"><div class="input-group"><label>Tiết PPCT</label><input type="number" id="add-ppct-period"></div></div><div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content"></div><button class="btn-primary w-full mb-20" onclick="addPPCT()">Thêm Bài</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Lớp</th><th>Môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div></div></div></div>
+    <div id="modal-setup-holidays" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🏖️ Ngày nghỉ & Sự kiện</h3><div class="close" onclick="closeModal('modal-setup-holidays')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-red w-full mb-15" onclick="triggerImport('holidays')"><i class="fas fa-file-excel"></i> Import Lịch từ Excel</button><div class="form-row"><div class="input-group"><label>Ngày bắt đầu</label><input type="date" id="add-hol-start"></div><div class="input-group"><label>Ngày kết thúc</label><input type="date" id="add-hol-end"></div></div><div class="input-group"><label>Tên sự kiện / Lễ</label><input type="text" id="add-hol-name" placeholder="VD: Nghỉ Tết Nguyên Đán"></div><button class="btn-primary w-full mb-20" onclick="addHoliday()">Thêm Ngày Nghỉ</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Từ ngày</th><th>Đến ngày</th><th>Tên sự kiện</th><th>Xóa</th></tr></thead><tbody id="hol-tbody"></tbody></table></div></div></div></div>
+    <input type="file" id="general-import-file" style="display:none;" accept=".xlsx, .xls, .csv" onchange="handleGeneralImport(event)">
+
+    <!-- Đổi tiết, Edit Theme, Học sinh... -->
+    <div id="modal-adjust-schedule" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>🔄 Đổi lịch / Dạy bù</h3><div class="close" onclick="closeModal('modal-adjust-schedule')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="adj-sched-id"><div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div><div class="form-row"><div class="input-group"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div></div><div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button></div></div></div>
+    <div id="modal-edit-theme" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi Chủ điểm tháng</h3><div class="close" onclick="closeModal('modal-edit-theme')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tháng</label><input type="number" id="edit-theme-month" min="1" max="12"></div><div class="input-group mb-0"><label>Tên Chủ điểm</label><input type="text" id="edit-theme-name" placeholder="VD: VĂN MINH - XANH - AN TOÀN"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveMonthlyTheme()">Lưu thay đổi</button></div></div></div>
+    
+    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
+    <div id="modal-import-excel" class="modal"><div class="modal-content" style="max-height: 95vh;"><div class="modal-header"><h3>📥 Nhập danh sách</h3><div class="close" onclick="closeModal('modal-import-excel')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 15px;"><div id="import-step-1"><div class="drop-zone" id="drop-zone" onclick="document.getElementById('excel-file').click()"><div class="drop-icon"><i class="fas fa-cloud-upload-alt"></i></div><h4>Kéo thả hoặc Nhấn chọn</h4><input type="file" id="excel-file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelUpload(event)"></div></div><div id="import-step-2" style="display: none;"><div class="mapping-section"><h4>Xác nhận cột:</h4><div class="mapping-grid"><div class="map-group"><label>Họ tên</label><select id="map-name" onchange="processParsedData()"></select></div><div class="map-group"><label>Giới tính</label><select id="map-gender" onchange="processParsedData()"></select></div><div class="map-group"><label>Ngày sinh</label><select id="map-dob" onchange="processParsedData()"></select></div><div class="map-group"><label>SĐT</label><select id="map-phone" onchange="processParsedData()"></select></div></div></div><div id="import-warnings"></div><div class="table-responsive"><table class="preview-table"><thead><tr><th>STT</th><th>Họ tên</th><th>SĐT</th></tr></thead><tbody id="preview-tbody"></tbody></table></div></div></div><div class="modal-footer" id="import-step-2-footer" style="display: none; gap:10px;"><button class="btn-outline w-full" onclick="resetImport()">Quay lại</button><button class="btn-primary w-full" id="btn-confirm-import" onclick="confirmImport()">✅ Xác nhận</button></div></div></div>
+    
+    <div id="modal-record-behavior" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Ghi nhận Nề nếp</h3><div class="close" onclick="closeModal('modal-record-behavior')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0;"><div class="behavior-student-info" id="behavior-target-name"></div><div class="tab-container"><div class="tab-btn active" onclick="switchBehaviorTab('negative', this)">🔴 VI PHẠM</div><div class="tab-btn" onclick="switchBehaviorTab('positive', this)">🟢 BIỂU DƯƠNG</div></div><div class="quick-tag-grid" id="quick-tag-list" style="padding: 20px;"></div></div></div></div>
+    <div id="modal-confirm-tag" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Xác nhận ghi nhận</h3><div class="close" onclick="closeModal('modal-confirm-tag')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="conf-tag-id"><input type="hidden" id="conf-stu-id"><div class="alert-item" style="margin-bottom: 15px; background:#f8fafc;" id="conf-tag-display"></div><div class="input-group"><label>Điểm thực tế</label><input type="number" id="conf-points" style="font-size: 1.2rem; font-weight: bold;"></div><div class="input-group mb-0"><label>Ghi chú</label><input type="text" id="conf-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="submitBehaviorRecord()">LƯU GHI NHẬN</button></div></div></div>
+    <div id="modal-manage-tags" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>⚙️ Quản lý Hành vi</h3><div class="close" onclick="closeModal('modal-manage-tags')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-primary w-full mb-20" onclick="openModal('modal-add-tag')">+ Thêm mới</button><div id="manage-tag-list" class="list-container"></div></div></div></div>
+    <div id="modal-add-tag" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Thêm hành vi</h3><div class="close" onclick="closeModal('modal-add-tag')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="edit-tag-id"><div class="input-group"><label>Tên hành vi *</label><input type="text" id="tag-name"></div><div class="form-row"><div class="input-group"><label>Phân loại</label><select id="tag-type"><option value="negative">🔴 Điểm trừ</option><option value="positive">🟢 Điểm cộng</option></select></div><div class="input-group"><label>Điểm</label><input type="number" id="tag-points"></div></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveTag()">LƯU</button></div></div></div>
+    
+    <div id="modal-compose-notify" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Soạn Thông Báo</h3><div class="close" onclick="closeModal('modal-compose-notify')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn Template</label><select id="notify-template" onchange="applyNotifyTemplate()"><option value="">-- Tự soạn thảo --</option><option value="T1">📌 Đóng tiền</option><option value="T2">📌 Họp phụ huynh</option><option value="T3">📌 Nhắc mang sách vở</option></select></div><div class="input-group"><label>✨ Nhờ AI Soạn</label><div style="display:flex; gap:10px;"><input type="text" id="ai-prompt" style="flex:1;"><button class="btn-primary" onclick="generateAINotify()"><i class="fas fa-magic"></i></button></div></div><div class="input-group"><label>Tiêu đề *</label><input type="text" id="notify-title"></div><div class="input-group mb-0"><label>Nội dung *</label><textarea id="notify-content" rows="8"></textarea></div></div><div class="modal-footer" style="display: flex; gap:10px;"><button class="btn-outline w-full" onclick="copyNotifyToZalo()"><i class="fas fa-copy"></i> Copy Zalo</button><button class="btn-primary w-full" onclick="saveNotify()"><i class="fas fa-save"></i> Lưu</button></div></div></div>
+    <div id="modal-add-task" class="modal"><div class="modal-content"><div class="modal-header"><h3>Thêm công việc</h3><div class="close" onclick="closeModal('modal-add-task')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="task-id"><div class="input-group"><label>Tiêu đề *</label><input type="text" id="task-title"></div><div class="form-row"><div class="input-group"><label>Trạng thái</label><select id="task-status"><option value="todo">📌 Cần làm</option><option value="doing">⏳ Đang làm</option><option value="done">✅ Đã xong</option></select></div><div class="input-group"><label>Mức ưu tiên</label><select id="task-priority"><option value="high">🔴 Cao</option><option value="medium">🟡 TB</option><option value="low">🟢 Thấp</option></select></div></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveTask()">Lưu</button></div></div></div>
+    
+    <div id="modal-upload-doc" class="modal"><div class="modal-content"><div class="modal-header"><h3>Tải lên tài liệu</h3><div class="close" onclick="closeModal('modal-upload-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn thư mục</label><select id="doc-folder"><option value="Giáo án">Giáo án</option><option value="Biên bản">Biên bản họp</option><option value="Khác">Khác</option></select></div><div class="input-group"><label>Chọn File *</label><input type="file" id="doc-file" style="padding: 8px;"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDoc()"><i class="fas fa-cloud-upload-alt"></i> Lưu file</button></div></div></div>
+    <div id="modal-preview-doc" class="modal"><div class="modal-content" style="height: 90vh; max-width: 800px; display: flex; flex-direction: column;"><div class="modal-header"><h3 id="preview-doc-title">Đang xem</h3><div class="close" onclick="closePreviewModal()"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0; background: #e2e8f0; flex: 1; display: flex; flex-direction: column;" id="preview-container"></div></div></div>
+    <div id="modal-rename-doc" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi tên</h3><div class="close" onclick="closeModal('modal-rename-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="rename-doc-id"><div class="input-group mb-0"><label>Tên mới</label><input type="text" id="rename-doc-name"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveRenameDoc()"><i class="fas fa-save"></i> Cập nhật</button></div></div></div>
+
+    <!-- CẬP NHẬT THÀNH DẠNG MODULE -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>

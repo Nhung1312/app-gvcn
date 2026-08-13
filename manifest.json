@@ -1,0 +1,23 @@
+{
+  "name": "Trợ Lý GVCN Pro",
+  "short_name": "App GVCN",
+  "description": "Trợ lý đắc lực quản lý lớp học dành cho Giáo viên chủ nhiệm",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "icon-appgvcn.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-appgvcn.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
