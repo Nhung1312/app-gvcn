@@ -242,12 +242,14 @@
             <!-- CÀI ĐẶT -->
             <section id="view-settings" class="view">
                 <div class="top-bar"><div class="top-bar-title"><h2>⚙️ Cài đặt</h2></div></div>
+                
                 <div class="settings-card mb-20">
                     <div class="input-group"><label>Tên Giáo Viên</label><input type="text" id="set-teacher"></div>
                     <div class="input-group"><label>Tên Lớp</label><input type="text" id="set-class"></div>
                     <div class="input-group"><label>Năm học</label><input type="text" id="set-year"></div>
                     <button class="btn-primary w-full mt-10" onclick="saveSettings()">Lưu cài đặt</button>
                 </div>
+                
                 <div class="section-title"><h3>Tự động & Cảnh báo</h3></div>
                 <div class="settings-card mb-20">
                     <label class="toggle-row"><span>Tự trừ điểm thi đua khi Vắng không phép</span><input type="checkbox" id="set-auto-absent"></label>
@@ -268,6 +270,15 @@
                         <div class="theme-btn" style="background: #8b5cf6;" onclick="changeTheme('theme-purple', this)" title="Tím Pastel"></div>
                         <div class="theme-btn" style="background: #ec4899;" onclick="changeTheme('theme-pink', this)" title="Hồng Ruby"></div>
                     </div>
+                </div>
+
+                <!-- HƯỚNG DẪN SỬ DỤNG GVCN (MỚI THÊM) -->
+                <div class="section-title"><h3>📖 Hướng dẫn sử dụng</h3></div>
+                <div class="settings-card mb-20">
+                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Nắm bắt toàn bộ tính năng siêu việt của Trợ lý GVCN chỉ trong 2 phút.</p>
+                    <button class="btn-primary w-full btn-large" onclick="openModal('modal-guide')" style="background: var(--warning); color: #fff; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
+                        <i class="fas fa-book-open"></i> XEM HƯỚNG DẪN TÂN THỦ
+                    </button>
                 </div>
 
                 <!-- Sao lưu & Khôi phục -->
@@ -351,6 +362,34 @@
     <div id="modal-upload-doc" class="modal"><div class="modal-content"><div class="modal-header"><h3>Tải lên tài liệu</h3><div class="close" onclick="closeModal('modal-upload-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn thư mục</label><select id="doc-folder"><option value="Giáo án">Giáo án</option><option value="Biên bản">Biên bản họp</option><option value="Khác">Khác</option></select></div><div class="input-group"><label>Chọn File *</label><input type="file" id="doc-file" style="padding: 8px;"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDoc()"><i class="fas fa-cloud-upload-alt"></i> Lưu file</button></div></div></div>
     <div id="modal-preview-doc" class="modal"><div class="modal-content" style="height: 90vh; max-width: 800px; display: flex; flex-direction: column;"><div class="modal-header"><h3 id="preview-doc-title">Đang xem</h3><div class="close" onclick="closePreviewModal()"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0; background: #e2e8f0; flex: 1; display: flex; flex-direction: column;" id="preview-container"></div></div></div>
     <div id="modal-rename-doc" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi tên</h3><div class="close" onclick="closeModal('modal-rename-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="rename-doc-id"><div class="input-group mb-0"><label>Tên mới</label><input type="text" id="rename-doc-name"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveRenameDoc()"><i class="fas fa-save"></i> Cập nhật</button></div></div></div>
+
+    <!-- MODAL HƯỚNG DẪN SỬ DỤNG GVCN (MỚI THÊM) -->
+    <div id="modal-guide" class="modal">
+        <div class="modal-content" style="max-height: 90vh;">
+            <div class="modal-header">
+                <h3>📖 Hướng dẫn sử dụng</h3>
+                <div class="close" onclick="closeModal('modal-guide')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="line-height: 1.6; color: var(--text-main);">
+                <div class="alert-item green mb-15">
+                    <div class="alert-info">
+                        Quy trình 5 bước để làm chủ Trợ lý GVCN, tiết kiệm 80% thời gian!
+                    </div>
+                </div>
+                <ol style="padding-left: 20px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <li><strong>Bước 1: Cấu hình ban đầu.</strong> Vào tab Cài đặt đổi tên lớp. Vào "Sổ giảng" -> "Cấu hình" -> Nhập TKB và PPCT để app tự động sinh Sổ Báo Giảng cả năm.</li>
+                    <li><strong>Bước 2: Nhập danh sách.</strong> Vào "Lớp học", dùng tính năng Import để tải lên danh sách học sinh từ file Excel tiện lợi.</li>
+                    <li><strong>Bước 3: Điểm danh & Thi đua.</strong> Điểm danh 1 chạm mỗi ngày. Chuyển sang tab "Nề nếp" để cộng/trừ điểm thi đua. Hệ thống sẽ tự xếp loại Ngôi sao.</li>
+                    <li><strong>Bước 4: Nhắn Zalo Phụ huynh.</strong> Tại danh sách lớp, bấm icon Zalo màu xanh để nhắn tin trực tiếp. Hoặc dùng AI soạn Thông báo gửi nhóm lớp.</li>
+                    <li><strong>Bước 5: Tổng kết cuối tháng.</strong> Xem bảng Xếp loại chi tiết, tải xuống báo cáo, và xuất <strong>Phiếu liên lạc ảnh</strong> cực kỳ chuyên nghiệp gửi phụ huynh.</li>
+                </ol>
+                <p class="text-sm text-muted text-center">Chúc thầy cô có những giờ lên lớp thật tuyệt vời! ❤️</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary w-full btn-large" onclick="closeModal('modal-guide')">Đã hiểu & Bắt đầu dùng</button>
+            </div>
+        </div>
+    </div>
 
     <!-- KHUNG ẨN CHỨA THIẾT KẾ PHIẾU LIÊN LẠC ẢNH -->
     <div id="report-card-template" style="position: absolute; left: -9999px; top: -9999px; width: 400px; background: linear-gradient(135deg, #eff6ff, #ffffff); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 2px solid #bfdbfe; font-family: 'Plus Jakarta Sans', sans-serif;">
