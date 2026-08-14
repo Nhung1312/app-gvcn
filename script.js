@@ -95,7 +95,7 @@ const defaultTags = [
     { id: "t6", name: "Làm việc tốt", type: "positive", defaultPoints: 2, currentPoints: 2, isSystem: true, enabled: true, icon: "fa-heart", color: "qt-positive" },
     { id: "t7", name: "Đạt thành tích", type: "positive", defaultPoints: 3, currentPoints: 3, isSystem: true, enabled: true, icon: "fa-medal", color: "qt-positive" }
 ];
-const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default" };
+const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default", apiKey: "" };
 
 function initData() {
     let v4Data = JSON.parse(localStorage.getItem('gvcnData_v4'));
@@ -179,13 +179,17 @@ window.changeTheme = function(themeName, element) {
 
 window.loadSettings = function() { 
     const s = appData.settings; 
-    document.getElementById('set-teacher').value = s.teacherName; 
-    document.getElementById('set-class').value = s.className; 
-    document.getElementById('set-year').value = s.year; 
-    document.getElementById('set-auto-absent').checked = s.autoAbsentDisc; 
-    document.getElementById('set-auto-late').checked = s.autoLateDisc; 
-    document.getElementById('set-warn-absent').value = s.warnAbsent; 
-    document.getElementById('set-warn-behavior').value = s.warnBehavior; 
+    document.getElementById('set-teacher').value = s.teacherName || ''; 
+    document.getElementById('set-class').value = s.className || ''; 
+    document.getElementById('set-year').value = s.year || ''; 
+    document.getElementById('set-auto-absent').checked = s.autoAbsentDisc || false; 
+    document.getElementById('set-auto-late').checked = s.autoLateDisc || false; 
+    document.getElementById('set-warn-absent').value = s.warnAbsent || 3; 
+    document.getElementById('set-warn-behavior').value = s.warnBehavior || -5; 
+    
+    if(document.getElementById('set-api-key')) {
+        document.getElementById('set-api-key').value = s.apiKey || '';
+    }
 
     let currentTheme = s.theme || 'default';
     document.body.className = currentTheme === 'default' ? '' : currentTheme;
@@ -194,7 +198,20 @@ window.loadSettings = function() {
         if(btn.getAttribute('onclick').includes(currentTheme)) btn.classList.add('active');
     });
 }
-window.saveSettings = function() { appData.settings.teacherName = document.getElementById('set-teacher').value; appData.settings.className = document.getElementById('set-class').value; appData.settings.year = document.getElementById('set-year').value; window.saveData(); window.showToast("✅ Đã lưu cài đặt!"); }
+
+window.saveSettings = function() { 
+    appData.settings.teacherName = document.getElementById('set-teacher').value; 
+    appData.settings.className = document.getElementById('set-class').value; 
+    appData.settings.year = document.getElementById('set-year').value; 
+    
+    if(document.getElementById('set-api-key')) {
+        appData.settings.apiKey = document.getElementById('set-api-key').value.trim();
+    }
+    
+    window.saveData(); 
+    window.showToast("✅ Đã lưu cài đặt!"); 
+}
+
 window.saveConfig = function() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; window.saveData(); window.showToast("Đã lưu cấu hình tự động!"); }
 window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
@@ -505,6 +522,12 @@ window.generateReportCard = async function(stuId) {
     } catch(e) { console.error(e); window.showToast("Lỗi khi tạo ảnh!", "error"); } finally { cardEl.style.left = '-9999px'; }
 }
 
+// Gọi giao diện Soạn bằng AI cho Học sinh
+window.openAIForStudent = function(studentName) {
+    document.getElementById('ai-prompt').value = `Viết một đoạn nhận xét ngắn gọn, tích cực để gửi cho phụ huynh về tình hình học tập và nề nếp của em ${studentName}.`;
+    window.openModal('modal-compose-notify');
+}
+
 window.renderStudents = function() {
     const list = document.getElementById('student-list'); list.innerHTML = ''; 
     const searchInput = document.getElementById('search-student');
@@ -514,9 +537,14 @@ window.renderStudents = function() {
     filtered.forEach((stu, index) => { 
         let cleanPhone = stu.phone ? String(stu.phone).replace(/[^0-9]/g, '') : '';
         let zaloBtn = cleanPhone ? `<button class="btn-outline-action" style="color:white; background:#0068ff; border-color:#0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);" onclick="window.open('https://zalo.me/${cleanPhone}', '_blank')" title="Nhắn Zalo cho Phụ huynh"><i class="fas fa-comment-dots"></i></button>` : '';
-        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
+        
+        // NÚT TRỢ LÝ AI (HÌNH NGÔI SAO LẤP LÁNH) ĐÃ ĐƯỢC KHÔI PHỤC TẠI ĐÂY
+        let aiBtn = `<button class="btn-outline-action" style="color:white; background:#f59e0b; border-color:#f59e0b; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);" onclick="openAIForStudent('${stu.name}')" title="Nhờ AI nhận xét"><i class="fas fa-magic"></i></button>`;
+        
+        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${aiBtn}${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
     });
 }
+
 window.saveStudent = function() {
     const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
     if(!name) return window.showToast("Nhập tên!", "error");
@@ -631,7 +659,44 @@ window.deleteTag = function(id) { if(confirm("Xóa hành vi này?")) { appData.b
 window.saveTag = function() { const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return window.showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); window.saveData(); window.renderManageTags(); window.closeModal('modal-add-tag'); window.showToast("Đã thêm!"); }
 
 window.applyNotifyTemplate = function() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
-window.generateAINotify = function() { if(!document.getElementById('ai-prompt').value) return window.showToast("Nhập nội dung cần nhờ AI", "error"); document.getElementById('notify-content').value = "⚠️ Chưa cấu hình API. Thêm API Key vào mã nguồn để sử dụng."; }
+
+// HÀM GỌI API GOOGLE GEMINI HOÀN CHỈNH
+window.generateAINotify = async function() { 
+    const prompt = document.getElementById('ai-prompt').value;
+    if(!prompt) return window.showToast("Nhập nội dung cần nhờ AI", "error"); 
+    
+    const apiKey = appData.settings.apiKey;
+    if(!apiKey) {
+        document.getElementById('notify-content').value = "⚠️ Chưa có API Key. Vui lòng vào tab Cài đặt để nhập mã API Key Google Gemini.";
+        return window.showToast("Thiếu API Key!", "error");
+    }
+
+    window.showToast("🤖 AI đang soạn thảo...", "success");
+    document.getElementById('notify-content').value = "Đang tạo nội dung, thầy cô chờ một chút nhé...";
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: `Đóng vai một giáo viên chủ nhiệm, hãy soạn một thông báo gửi vào nhóm Zalo cho phụ huynh học sinh với nội dung cốt lõi sau: ${prompt}. Yêu cầu: Giọng văn lịch sự, chuyên nghiệp, súc tích, có biểu tượng cảm xúc (emoji) cho sinh động.` }] }]
+            })
+        });
+        
+        const data = await response.json();
+        if(data.candidates && data.candidates.length > 0) {
+            document.getElementById('notify-content').value = data.candidates[0].content.parts[0].text.trim();
+            window.showToast("✅ AI đã soạn xong!");
+        } else {
+            throw new Error("Lỗi phản hồi từ AI");
+        }
+    } catch(err) {
+        console.error(err);
+        document.getElementById('notify-content').value = "Lỗi kết nối AI. Vui lòng kiểm tra lại API Key xem có chính xác không.";
+        window.showToast("Lỗi kết nối AI!", "error");
+    }
+}
+
 window.copyNotifyToZalo = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ nội dung!", "error"); navigator.clipboard.writeText(`📢 [${appData.settings.className}] - ${t}\n\n${c}`).then(() => { window.showToast("✅ Đã copy! Đang tự động mở Zalo..."); setTimeout(() => { window.open('https://chat.zalo.me', '_blank'); }, 1000); }); }
 window.saveNotify = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ thông tin!", "error"); appData.notifications.push({ id: Date.now(), title: t, content: c, createdAt: formatDateTime() }); window.saveData(); window.closeModal('modal-compose-notify'); window.renderNotifies(); window.showToast("Đã lưu TB!"); }
 window.renderNotifies = function() { const list = document.getElementById('notify-list'); list.innerHTML = ''; let arr = [...appData.notifications].reverse(); if(arr.length===0) list.innerHTML = '<div class="empty-state">Chưa có thông báo</div>'; arr.forEach(n => { list.innerHTML += `<div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px;"><div class="w-full" style="display:flex; justify-content:space-between;"><strong>📢 ${n.title}</strong><small class="text-muted">${n.createdAt}</small></div><div style="font-size:0.85rem; color:var(--text-muted); white-space:pre-wrap;">${n.content}</div></div>`; }); }
