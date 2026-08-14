@@ -312,3 +312,31 @@ body.theme-pink {
 body.theme-green .hero-card, body.theme-green .lesson-log-hero { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4); }
 body.theme-purple .hero-card, body.theme-purple .lesson-log-hero { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4); }
 body.theme-pink .hero-card, body.theme-pink .lesson-log-hero { background: linear-gradient(135deg, #ec4899, #be185d); box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.4); }
+
+/* HIỆU ỨNG NÚT AI NHẤP NHÁY */
+.btn-ai-magic {
+    background: linear-gradient(45deg, #f59e0b, #fbbf24, #f59e0b);
+    background-size: 200% 200%;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1rem;
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
+    cursor: pointer;
+    transition: 0.2s;
+    animation: aiBlink 2s infinite;
+    flex-shrink: 0;
+}
+.btn-ai-magic:active {
+    transform: scale(0.92);
+}
+@keyframes aiBlink {
+    0% { box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4); background-position: 0% 50%; }
+    50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.9), 0 0 10px rgba(251, 191, 36, 0.6); background-position: 100% 50%; }
+    100% { box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4); background-position: 0% 50%; }
+}

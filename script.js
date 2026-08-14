@@ -538,8 +538,8 @@ window.renderStudents = function() {
         let cleanPhone = stu.phone ? String(stu.phone).replace(/[^0-9]/g, '') : '';
         let zaloBtn = cleanPhone ? `<button class="btn-outline-action" style="color:white; background:#0068ff; border-color:#0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);" onclick="window.open('https://zalo.me/${cleanPhone}', '_blank')" title="Nhắn Zalo cho Phụ huynh"><i class="fas fa-comment-dots"></i></button>` : '';
         
-        // NÚT TRỢ LÝ AI (HÌNH NGÔI SAO LẤP LÁNH) ĐÃ ĐƯỢC KHÔI PHỤC TẠI ĐÂY
-        let aiBtn = `<button class="btn-outline-action" style="color:white; background:#f59e0b; border-color:#f59e0b; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);" onclick="openAIForStudent('${stu.name}')" title="Nhờ AI nhận xét"><i class="fas fa-magic"></i></button>`;
+        // NÚT TRỢ LÝ AI ĐƯỢC GẮN CLASS MỚI ĐỂ NHẤP NHÁY
+        let aiBtn = `<button class="btn-ai-magic" onclick="openAIForStudent('${stu.name}')" title="Nhờ AI nhận xét"><i class="fas fa-magic"></i></button>`;
         
         list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${aiBtn}${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
     });
@@ -660,7 +660,7 @@ window.saveTag = function() { const name = document.getElementById('tag-name').v
 
 window.applyNotifyTemplate = function() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
 
-// HÀM GỌI API GOOGLE GEMINI HOÀN CHỈNH
+// HÀM GỌI API GOOGLE GEMINI TÍCH HỢP QUÉT LỖI
 window.generateAINotify = async function() { 
     const prompt = document.getElementById('ai-prompt').value;
     if(!prompt) return window.showToast("Nhập nội dung cần nhờ AI", "error"); 
@@ -684,15 +684,21 @@ window.generateAINotify = async function() {
         });
         
         const data = await response.json();
+        
+        if(!response.ok) {
+            console.error("🔍 BẮT ĐƯỢC LỖI TỪ GOOGLE:", data);
+            throw new Error(data.error?.message || "Lỗi kết nối API");
+        }
+
         if(data.candidates && data.candidates.length > 0) {
             document.getElementById('notify-content').value = data.candidates[0].content.parts[0].text.trim();
             window.showToast("✅ AI đã soạn xong!");
         } else {
-            throw new Error("Lỗi phản hồi từ AI");
+            throw new Error("AI không trả về nội dung");
         }
     } catch(err) {
-        console.error(err);
-        document.getElementById('notify-content').value = "Lỗi kết nối AI. Vui lòng kiểm tra lại API Key xem có chính xác không.";
+        console.error("Chi tiết lỗi:", err);
+        document.getElementById('notify-content').value = `Lỗi AI: ${err.message}\nVui lòng kiểm tra lại API Key xem có chính xác và còn hoạt động không nhé!`;
         window.showToast("Lỗi kết nối AI!", "error");
     }
 }
