@@ -745,3 +745,40 @@ window.saveMonthlyTheme = function() { let m = document.getElementById('edit-the
 window.updateLeaderboard = function() { window.renderMonthlyTheme(); let month = parseInt(document.getElementById('rank-month-select').value); const list = document.getElementById('honor-roll-list'); list.innerHTML = ''; let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=e0ecff&color=0d6efd&bold=true` }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; if(recordMonth === month && stuPoints[r.studentId]) { stuPoints[r.studentId].points += Number(r.snapshotPoints); } }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); let topStudents = rankedStudents.slice(0, 5); if(topStudents.length === 0 || topStudents[0].points === 0) { list.innerHTML = '<div class="text-center text-muted w-full" style="padding: 20px; font-size: 0.9rem; background:#f8fafc; border-radius:12px;">Tháng này chưa có dữ liệu thi đua.</div>'; return; } let top1 = topStudents[0]; let htmlContent = ` <div class="star-top1"> <img src="${top1.avatar}" class="star-avatar-1"> <div class="star-info-1"> <div class="star-badge">Hạng 1</div> <div class="star-name-1">${top1.name}</div> <div class="star-pts-1"><i class="fas fa-arrow-up"></i> ${top1.points} điểm</div> </div> </div> <div class="star-list-others"> `; for(let i = 1; i < topStudents.length; i++) { let stu = topStudents[i]; if (stu.points > 0) { let rank = i + 1; htmlContent += `<div class="star-item"><div class="star-rank r${rank}">${rank}</div><img src="${stu.avatar}" class="star-avatar"><div class="star-name">${stu.name}</div><div class="star-pts">+${stu.points}</div></div>`; } } htmlContent += `</div>`; list.innerHTML = htmlContent; }
 window.renderRankingList = function() { let period = document.getElementById('full-rank-period-select').value; const list = document.getElementById('full-ranking-list'); list.innerHTML = ''; let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; let inPeriod = false; if (period === 'HK1' && (recordMonth >= 8 || recordMonth <= 12)) inPeriod = true; else if (period === 'HK2' && (recordMonth >= 1 && recordMonth <= 5)) inPeriod = true; else if (period === 'CA_NAM') inPeriod = true; else if (parseInt(period) === recordMonth) inPeriod = true; if (inPeriod && stuPoints[r.studentId]) { stuPoints[r.studentId].points += Number(r.snapshotPoints); } }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); if (rankedStudents.length === 0) { list.innerHTML = '<div class="empty-state">Chưa có học sinh nào.</div>'; return; } rankedStudents.forEach((stu, index) => { let rank = index + 1; let classification = "Đạt"; let badgeClass = "bg-orange"; if (stu.points >= 15) { classification = "Tốt"; badgeClass = "bg-green"; } else if (stu.points >= 5) { classification = "Khá"; badgeClass = "bg-blue"; } else if (stu.points >= 0) { classification = "Đạt"; badgeClass = "bg-orange"; } else { classification = "Cần cố gắng"; badgeClass = "bg-red"; } list.innerHTML += ` <div class="list-item" style="display:flex; align-items:center; gap:12px; padding: 12px 15px;"> <div style="width: 25px; font-weight:900; font-size: 1.1rem; color: ${rank <= 3 ? 'var(--warning)' : 'var(--text-muted)'}; text-align:center;">#${rank}</div> <div style="flex:1;"><strong style="font-size:0.95rem; color:var(--text-main);">${stu.name}</strong><div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Tổng điểm: <b class="${stu.points >= 0 ? 'text-green' : 'text-red'}">${stu.points > 0 ? '+'+stu.points : stu.points}</b></div></div> <div class="star-badge ${badgeClass}" style="margin:0; padding:6px 12px; font-size:0.75rem; border-radius: 8px; color:white;">${classification}</div> </div> `; }); }
 window.exportRankingExcel = function() { let selectEl = document.getElementById('full-rank-period-select'); let periodName = selectEl.options[selectEl.selectedIndex].text; let periodVal = selectEl.value; if (appData.students.length === 0) return window.showToast("Lớp chưa có học sinh!", "error"); let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; let inPeriod = false; if (periodVal === 'HK1' && (recordMonth >= 8 || recordMonth <= 12)) inPeriod = true; else if (periodVal === 'HK2' && (recordMonth >= 1 && recordMonth <= 5)) inPeriod = true; else if (periodVal === 'CA_NAM') inPeriod = true; else if (parseInt(periodVal) === recordMonth) inPeriod = true; if (inPeriod && stuPoints[r.studentId]) stuPoints[r.studentId].points += Number(r.snapshotPoints); }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); let ws_data = [ [`BẢNG TỔNG HỢP XẾP LOẠI THI ĐUA - ${periodName.toUpperCase()}`], ["Lớp: " + appData.settings.className, "GVCN: " + appData.settings.teacherName], [""], ["Xếp hạng", "Họ và tên", "Tổng điểm thi đua", "Xếp loại", "Ghi chú GVCN"] ]; rankedStudents.forEach((stu, index) => { let classification = "Đạt"; if (stu.points >= 15) classification = "Tốt"; else if (stu.points >= 5) classification = "Khá"; else if (stu.points >= 0) classification = "Đạt"; else classification = "Cần cố gắng"; ws_data.push([index + 1, stu.name, stu.points, classification, ""]); }); var wb = XLSX.utils.book_new(); var ws = XLSX.utils.aoa_to_sheet(ws_data); XLSX.utils.book_append_sheet(wb, ws, "Xep_Loai"); XLSX.writeFile(wb, `Bang_Xep_Loai_${periodVal}.xlsx`); window.showToast("Đã xuất file Excel Báo Cáo!"); }
+
+// ================= TẢI FILE MẪU TKB & PPCT =================
+window.downloadTemplateTKB = function() {
+    const data = [
+        ["Thứ", "Tiết", "Lớp", "Môn"],
+        [2, 1, "8A1", "Toán"],
+        [2, 2, "8A1", "Văn"],
+        ["(Chú ý: Xóa 2 dòng mẫu này đi và nhập dữ liệu thật của bạn vào. KHÔNG sửa tên cột ở hàng 1)", "", "", ""]
+    ];
+    var wb = XLSX.utils.book_new(); 
+    var ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Tự động chỉnh độ rộng cột cho đẹp
+    ws['!cols'] = [{wch: 10}, {wch: 10}, {wch: 15}, {wch: 20}];
+    
+    XLSX.utils.book_append_sheet(wb, ws, "TKB_Mau");
+    XLSX.writeFile(wb, "Mau_Thoi_Khoa_Bieu.xlsx");
+    window.showToast("Đã tải xuống File Mẫu TKB!", "success");
+}
+
+window.downloadTemplatePPCT = function() {
+    const data = [
+        ["Tuần", "Tiết PPCT", "Tên bài học / Chuyên đề", "Số tiết", "Thiết bị dạy học & NLS", "Địa điểm"],
+        [1, 1, "Bài 1: Tập hợp các số hữu tỉ", 1, "Slide bài giảng, Máy chiếu", "Lớp học"],
+        [1, 2, "Bài 1: (Tiếp theo)", 1, "Trò chơi Quizizz", "Lớp học"],
+        ["(Chú ý: Xóa các dòng mẫu này đi và copy PPCT 5512 của bạn vào. KHÔNG sửa tên cột ở hàng 1)", "", "", "", "", ""]
+    ];
+    var wb = XLSX.utils.book_new(); 
+    var ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Tự động chỉnh độ rộng cột cho PPCT
+    ws['!cols'] = [{wch: 10}, {wch: 15}, {wch: 40}, {wch: 10}, {wch: 30}, {wch: 15}];
+    
+    XLSX.utils.book_append_sheet(wb, ws, "PPCT_Mau");
+    XLSX.writeFile(wb, "Mau_Phan_Phoi_CT.xlsx");
+    window.showToast("Đã tải xuống File Mẫu PPCT!", "success");
+}
