@@ -47,11 +47,26 @@ onAuthStateChanged(auth, async (user) => {
             } else {
                 const duLieu = docUserSnap.data();
                 const ngayHetHan = new Date(duLieu.ngay_het_han);
-                if (ngayHienTai > ngayHetHan) {
+                
+                // TÍNH SỐ NGÀY CÒN LẠI
+                const timeDiff = ngayHetHan.getTime() - ngayHienTai.getTime();
+                const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                if (daysLeft <= 0) {
+                    // Đã hết hạn -> Khóa màn hình
                     hasAccess = false;
                     document.getElementById('man-hinh-thu-phi').style.display = 'block';
                     let emailElements = document.getElementsByClassName('email-user');
                     for (let i = 0; i < emailElements.length; i++) emailElements[i].innerText = user.email.split('@')[0];
+                } else if (daysLeft <= 5) {
+                    // CÒN 5 NGÀY HOẶC ÍT HƠN -> HIỆN BANNER CẢNH BÁO
+                    const banner = document.getElementById('trial-warning-banner');
+                    if (banner) {
+                        banner.style.display = 'flex';
+                        document.getElementById('trial-days-left').innerText = daysLeft;
+                        // Điền sẵn cú pháp chuyển khoản vào Modal
+                        document.getElementById('upgrade-email-prefix').innerText = user.email.split('@')[0];
+                    }
                 }
             }
         } catch (error) { console.log("Lỗi kiểm tra bản quyền:", error); }

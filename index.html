@@ -63,6 +63,21 @@
                     </div>
                     <img src="https://ui-avatars.com/api/?name=GV&background=e0e7ff&color=4f46e5&bold=true" alt="Avatar" class="avatar">
                 </header>
+                
+                <!-- BANNER CẢNH BÁO HẾT HẠN DÙNG THỬ (Ẩn mặc định, chỉ hiện khi còn <= 5 ngày) -->
+                <div id="trial-warning-banner" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 16px 20px; border-radius: 18px; color: white; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); align-items: center; justify-content: space-between;">
+                    <div style="flex: 1; padding-right: 15px;">
+                        <strong style="display: block; font-size: 1.05rem; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                            <i class="fas fa-clock"></i> Chỉ còn <span id="trial-days-left" style="font-size: 1.3rem; color: #fffbeb;">-</span> ngày dùng thử
+                        </strong>
+                        <span style="font-size: 0.85rem; opacity: 0.95; line-height: 1.4; display: block;">
+                            Gia hạn ngay để không bị gián đoạn dữ liệu và ủng hộ tác giả duy trì máy chủ nhé! ❤️
+                        </span>
+                    </div>
+                    <button onclick="openModal('modal-upgrade')" style="background: white; color: #d97706; padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; flex-shrink: 0; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer;">
+                        Gia hạn ngay
+                    </button>
+                </div>
 
                 <div class="lesson-log-hero" onclick="switchView('view-lesson-log')">
                     <div class="ll-header">
@@ -306,6 +321,24 @@
                     </button>
                     <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="restoreData(event)">
                 </div>
+
+                <!-- KHU VỰC LIÊN HỆ HỖ TRỢ (ĐÃ THÊM SĐT MỚI) -->
+                <div class="section-title"><h3>💬 Hỗ trợ & Báo lỗi</h3></div>
+                <div class="settings-card mb-20">
+                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">
+                        Trong quá trình sử dụng, nếu thầy cô gặp lỗi hoặc có góp ý nâng cấp App, vui lòng liên hệ trực tiếp với người phát triển để được hỗ trợ nhanh nhất nhé!
+                    </p>
+                    
+                    <!-- Nút mở Zalo (Đã điền số của bạn) -->
+                    <button class="btn-primary w-full btn-large" onclick="window.open('https://zalo.me/0775172026', '_blank')" style="background: #0068ff; color: #fff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);">
+                        <i class="fas fa-comment-dots"></i> NHẮN ZALO CHO ADMIN
+                    </button>
+                    
+                    <!-- Nút gọi điện trực tiếp (Đã điền số của bạn) -->
+                    <button class="btn-outline w-full mt-10" onclick="window.location.href='tel:0775172026'">
+                        <i class="fas fa-phone-alt text-green"></i> GỌI ĐIỆN: 077.517.2026
+                    </button>
+                </div>
                 
                 <div class="settings-card">
                     <button class="btn-outline w-full mb-15" onclick="logoutApp()" style="color: #64748b; border-color: #cbd5e1; font-weight: 800;">
@@ -398,6 +431,40 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-primary w-full btn-large" onclick="closeModal('modal-guide')">Đã hiểu & Bắt đầu dùng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GIA HẠN / NÂNG CẤP SỚM -->
+    <div id="modal-upgrade" class="modal" style="z-index: 9999;">
+        <div class="modal-content" style="background: #f8fafc; text-align: center; max-height: 90vh;">
+            <div class="modal-header">
+                <h3>🚀 Nâng Cấp Bản Pro</h3>
+                <div class="close" onclick="closeModal('modal-upgrade')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="font-size: 14px; color: #64748b; margin-bottom: 20px; font-weight: 600;">
+                    Chỉ với ~25k/tháng để sở hữu toàn bộ tính năng siêu việt và lưu trữ dữ liệu an toàn trên Cloud trọn đời.
+                </p>
+                
+                <div style="border: 2px solid #10b981; border-radius: 16px; padding: 20px; width: 100%; max-width: 250px; margin: 0 auto 20px; background: #fff; position: relative; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.2);">
+                    <span style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 4px 14px; border-radius: 12px; font-size: 11px; font-weight: 800; white-space: nowrap;">GÓI 1 NĂM HỌC (SIÊU TIẾT KIỆM)</span>
+                    <p style="font-size: 36px; color: #10b981; font-weight: 900; margin: 10px 0;">299K</p>
+                    <p style="font-size: 13px; color: #64748b; margin-bottom: 10px; font-weight: 600;">Nội dung CK bắt buộc:</p>
+                    <div style="background: #d1fae5; padding: 8px; border-radius: 8px;">
+                        <strong style="color: #059669; font-size: 16px; letter-spacing: 0.5px;" id="upgrade-email-prefix"></strong> 
+                        <strong style="color: #059669; font-size: 16px;"> 1N</strong>
+                    </div>
+                </div>
+
+                <img src="qr-thu-phi.jpg" alt="Mã QR Thanh Toán" style="width: 200px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 15px;">
+                
+                <p style="font-size: 13px; color: #ef4444; font-weight: 700; font-style: italic;">
+                    Lưu ý: Quét mã QR và giữ nguyên Nội dung chuyển khoản để hệ thống tự động cộng thêm 1 năm sử dụng nhé!
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary w-full btn-large" onclick="closeModal('modal-upgrade')">Đã chuyển khoản xong</button>
             </div>
         </div>
     </div>
