@@ -1,9 +1,10 @@
+// ================= FIREBASE AUTH & DATABASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { initializeFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAQz-4TAujSNhDV8wQY82-wnCTGJtdxhsM",
+  apiKey: "AIzaSyAQz-4TAujSNhDV8wQY82-wnCTGJtdxhsM", 
   authDomain: "quan-ly-day-them-f7b1e.firebaseapp.com",
   projectId: "quan-ly-day-them-f7b1e",
   storageBucket: "quan-ly-day-them-f7b1e.firebasestorage.app",
@@ -13,12 +14,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true
-});
+const firestoreDb = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 let currentUser = null;
+
 const loginScreen = document.getElementById('login-screen');
 const btnLogin = document.getElementById('btn-login');
 
@@ -47,19 +47,25 @@ onAuthStateChanged(auth, async (user) => {
             } else {
                 const duLieu = docUserSnap.data();
                 const ngayHetHan = new Date(duLieu.ngay_het_han);
+                
+                // TÍNH SỐ NGÀY CÒN LẠI
                 const timeDiff = ngayHetHan.getTime() - ngayHienTai.getTime();
                 const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
                 if (daysLeft <= 0) {
+                    // Đã hết hạn -> Khóa màn hình
                     hasAccess = false;
                     document.getElementById('man-hinh-thu-phi').style.display = 'block';
                     let emailElements = document.getElementsByClassName('email-user');
                     for (let i = 0; i < emailElements.length; i++) emailElements[i].innerText = user.email.split('@')[0];
                 } else if (daysLeft <= 5) {
+                    // CÒN 5 NGÀY HOẶC ÍT HƠN -> HIỆN BANNER CẢNH BÁO
                     const banner = document.getElementById('trial-warning-banner');
                     if (banner) {
                         banner.style.display = 'flex';
                         document.getElementById('trial-days-left').innerText = daysLeft;
+                        // Điền sẵn cú pháp chuyển khoản vào Modal
+                        document.getElementById('upgrade-email-prefix').innerText = user.email.split('@')[0];
                     }
                 }
             }
@@ -70,14 +76,14 @@ onAuthStateChanged(auth, async (user) => {
                 const docRef = doc(firestoreDb, "DuLieuGVCN", user.uid);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
-                    appData = docSnap.data();
+                    appData = docSnap.data(); 
                 } else {
-                    await setDoc(docRef, appData);
+                    await setDoc(docRef, appData); 
                 }
             } catch(e) {
                 console.warn("Lỗi tải mây:", e);
             }
-            window.initAppUI();
+            window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
         }
     } else {
         currentUser = null;
@@ -94,779 +100,206 @@ window.logoutApp = function() {
     }
 };
 
+// ================= DATA STRUCTURE =================
+const defaultTags = [
+    { id: "t1", name: "Đi học muộn", type: "negative", defaultPoints: -1, currentPoints: -1, isSystem: true, enabled: true, icon: "fa-clock", color: "qt-negative" },
+    { id: "t2", name: "Không thuộc bài", type: "negative", defaultPoints: -1, currentPoints: -1, isSystem: true, enabled: true, icon: "fa-book-open", color: "qt-negative" },
+    { id: "t3", name: "Mất trật tự", type: "negative", defaultPoints: -1, currentPoints: -1, isSystem: true, enabled: true, icon: "fa-volume-up", color: "qt-negative" },
+    { id: "t4", name: "Vi phạm nội quy", type: "negative", defaultPoints: -2, currentPoints: -2, isSystem: true, enabled: true, icon: "fa-exclamation-triangle", color: "qt-negative" },
+    { id: "t5", name: "Tích cực phát biểu", type: "positive", defaultPoints: 1, currentPoints: 1, isSystem: true, enabled: true, icon: "fa-hand-paper", color: "qt-positive" },
+    { id: "t6", name: "Làm việc tốt", type: "positive", defaultPoints: 2, currentPoints: 2, isSystem: true, enabled: true, icon: "fa-heart", color: "qt-positive" },
+    { id: "t7", name: "Đạt thành tích", type: "positive", defaultPoints: 3, currentPoints: 3, isSystem: true, enabled: true, icon: "fa-medal", color: "qt-positive" }
+];
+const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default", apiKey: "" };
+
 function initData() {
-    let saved = JSON.parse(localStorage.getItem('gvcnData_v4'));
-    if (!saved) {
-        saved = {
-            settings: { className: "9A", teacherName: "Thầy/Cô", schoolYear: "2025-2026", seatRows: 5, seatCols: 4 },
-            students: [],
-            attendance: {},
-            discipline: [],
-            fundLogs: [],
-            fundCampaigns: [],
-            scheduleSetup: { week1Start: "", ppct: [], tkb: [], holidays: [], mathRatios: [] },
-            scheduleRecords: []
+    let v4Data = JSON.parse(localStorage.getItem('gvcnData_v4'));
+    if (!v4Data) {
+        let v3Data = JSON.parse(localStorage.getItem('gvcnData_v3')) || JSON.parse(localStorage.getItem('gvcnData_v2'));
+        v4Data = {
+            settings: v3Data ? { ...defaultSettings, ...v3Data.settings } : defaultSettings,
+            students: v3Data ? v3Data.students : [], attendance: v3Data ? v3Data.attendance : {},
+            behaviorTags: defaultTags, behaviorRecords: v3Data ? v3Data.behaviorRecords||[] : [], tasks: v3Data ? v3Data.tasks||[] : [], 
+            notifications: v3Data ? v3Data.notifications||[] : [], documents: v3Data ? v3Data.documents||[] : [],
+            scheduleSetup: v3Data && v3Data.scheduleSetup ? v3Data.scheduleSetup : { week1Start: "", ppct: [], tkb: [], holidays: [], mathRatios: [] },
+            scheduleRecords: v3Data && v3Data.scheduleRecords ? v3Data.scheduleRecords : [],
+            monthlyThemes: v3Data && v3Data.settings && v3Data.settings.monthlyThemes ? v3Data.settings.monthlyThemes : { "8": "VĂN MINH - XANH - AN TOÀN" }
         };
+        localStorage.setItem('gvcnData_v4', JSON.stringify(v4Data));
     } else {
-        if (!saved.scheduleSetup) saved.scheduleSetup = { week1Start: "", ppct: [], tkb: [], holidays: [], mathRatios: [] };
-        if (!saved.scheduleSetup.mathRatios) saved.scheduleSetup.mathRatios = [];
-        if (!saved.scheduleRecords) saved.scheduleRecords = [];
+        if (!v4Data.settings.monthlyThemes) { v4Data.settings.monthlyThemes = { "8": "VĂN MINH - XANH - AN TOÀN" }; }
+        if (!v4Data.settings.theme) { v4Data.settings.theme = "default"; }
+
+    if (!v4Data.scheduleSetup) { v4Data.scheduleSetup = { week1Start: "", ppct: [], tkb: [], holidays: [], mathRatios: [] }; }
+    if (!v4Data.scheduleSetup.mathRatios) { v4Data.scheduleSetup.mathRatios = []; }
+
     }
-    return saved;
+    return v4Data;
 }
 
 let appData = initData();
 let syncTimeout = null;
 
-window.saveData = function() {
-    localStorage.setItem('gvcnData_v4', JSON.stringify(appData));
+window.saveData = function() { 
+    localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
+    window.updateDashboardInfo(); 
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
             const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
-            setDoc(docRef, appData).then(() => { console.log("☁️ Đã đồng bộ mây GVCN!"); }).catch(e => console.error(e));
-        }, 2000);
+            setDoc(docRef, appData).then(() => { console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); }).catch(e => console.error("Lỗi đồng bộ mây:", e));
+        }, 3000);
     }
+}
+
+function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+function formatDateTime() { const d = new Date(); return `${d.toLocaleDateString('vi-VN')} ${d.getHours()}:${d.getMinutes()}`; }
+
+const DB_NAME = 'GVCN_Docs_DB'; const DB_VERSION = 1; let db;
+function initIndexedDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onerror = () => reject(); request.onsuccess = (e) => { db = e.target.result; resolve(db); }; request.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' }); }; }); }
+window.saveFileToDB = function(id, file) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').put({ id: id, blob: file }); req.onsuccess = resolve; req.onerror = reject; }); }
+window.getFileFromDB = function(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readonly').objectStore('files').get(id); req.onsuccess = (e) => resolve(e.target.result ? e.target.result.blob : null); req.onerror = reject; }); }
+window.deleteFileFromDB = function(id) { return new Promise((resolve, reject) => { const req = db.transaction(['files'], 'readwrite').objectStore('files').delete(id); req.onsuccess = resolve; req.onerror = reject; }); }
+
+window.onload = async () => {
+    await initIndexedDB(); 
+    document.getElementById('today-date').innerText = new Date().toLocaleDateString('vi-VN');
+    document.getElementById('attendance-date').value = getTodayStr();
+    window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err)); }
+    window.checkAppUpdateAnnouncement();
 };
 
 window.showToast = function(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    if(!container) return;
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle text-green' : 'fa-exclamation-circle text-red'}"></i> <span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-};
+    const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = `toast ${type}`;
+    toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> <span>${message}</span>`; container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-20px)'; setTimeout(() => toast.remove(), 300); }, 3000);
+}
 
-window.toggleDrawer = function(open) {
-    document.getElementById('drawer').classList.toggle('active', open);
-    document.getElementById('drawer-overlay').classList.toggle('active', open);
-};
-
-window.switchView = function(viewId, navEl = null) {
+window.switchView = function(viewId, navElement = null) {
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-    window.scrollTo(0, 0);
-
-    document.querySelectorAll('.drawer-item').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    if(navEl) navEl.classList.add('active');
-
-    if(viewId === 'view-dashboard') renderDashboard();
-    if(viewId === 'view-students') renderStudentsList();
-    if(viewId === 'view-attendance') loadAttendanceByDate();
-    if(viewId === 'view-discipline') renderDisciplineRecords();
-    if(viewId === 'view-fees') renderFundSummary();
-    if(viewId === 'view-lesson-log') initLessonLogView();
-    if(viewId === 'view-settings') loadSettingsToUI();
-};
-
-window.openModal = function(id) { 
-    const el = document.getElementById(id);
-    if(el) el.style.display = 'flex'; 
-};
-window.closeModal = function(id) { 
-    const el = document.getElementById(id);
-    if(el) el.style.display = 'none'; 
-};
-
-function getTodayStr() { return new Date().toISOString().split('T')[0]; }
-
-function renderDashboard() {
-    const s = appData.settings;
-    document.getElementById('dash-school-year').innerText = s.schoolYear;
-    document.getElementById('dash-class-name').innerText = 'Lớp ' + s.className;
-    document.getElementById('dash-teacher-name').innerText = s.teacherName;
-    document.getElementById('dash-total-students').innerText = appData.students.length;
-
-    let today = getTodayStr();
-    let att = appData.attendance[today] || {};
-    let present = 0, absent = 0;
-    appData.students.forEach(st => {
-        let status = att[st.id] || 'present';
-        if(status === 'present') present++; else absent++;
-    });
-    document.getElementById('dash-present-today').innerText = present;
-    document.getElementById('dash-absent-today').innerText = absent;
-
-    let balance = calculateFundBalance();
-    document.getElementById('dash-fund-balance').innerText = balance.toLocaleString('vi-VN') + 'đ';
-
-    const alertsContainer = document.getElementById('dash-alerts-container');
-    alertsContainer.innerHTML = '';
-    let alertsCount = 0;
-
-    if(absent > 0) {
-        alertsCount++;
-        alertsContainer.innerHTML += `
-            <div class="alert-item red">
-                <div class="alert-icon"><i class="fas fa-user-times"></i></div>
-                <div class="alert-info"><h4>Vắng mặt hôm nay (${absent} HS)</h4><p>Kiểm tra liên hệ phụ huynh các em vắng tiết.</p></div>
-            </div>`;
-    }
-
-    let unpaidStudents = getUnpaidCampaignsCount();
-    if(unpaidStudents > 0) {
-        alertsCount++;
-        alertsContainer.innerHTML += `
-            <div class="alert-item yellow">
-                <div class="alert-icon"><i class="fas fa-coins"></i></div>
-                <div class="alert-info"><h4>Khoản thu chưa hoàn tất</h4><p>Còn ${unpaidStudents} lượt chưa nộp các khoản quỹ.</p></div>
-            </div>`;
-    }
-
-    if(alertsCount === 0) {
-        alertsContainer.innerHTML = `<div class="alert-item green"><div class="alert-icon"><i class="fas fa-check-circle"></i></div><div class="alert-info"><h4>Tất cả ổn định!</h4><p>Chưa có vấn đề gì cần lưu ý hôm nay.</p></div></div>`;
-    }
-    document.getElementById('dash-badge-alerts').innerText = alertsCount + ' việc';
-
-    const llList = document.getElementById('dash-ll-list');
-    if (llList) {
-        llList.innerHTML = '';
-        let todaysLessons = (appData.scheduleRecords || []).filter(r => r.date === today);
-        document.getElementById('dash-ll-date').innerText = new Date().toLocaleDateString('vi-VN');
-        if(todaysLessons.length === 0) {
-            llList.innerHTML = `<div style="text-align:center; font-size:0.85rem; opacity:0.85; color:white; padding:5px;">Hôm nay không có tiết dạy nào.</div>`;
-        } else {
-            todaysLessons.sort((a,b) => a.period - b.period).forEach(l => {
-                let stIcon = l.status === 'off' ? 'fa-times text-red' : (l.status === 'completed' ? 'fa-check text-green' : 'fa-clock text-blue');
-                llList.innerHTML += `
-                    <div class="ll-item">
-                        <div class="ll-period"><span>Tiết</span>${l.period}</div>
-                        <div class="ll-content">
-                            <h4>${l.subject} - Lớp ${l.className}</h4>
-                            <p>${l.content}</p>
-                        </div>
-                        <i class="fas ${stIcon}" style="background:white; padding:6px; border-radius:50%; font-size:0.8rem;"></i>
-                    </div>
-                `;
-            });
-        }
-        let currentWeek = todaysLessons.length > 0 ? todaysLessons[0].week : 1;
-        let weekLessons = (appData.scheduleRecords || []).filter(r => r.week == currentWeek && r.status !== 'off').length;
-        document.getElementById('dash-ll-week-count').innerText = weekLessons;
-    }
+    document.getElementById(viewId).classList.add('active'); window.scrollTo(0, 0);
+    if (navElement) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); navElement.classList.add('active'); }
+    if(viewId === 'view-settings') window.loadSettings(); if(viewId === 'view-attendance') window.renderAttendance(); if(viewId === 'view-discipline') window.renderDisciplineStudents();
+    if(viewId === 'view-announcements') window.renderNotifies(); if(viewId === 'view-plans') window.renderKanban(); if(viewId === 'view-docs') window.renderDocs();
+    if(viewId === 'view-lesson-log') window.initLessonLogView();
 }
+window.openModal = function(id) { document.getElementById(id).style.display = 'flex'; }
+window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
 
-function calculateFundBalance() {
-    let tin = 0, tout = 0;
-    appData.fundLogs.forEach(l => {
-        if(l.type === 'in') tin += l.amount; else tout += l.amount;
-    });
-    return tin - tout;
-}
-
-function getUnpaidCampaignsCount() {
-    let count = 0;
-    appData.fundCampaigns.forEach(c => {
-        let paidCount = Object.values(c.paid || {}).filter(v => v).length;
-        count += (appData.students.length - paidCount);
-    });
-    return count;
-}
-
-let isSeatmapView = false;
-window.toggleStudentSubView = function() {
-    isSeatmapView = !isSeatmapView;
-    document.getElementById('subview-students-list').style.display = isSeatmapView ? 'none' : 'block';
-    document.getElementById('subview-seatmap').style.display = isSeatmapView ? 'block' : 'none';
-    document.getElementById('btn-toggle-subview-icon').className = isSeatmapView ? 'fas fa-list' : 'fas fa-th';
-    if(isSeatmapView) renderSeatmap(); else renderStudentsList();
-};
-
-window.renderStudentsList = function() {
-    const container = document.getElementById('students-container');
-    container.innerHTML = '';
-    const query = (document.getElementById('search-student-input')?.value || '').toLowerCase();
-    const list = appData.students.filter(s => s.name.toLowerCase().includes(query));
-
-    if(list.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Không tìm thấy học sinh nào.</div>';
-        return;
-    }
-
-    list.forEach((st, idx) => {
-        let initials = st.name.split(' ').map(n=>n[0]).slice(-2).join('').toUpperCase();
-        let item = document.createElement('div');
-        item.className = 'student-card';
-        item.innerHTML = `
-            <div class="student-avatar ${st.gender === 'Nữ' ? 'female' : ''}">${initials}</div>
-            <div class="student-info">
-                <h4>${st.name}</h4>
-                <p>Tổ ${st.team} | ${st.gender} | Sinh: ${st.dob || '--'}</p>
-            </div>
-            <div class="student-actions">
-                ${st.parentPhone ? `<a href="tel:${st.parentPhone}" class="btn-outline-action text-blue"><i class="fas fa-phone"></i></a>` : ''}
-                <button class="btn-outline-action text-red" onclick="deleteStudent(${st.id})"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
-        container.appendChild(item);
-    });
-};
-
-window.saveNewStudent = function() {
-    let name = document.getElementById('add-stu-name').value.trim();
-    let gender = document.getElementById('add-stu-gender').value;
-    let team = document.getElementById('add-stu-team').value;
-    let dob = document.getElementById('add-stu-dob').value;
-    let phone = document.getElementById('add-stu-parent-phone').value.trim();
-    let note = document.getElementById('add-stu-note').value.trim();
-
-    if(!name) return window.showToast('Vui lòng nhập họ và tên!', 'error');
-
-    appData.students.push({
-        id: Date.now(),
-        name: name,
-        gender: gender,
-        team: parseInt(team),
-        dob: dob,
-        parentPhone: phone,
-        note: note,
-        seatIndex: -1
-    });
-
+// ================= TÍNH NĂNG ĐỔI GIAO DIỆN =================
+window.changeTheme = function(themeName, element) {
+    document.body.className = themeName === 'default' ? '' : themeName;
+    document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+    if(element) element.classList.add('active');
+    appData.settings.theme = themeName;
     window.saveData();
-    window.closeModal('modal-add-student');
-    window.renderStudentsList();
-    window.showToast('Đã thêm học sinh thành công!');
-    document.getElementById('add-stu-name').value = '';
-};
-
-window.deleteStudent = function(id) {
-    if(confirm('Bạn có chắc chắn muốn xóa học sinh này khỏi danh sách lớp?')) {
-        appData.students = appData.students.filter(s => s.id !== id);
-        window.saveData();
-        window.renderStudentsList();
-        window.showToast('Đã xóa học sinh.');
-    }
-};
-
-window.renderSeatmap = function() {
-    const grid = document.getElementById('seatmap-grid-container');
-    grid.innerHTML = '';
-    const s = appData.settings;
-    grid.style.gridTemplateColumns = `repeat(${s.seatCols}, 1fr)`;
-
-    let totalSeats = s.seatRows * s.seatCols;
-    for(let i = 0; i < totalSeats; i++) {
-        let student = appData.students.find(st => st.seatIndex === i);
-        let cell = document.createElement('div');
-        cell.className = `seat-cell ${student ? 'occupied' : ''}`;
-        cell.innerHTML = student ? `<strong>${student.name}</strong><br><small>Tổ ${student.team}</small>` : `<span>Bàn ${i+1}</span>`;
-        cell.onclick = () => assignSeat(i);
-        grid.appendChild(cell);
-    }
-};
-
-function assignSeat(seatIdx) {
-    let options = ['-- Bỏ trống chỗ này --', ...appData.students.map((st, i) => `${i+1}. ${st.name}`)];
-    let choice = prompt(`Sắp chỗ Bàn số ${seatIdx+1}:\nNhập STT học sinh (hoặc 0 để bỏ trống):`);
-    if(choice === null) return;
-    let num = parseInt(choice);
-    if(isNaN(num) || num < 0 || num > appData.students.length) return alert('Lựa chọn không hợp lệ!');
-
-    appData.students.forEach(st => { if(st.seatIndex === seatIdx) st.seatIndex = -1; });
-    if(num > 0) {
-        appData.students[num-1].seatIndex = seatIdx;
-    }
-    window.saveData();
-    window.renderSeatmap();
+    window.showToast("Đã đổi màu giao diện!", "success");
 }
 
-window.updateSeatmapDimensions = function() {
-    appData.settings.seatCols = parseInt(document.getElementById('seatmap-cols').value) || 4;
-    appData.settings.seatRows = parseInt(document.getElementById('seatmap-rows').value) || 5;
-    window.saveData();
-    window.renderSeatmap();
-};
-
-window.loadAttendanceByDate = function() {
-    let inputDate = document.getElementById('attendance-current-date');
-    if(!inputDate.value) inputDate.value = getTodayStr();
-    let curDate = inputDate.value;
-
-    if(!appData.attendance[curDate]) {
-        appData.attendance[curDate] = {};
-        appData.students.forEach(st => { appData.attendance[curDate][st.id] = 'present'; });
+window.loadSettings = function() { 
+    const s = appData.settings; 
+    document.getElementById('set-teacher').value = s.teacherName || ''; 
+    document.getElementById('set-class').value = s.className || ''; 
+    document.getElementById('set-year').value = s.year || ''; 
+    document.getElementById('set-auto-absent').checked = s.autoAbsentDisc || false; 
+    document.getElementById('set-auto-late').checked = s.autoLateDisc || false; 
+    document.getElementById('set-warn-absent').value = s.warnAbsent || 3; 
+    document.getElementById('set-warn-behavior').value = s.warnBehavior || -5; 
+    
+    if(document.getElementById('set-api-key')) {
+        document.getElementById('set-api-key').value = s.apiKey || '';
     }
 
-    let att = appData.attendance[curDate];
-    const container = document.getElementById('attendance-container');
-    container.innerHTML = '';
-    let present = 0, absent = 0;
-
-    appData.students.forEach((st, idx) => {
-        let status = att[st.id] || 'present';
-        if(status === 'present') present++; else absent++;
-
-        let row = document.createElement('div');
-        row.className = 'attendance-row';
-        row.innerHTML = `
-            <div style="flex:1;">
-                <strong>${idx+1}. ${st.name}</strong>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin:0;">Tổ ${st.team}</p>
-            </div>
-            <div class="att-status-buttons">
-                <button class="btn-att ${status === 'present' ? 'present' : ''}" onclick="setStudentAttStatus('${curDate}', ${st.id}, 'present')"><i class="fas fa-check"></i></button>
-                <button class="btn-att ${status === 'permitted' ? 'permitted' : ''}" onclick="setStudentAttStatus('${curDate}', ${st.id}, 'permitted')">P</button>
-                <button class="btn-att ${status === 'absent' ? 'absent' : ''}" onclick="setStudentAttStatus('${curDate}', ${st.id}, 'absent')"><i class="fas fa-times"></i></button>
-            </div>
-        `;
-        container.appendChild(row);
-    });
-
-    document.getElementById('att-summary-total').innerText = appData.students.length;
-    document.getElementById('att-summary-present').innerText = present;
-    document.getElementById('att-summary-absent').innerText = absent;
-};
-
-window.setStudentAttStatus = function(dateStr, stId, status) {
-    if(!appData.attendance[dateStr]) appData.attendance[dateStr] = {};
-    appData.attendance[dateStr][stId] = status;
-    window.saveData();
-    window.loadAttendanceByDate();
-};
-
-window.changeAttendanceDate = function(offset) {
-    let d = new Date(document.getElementById('attendance-current-date').value);
-    d.setDate(d.getDate() + offset);
-    document.getElementById('attendance-current-date').value = d.toISOString().split('T')[0];
-    window.loadAttendanceByDate();
-};
-
-window.saveAttendance = function() {
-    window.saveData();
-    window.showToast('Đã lưu điểm danh ngày hôm nay!');
-};
-
-window.switchDisciplineTab = function(tab, btn) {
-    document.querySelectorAll('#view-discipline .tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-discipline-violations').style.display = tab === 'violations' ? 'block' : 'none';
-    document.getElementById('tab-discipline-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
-    if(tab === 'violations') renderDisciplineRecords(); else renderDisciplineLeaderboard();
-};
-
-function renderDisciplineRecords() {
-    const container = document.getElementById('discipline-records-container');
-    container.innerHTML = '';
-    if(appData.discipline.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Lớp chưa có ghi nhận vi phạm nào.</div>';
-        return;
-    }
-    appData.discipline.slice().reverse().forEach((d, idx) => {
-        let st = appData.students.find(s => s.id === d.studentId);
-        let item = document.createElement('div');
-        item.className = 'record-card';
-        item.innerHTML = `
-            <div style="flex:1;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <strong>${st ? st.name : 'Đã xóa'}</strong>
-                    <span class="badge ${d.type === 'violation' ? 'badge-red' : 'badge-green'}">${d.type === 'violation' ? '-' : '+'}${d.points}đ</span>
-                </div>
-                <p style="font-size:0.85rem; color:var(--text-main); margin:0;">${d.reason}</p>
-                <small style="color:var(--text-muted); font-size:0.75rem;">${d.date}</small>
-            </div>
-            <button class="btn-outline-action text-red" style="margin-left:10px;" onclick="deleteDiscipline(${d.id})"><i class="fas fa-trash"></i></button>
-        `;
-        container.appendChild(item);
+    let currentTheme = s.theme || 'default';
+    document.body.className = currentTheme === 'default' ? '' : currentTheme;
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('onclick').includes(currentTheme)) btn.classList.add('active');
     });
 }
 
-function renderDisciplineLeaderboard() {
-    const container = document.getElementById('discipline-leaderboard-container');
-    container.innerHTML = '';
-    let scores = {};
-    appData.students.forEach(st => { scores[st.id] = 100; });
-    appData.discipline.forEach(d => {
-        if(scores[d.studentId] !== undefined) {
-            if(d.type === 'violation') scores[d.studentId] -= d.points;
-            else scores[d.studentId] += d.points;
-        }
-    });
-
-    let sorted = appData.students.map(st => ({ student: st, score: scores[st.id] })).sort((a,b) => b.score - a.score);
-
-    sorted.forEach((item, i) => {
-        let row = document.createElement('div');
-        row.className = 'leaderboard-row';
-        row.innerHTML = `
-            <div class="lb-rank ${i<3 ? 'top text-orange' : ''}">#${i+1}</div>
-            <div style="flex:1;"><strong>${item.student.name}</strong><br><small class="text-muted">Tổ ${item.student.team}</small></div>
-            <div class="lb-score ${item.score < 80 ? 'text-red' : 'text-green'}">${item.score}đ</div>
-        `;
-        container.appendChild(row);
-    });
-}
-
-window.saveDisciplineRecord = function() {
-    let stId = parseInt(document.getElementById('disc-student-select').value);
-    let type = document.getElementById('disc-type').value;
-    let points = parseInt(document.getElementById('disc-points').value) || 2;
-    let reason = document.getElementById('disc-reason').value.trim();
-    let date = document.getElementById('disc-date').value || getTodayStr();
-
-    if(!stId || !reason) return window.showToast('Vui lòng nhập đủ thông tin!', 'error');
-
-    appData.discipline.push({ id: Date.now(), studentId: stId, type: type, points: points, reason: reason, date: date });
-    window.saveData();
-    window.closeModal('modal-add-discipline');
-    renderDisciplineRecords();
-    window.showToast('Đã lưu ghi nhận kỷ luật!');
-    document.getElementById('disc-reason').value = '';
-};
-
-window.deleteDiscipline = function(id) {
-    appData.discipline = appData.discipline.filter(d => d.id !== id);
-    window.saveData();
-    renderDisciplineRecords();
-};
-
-window.switchFundTab = function(tab, btn) {
-    document.querySelectorAll('#view-fees .tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-fund-campaigns').style.display = tab === 'campaigns' ? 'block' : 'none';
-    document.getElementById('tab-fund-logs').style.display = tab === 'logs' ? 'block' : 'none';
-    if(tab === 'campaigns') renderFundCampaigns(); else renderFundLogs();
-};
-
-function renderFundSummary() {
-    let tin = 0, tout = 0;
-    appData.fundLogs.forEach(l => { if(l.type === 'in') tin += l.amount; else tout += l.amount; });
-    document.getElementById('fund-total-balance').innerText = (tin - tout).toLocaleString('vi-VN') + ' VNĐ';
-    document.getElementById('fund-total-in').innerText = tin.toLocaleString('vi-VN') + 'đ';
-    document.getElementById('fund-total-out').innerText = tout.toLocaleString('vi-VN') + 'đ';
-    renderFundCampaigns();
-}
-
-function renderFundCampaigns() {
-    const container = document.getElementById('fund-campaigns-container');
-    container.innerHTML = '';
-    if(appData.fundCampaigns.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Chưa có đợt thu nào. Bấm tạo đợt thu mới!</div>';
-        return;
-    }
-    appData.fundCampaigns.slice().reverse().forEach(c => {
-        let paidCount = Object.values(c.paid || {}).filter(v => v).length;
-        let card = document.createElement('div');
-        card.className = 'campaign-card';
-        card.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div>
-                    <h4>${c.title}</h4>
-                    <p class="text-blue">Mức thu: ${c.amount.toLocaleString('vi-VN')}đ / HS</p>
-                </div>
-                <span class="badge ${paidCount === appData.students.length ? 'badge-green' : 'badge-yellow'}">${paidCount}/${appData.students.length} đã nộp</span>
-            </div>
-            <div class="action-row mt-10">
-                <button class="btn-outline text-blue" onclick="openCampaignDetails(${c.id})"><i class="fas fa-list-check"></i> Xem danh sách thu</button>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-}
-
-function renderFundLogs() {
-    const container = document.getElementById('fund-logs-container');
-    container.innerHTML = '';
-    if(appData.fundLogs.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Chưa có nhật ký thu chi.</div>';
-        return;
-    }
-    appData.fundLogs.slice().reverse().forEach(l => {
-        let item = document.createElement('div');
-        item.className = 'fund-log-item';
-        item.innerHTML = `
-            <div><strong>${l.desc}</strong><br><small class="text-muted">${l.date}</small></div>
-            <div class="${l.type === 'in' ? 'text-green' : 'text-red'}"><strong>${l.type === 'in' ? '+' : '-'}${l.amount.toLocaleString('vi-VN')}đ</strong></div>
-        `;
-        container.appendChild(item);
-    });
-}
-
-window.saveFundLog = function() {
-    let type = document.getElementById('fund-log-type').value;
-    let amount = parseInt(document.getElementById('fund-log-amount').value);
-    let desc = document.getElementById('fund-log-desc').value.trim();
-    let date = document.getElementById('fund-log-date').value || getTodayStr();
-
-    if(isNaN(amount) || amount <= 0 || !desc) return window.showToast('Vui lòng nhập đủ thông tin!', 'error');
-
-    appData.fundLogs.push({ id: Date.now(), type: type, amount: amount, desc: desc, date: date });
-    window.saveData();
-    window.closeModal('modal-add-fund');
-    renderFundSummary();
-    renderFundLogs();
-    window.showToast('Đã lưu giao dịch thu chi!');
-};
-
-window.createFundCampaign = function() {
-    let title = document.getElementById('camp-title').value.trim();
-    let amount = parseInt(document.getElementById('camp-amount').value);
-    let deadline = document.getElementById('camp-deadline').value;
-
-    if(!title || isNaN(amount)) return window.showToast('Nhập đủ tên và số tiền!', 'error');
-
-    appData.fundCampaigns.push({ id: Date.now(), title: title, amount: amount, deadline: deadline, paid: {} });
-    window.saveData();
-    window.closeModal('modal-create-campaign');
-    renderFundCampaigns();
-    window.showToast('Đã tạo đợt thu mới thành công!');
-};
-
-function extractGrade(className) {
-    if (!className) return "";
-    let str = String(className).trim();
-    let match = str.match(/(?:Khối\s*)?([1-9]|1[0-2])/i);
-    return match ? match[1] : str.toLowerCase();
-}
-
-window.renderSetupData = function() {
-    let stp = appData.scheduleSetup;
-    if (!stp) { stp = { week1Start: "", ppct: [], tkb: [], holidays: [], mathRatios: [] }; appData.scheduleSetup = stp; }
-    if (!stp.mathRatios) stp.mathRatios = [];
-    document.getElementById('setup-week1-date').value = stp.week1Start || '';
-    document.getElementById('setup-tkb-count').innerText = (stp.tkb || []).length + " bản ghi";
-    document.getElementById('setup-ppct-count').innerText = (stp.ppct || []).length + " bài dạy";
-    document.getElementById('setup-holidays-count').innerText = (stp.holidays || []).length + " sự kiện";
-    document.getElementById('setup-math-ratio-count').innerText = stp.mathRatios.length + " cấu hình";
-
-    const tbodyTKB = document.getElementById('tkb-tbody'); 
-    if(tbodyTKB) {
-        tbodyTKB.innerHTML = '';
-        (stp.tkb || []).forEach((t, i) => { tbodyTKB.innerHTML += `<tr><td>${t.dayOfWeek}</td><td>${t.period}</td><td>${t.className}</td><td>${t.subject}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('tkb', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
+window.saveSettings = function() { 
+    appData.settings.teacherName = document.getElementById('set-teacher').value; 
+    appData.settings.className = document.getElementById('set-class').value; 
+    appData.settings.year = document.getElementById('set-year').value; 
+    
+    if(document.getElementById('set-api-key')) {
+        appData.settings.apiKey = document.getElementById('set-api-key').value.trim();
     }
     
-    const tbodyPPCT = document.getElementById('ppct-tbody'); 
-    if(tbodyPPCT) {
-        tbodyPPCT.innerHTML = '';
-        (stp.ppct || []).forEach((p, i) => { 
-            let br = p.branch ? `<span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:6px; font-weight:bold;">${p.branch}</span>` : '-';
-            tbodyPPCT.innerHTML += `<tr><td>${p.className}</td><td>${p.subject}</td><td>${br}</td><td>${p.ppct}</td><td>${p.content.substring(0,20)}...</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; 
-        });
-    }
-
-    const tbodyHol = document.getElementById('hol-tbody'); 
-    if(tbodyHol) {
-        tbodyHol.innerHTML = '';
-        (stp.holidays || []).forEach((h, i) => { tbodyHol.innerHTML += `<tr><td>${h.start}</td><td>${h.end}</td><td>${h.name}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('holidays', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
-    }
-
-    const tbodyMath = document.getElementById('math-ratio-tbody');
-    if (tbodyMath) {
-        tbodyMath.innerHTML = '';
-        stp.mathRatios.forEach((m, i) => {
-            tbodyMath.innerHTML += `<tr><td><b>Khối ${m.grade}</b></td><td>Tuần ${m.fromWeek} - ${m.toWeek}</td><td><b>${m.dai} Đại - ${m.hinh} Hình</b></td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('mathRatios', ${i})"><i class="fas fa-times"></i></button></td></tr>`;
-        });
-    }
-};
-
-window.delSetupData = function(type, index) { 
-    appData.scheduleSetup[type].splice(index, 1); 
     window.saveData(); 
-    window.renderSetupData(); 
-};
+    window.showToast("✅ Đã lưu cài đặt!"); 
+}
 
-window.clearAllSetupData = function(type) {
-    let typeName = (type === 'tkb') ? 'Thời khóa biểu' : ((type === 'ppct') ? 'Phân phối chương trình' : 'Lịch nghỉ lễ');
-    let currentCount = (appData.scheduleSetup[type] || []).length;
-    if (currentCount === 0) return window.showToast(`Danh sách ${typeName} đang trống!`, "error");
-    if (confirm(`⚠️ Bạn có chắc chắn muốn XÓA TẤT CẢ ${currentCount} dòng dữ liệu của ${typeName} không?`)) {
-        appData.scheduleSetup[type] = [];
-        window.saveData();
-        window.renderSetupData();
-        window.showToast(`✅ Đã xóa toàn bộ ${typeName}!`, "success");
-    }
-};
+window.saveConfig = function() { appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; appData.settings.autoLateDisc = document.getElementById('set-auto-late').checked; appData.settings.warnAbsent = parseInt(document.getElementById('set-warn-absent').value) || 3; appData.settings.warnBehavior = parseInt(document.getElementById('set-warn-behavior').value) || -5; window.saveData(); window.showToast("Đã lưu cấu hình tự động!"); }
+window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
 
-window.addTKB = function() {
-    let d = document.getElementById('add-tkb-day').value, p = document.getElementById('add-tkb-period').value, c = document.getElementById('add-tkb-class').value, s = document.getElementById('add-tkb-subject').value;
-    if(!d || !p || !c || !s) return window.showToast("Nhập đủ thông tin!", "error");
-    appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(d), period: parseInt(p), className: c.trim(), subject: s.trim() });
-    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm TKB!");
-};
 
-window.addPPCT = function() {
-    let c = document.getElementById('add-ppct-class').value, s = document.getElementById('add-ppct-subject').value, p = document.getElementById('add-ppct-period').value, n = document.getElementById('add-ppct-content').value;
-    let br = document.getElementById('add-ppct-branch') ? document.getElementById('add-ppct-branch').value.trim() : '';
-    if(!c || !s || !p || !n) return window.showToast("Nhập đủ thông tin!", "error");
+// ================= DASHBOARD =================
+window.updateDashboardInfo = function() {
+    const s = appData.settings;
+    document.getElementById('dash-teacher').innerText = s.teacherName; document.getElementById('dash-class').innerText = s.className; document.getElementById('dash-year').innerText = s.year;
     
-    if(!br && s.toLowerCase().includes('toán')) {
-        let lowN = n.toLowerCase();
-        if(lowN.includes('hình') || lowN.includes('góc') || lowN.includes('tam giác')) br = 'Hình';
-        else br = 'Đại';
-    }
-    
-    appData.scheduleSetup.ppct.push({ className: c.trim(), subject: s.trim(), branch: br, ppct: parseInt(p), content: n.trim() });
-    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm PPCT!");
-};
+    const totalStu = appData.students.length; document.getElementById('dash-count').innerText = totalStu + " HS"; document.getElementById('stat-total').innerText = totalStu;
+    const today = getTodayStr(); let presentCount = totalStu, absentCount = 0;
+    if(appData.attendance[today]) { presentCount = 0; absentCount = 0; Object.values(appData.attendance[today]).forEach(st => { if(st === 'present') presentCount++; if(st === 'excused' || st === 'unexcused') absentCount++; }); }
+    document.getElementById('dash-attendance-percent').innerText = (totalStu > 0 ? Math.round((presentCount / totalStu) * 100) : 100) + "%";
+    document.getElementById('stat-present').innerText = presentCount; document.getElementById('stat-absent').innerText = absentCount;
+    document.getElementById('stat-good').innerText = appData.behaviorRecords.filter(r => r.date === today && r.type === 'positive').length;
 
-window.addMathRatio = function() {
-    let grade = document.getElementById('add-math-grade').value.trim();
-    let fw = parseInt(document.getElementById('add-math-from-week').value);
-    let tw = parseInt(document.getElementById('add-math-to-week').value);
-    let dai = parseInt(document.getElementById('add-math-dai').value);
-    let hinh = parseInt(document.getElementById('add-math-hinh').value);
-    
-    if(!grade || isNaN(fw) || isNaN(tw) || isNaN(dai) || isNaN(hinh)) return window.showToast("Điền đủ thông tin!", "error");
-    grade = extractGrade(grade);
-    appData.scheduleSetup.mathRatios.push({ grade: grade, fromWeek: fw, toWeek: tw, dai: dai, hinh: hinh });
-    window.saveData(); window.renderSetupData(); window.showToast(`Đã thêm tỉ lệ Khối ${grade}!`);
-};
+    document.getElementById('dash-notify-count').innerText = appData.notifications.length + " TB";
+    document.getElementById('dash-task-count').innerText = appData.tasks.length + " việc";
+    document.getElementById('dash-doc-count').innerText = appData.documents.length + " file";
 
-window.addHoliday = function() {
-    let s = document.getElementById('add-hol-start').value, e = document.getElementById('add-hol-end').value, n = document.getElementById('add-hol-name').value;
-    if(!s || !e || !n) return window.showToast("Nhập đủ thông tin!", "error");
-    appData.scheduleSetup.holidays.push({ start: s, end: e, name: n.trim() });
-    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm ngày nghỉ!");
-};
-
-let currentImportType = '';
-window.triggerImport = function(type) { currentImportType = type; document.getElementById('general-import-file').click(); };
-
-window.handleGeneralImport = function(event) {
-    const file = event.target.files[0]; if (!file) return; const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'docx') {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            mammoth.convertToHtml({arrayBuffer: ev.target.result}).then(function(result) {
-                let doc = new DOMParser().parseFromString(result.value, 'text/html'); let tables = doc.querySelectorAll('table'); let count = 0;
-                tables.forEach(table => {
-                    let rows = table.querySelectorAll('tr'); let tietIdx = -1, ndIdx = -1;
-                    rows.forEach(tr => {
-                        let cells = Array.from(tr.querySelectorAll('th, td')).map(c => c.innerText.trim());
-                        if (tietIdx === -1) {
-                            cells.forEach((txt, i) => { if(txt.toLowerCase().includes('tiết')) tietIdx = i; else if(txt.toLowerCase().includes('bài') || txt.toLowerCase().includes('nội dung')) ndIdx = i; });
-                        } else if (cells.length > Math.max(tietIdx, ndIdx)) {
-                            let tiet = parseInt(cells[tietIdx]); let nd = cells[ndIdx];
-                            if(!isNaN(tiet) && nd) { appData.scheduleSetup.ppct.push({ className: "9A", subject: "Toán", ppct: tiet, content: nd }); count++; }
-                        }
-                    });
-                });
-                window.saveData(); window.renderSetupData(); window.showToast(`Đã import ${count} bài dạy từ Word!`);
-            });
-        };
-        reader.readAsArrayBuffer(file);
+    const llList = document.getElementById('dash-ll-list'); llList.innerHTML = '';
+    let todaysLessons = appData.scheduleRecords.filter(r => r.date === today);
+    document.getElementById('dash-ll-date').innerText = new Date().toLocaleDateString('vi-VN');
+    if(todaysLessons.length === 0) {
+        llList.innerHTML = `<div class="text-center w-full" style="font-size:0.85rem; opacity:0.8; color: white;">Hôm nay không có tiết dạy nào.</div>`;
     } else {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' }); let rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]); let count = 0;
-                rows.forEach(r => {
-                    if(currentImportType === 'tkb' && r['Thứ'] && r['Tiết'] && r['Lớp']) {
-                        appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(r['Thứ']), period: parseInt(r['Tiết']), className: String(r['Lớp']), subject: String(r['Môn']) }); count++;
-                    } else if(currentImportType === 'ppct' && r['Tiết']) {
-                        let p = parseInt(r['Tiết']); let n = String(r['Nội dung'] || r['Tên bài'] || '');
-                        if(!isNaN(p) && n) { appData.scheduleSetup.ppct.push({ className: String(r['Lớp'] || "9"), subject: String(r['Môn'] || "Toán"), branch: String(r['Phân môn'] || ''), ppct: p, content: n }); count++; }
-                    } else if(currentImportType === 'holidays' && r['Từ ngày'] && r['Đến ngày']) {
-                        appData.scheduleSetup.holidays.push({ start: r['Từ ngày'], end: r['Đến ngày'], name: r['Sự kiện'] || "Nghỉ lễ" }); count++;
-                    }
-                });
-                window.saveData(); window.renderSetupData(); window.showToast(`Đã import ${count} dòng!`);
-            } catch(e) { window.showToast("Lỗi định dạng file Excel!", "error"); }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-    event.target.value = "";
-};
-
-window.checkIsHoliday = function(dateStr) {
-    let d = new Date(dateStr);
-    for(let h of (appData.scheduleSetup.holidays || [])) { if(d >= new Date(h.start) && d <= new Date(h.end)) return h; } return null;
-};
-
-window.generateAutoSchedule = function() {
-    let startDate = document.getElementById('setup-week1-date').value;
-    if(!startDate) return window.showToast("Chọn ngày bắt đầu Tuần 1!", "error");
-    appData.scheduleSetup.week1Start = startDate;
-    let records = [];
-
-    let ppctMaster = {};
-    (appData.scheduleSetup.ppct || []).slice().sort((a,b) => a.ppct - b.ppct).forEach(p => {
-        let grade = extractGrade(p.className); let subj = p.subject.trim().toLowerCase(); let branch = (p.branch || '').trim();
-        let key = branch ? `${subj}-${grade}-${branch}` : `${subj}-${grade}`;
-        if(!ppctMaster[key]) ppctMaster[key] = [];
-        ppctMaster[key].push({...p});
-    });
-
-    let classQueues = {};
-    let classes = [...new Set((appData.scheduleSetup.tkb || []).map(t => t.className.trim()))];
-    let subjects = [...new Set((appData.scheduleSetup.tkb || []).map(t => t.subject.trim()))];
-
-    classes.forEach(cName => {
-        let grade = extractGrade(cName);
-        subjects.forEach(sName => {
-            let sLower = sName.toLowerCase(); let cLower = cName.toLowerCase();
-            if(sLower.includes('toán')) {
-                classQueues[`${sLower}-${cLower}-Đại`] = ppctMaster[`${sLower}-${grade}-Đại`] ? JSON.parse(JSON.stringify(ppctMaster[`${sLower}-${grade}-Đại`])) : [];
-                classQueues[`${sLower}-${cLower}-Hình`] = ppctMaster[`${sLower}-${grade}-Hình`] ? JSON.parse(JSON.stringify(ppctMaster[`${sLower}-${grade}-Hình`])) : [];
-            } else {
-                classQueues[`${sLower}-${cLower}`] = ppctMaster[`${sLower}-${grade}`] ? JSON.parse(JSON.stringify(ppctMaster[`${sLower}-${grade}`])) : [];
-            }
+        todaysLessons.sort((a,b) => a.period - b.period).forEach(l => {
+            let stIcon = l.status === 'off' ? 'fa-times text-red' : (l.status === 'completed' ? 'fa-check text-green' : 'fa-clock text-blue');
+            llList.innerHTML += `<div class="ll-item"><div class="ll-period"><span>Tiết</span>${l.period}</div><div class="ll-content"><h4>${l.subject} - ${l.className}</h4><p>${l.content}</p></div><i class="fas ${stIcon}" style="background: white; padding: 5px; border-radius: 50%;"></i></div>`;
         });
-    });
-
-    let currentDate = new Date(startDate);
-    for(let w = 1; w <= 35; w++) {
-        let mathCountInWeek = {};
-        for(let d = 2; d <= 7; d++) {
-            let dateStr = currentDate.toISOString().split('T')[0];
-            let holiday = window.checkIsHoliday(dateStr);
-            let dayTKB = (appData.scheduleSetup.tkb || []).filter(t => t.dayOfWeek == d).sort((a,b) => a.period - b.period);
-
-            dayTKB.forEach(tItem => {
-                let sLower = tItem.subject.trim().toLowerCase(); let cLower = tItem.className.trim().toLowerCase();
-                let grade = extractGrade(tItem.className); let isMath = sLower.includes('toán');
-                let targetBranch = '';
-                if(isMath) {
-                    if (mathCountInWeek[cLower] === undefined) mathCountInWeek[cLower] = 0;
-                    targetBranch = (mathCountInWeek[cLower] < 3) ? 'Đại' : 'Hình';
-                }
-                let qKey = (isMath && targetBranch) ? `${sLower}-${cLower}-${targetBranch}` : `${sLower}-${cLower}`;
-
-                if(holiday) {
-                    records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "NGHỈ LỄ - " + holiday.name, status: "off" });
-                } else if(classQueues[qKey] && classQueues[qKey].length > 0) {
-                    let lesson = classQueues[qKey].shift();
-                    records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: lesson.ppct, content: lesson.content, status: "scheduled" });
-                    if(isMath) mathCountInWeek[cLower]++;
-                } else {
-                    records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "Ôn tập / Tự chọn", status: "scheduled" });
-                }
-            });
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
     }
-    appData.scheduleRecords = records;
-    window.saveData();
-    window.closeModal('modal-setup-lesson-log');
-    initLessonLogView();
-    window.showToast("🎉 Đã tạo Sổ Báo Giảng tự động thành công!");
-};
+    
+    let currentWeek = todaysLessons.length > 0 ? todaysLessons[0].week : 1;
+    let weekLessons = appData.scheduleRecords.filter(r => r.week == currentWeek && r.status !== 'off').length;
+    document.getElementById('dash-ll-week-count').innerText = weekLessons;
 
-function initLessonLogView() {
-    const sel = document.getElementById('ll-week-select'); if(!sel) return;
-    sel.innerHTML = '';
+    const alertsHtml = document.getElementById('dash-alerts'); 
+    if (alertsHtml) {
+        alertsHtml.innerHTML = '';
+        let stuMap = {}; appData.students.forEach(st => { stuMap[st.id] = { name: st.name, absent: 0, points: 0 }; });
+        Object.values(appData.attendance).forEach(day => { Object.keys(day).forEach(sid => { if(day[sid] === 'unexcused' && stuMap[sid]) stuMap[sid].absent++; }); });
+        appData.behaviorRecords.forEach(r => { if(stuMap[r.studentId]) stuMap[r.studentId].points += Number(r.snapshotPoints); });
+        let hasAlert = false;
+        Object.keys(stuMap).forEach(sid => {
+            let stu = stuMap[sid];
+            if(stu.absent >= s.warnAbsent) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item yellow"><div class="alert-icon"><i class="fas fa-calendar-times"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Nghỉ không phép ${stu.absent} buổi</p></div></div>`; }
+            if(stu.points <= s.warnBehavior) { hasAlert = true; alertsHtml.innerHTML += `<div class="alert-item red"><div class="alert-icon"><i class="fas fa-exclamation"></i></div><div class="alert-info"><strong>${stu.name}</strong><p>Điểm thi đua chạm mốc ${stu.points} điểm</p></div></div>`; }
+        });
+        if(!hasAlert) alertsHtml.innerHTML = '<div class="text-center text-muted" style="padding: 10px;">Lớp đang hoạt động rất tốt! 🎉</div>';
+    }
+
+    window.updateLeaderboard();
+}
+
+window.initLessonLogView = function() {
+    const sel = document.getElementById('ll-week-select'); sel.innerHTML = '';
     let maxWeek = 1;
-    (appData.scheduleRecords || []).forEach(r => { if(r.week > maxWeek) maxWeek = r.week; });
-    for(let i = 1; i <= maxWeek; i++) sel.innerHTML += `<option value="${i}">Sổ báo giảng - Tuần ${i}</option>`;
-    let today = getTodayStr();
-    let todayRecord = (appData.scheduleRecords || []).find(r => r.date === today);
+    appData.scheduleRecords.forEach(r => { if(r.week > maxWeek) maxWeek = r.week; });
+    for(let i=1; i<=maxWeek; i++) { sel.innerHTML += `<option value="${i}">Sổ báo giảng - Tuần ${i}</option>`; }
+    let today = getTodayStr(); let todayRecord = appData.scheduleRecords.find(r => r.date === today);
     if(todayRecord) sel.value = todayRecord.week;
-    renderSchedule();
+    window.renderSchedule();
 }
 
 window.renderSchedule = function() {
-    const sel = document.getElementById('ll-week-select'); if (!sel) return;
-    const w = parseInt(sel.value) || 1;
+    const w = parseInt(document.getElementById('ll-week-select').value) || 1;
     const list = document.getElementById('ll-schedule-list'); list.innerHTML = '';
-    let records = (appData.scheduleRecords || []).filter(r => r.week == w);
+    let records = appData.scheduleRecords.filter(r => r.week == w);
     
     let total = records.filter(r => r.status !== 'off').length;
     let completed = records.filter(r => r.status === 'completed').length;
@@ -878,7 +311,7 @@ window.renderSchedule = function() {
         ${offCount > 0 ? `<span class="text-red">Nghỉ: ${offCount}</span>` : ''}
     `;
 
-    if(records.length === 0) { list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Chưa có dữ liệu tuần này. Bấm Cấu hình và Tự động tạo sổ!</div>'; return; }
+    if(records.length === 0) { list.innerHTML = '<div class="empty-state">Chưa có dữ liệu tuần này. Vui lòng cấu hình và Tự động tạo sổ!</div>'; return; }
 
     let byDate = {};
     records.forEach(r => { if(!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
@@ -886,189 +319,683 @@ window.renderSchedule = function() {
 
     Object.keys(byDate).sort().forEach(dateStr => {
         let dObj = new Date(dateStr); let dayName = daysOfWeek[dObj.getDay()];
-        list.innerHTML += `<div style="background:var(--primary); color:white; padding:8px 15px; border-radius:10px; font-weight:700; font-size:0.9rem; margin-top:10px;">📅 ${dayName} - ${dObj.toLocaleDateString('vi-VN')}</div>`;
+        let dateHeader = `<div style="background:var(--primary); color:white; padding:8px 15px; border-radius:10px; font-weight:700; font-size:0.9rem; margin-top:10px; box-shadow: var(--shadow-sm);">📅 ${dayName} - ${dObj.toLocaleDateString('vi-VN')}</div>`;
+        list.innerHTML += dateHeader;
 
         byDate[dateStr].sort((a,b) => a.period - b.period).forEach(r => {
             let isOff = r.status === 'off'; let isCompleted = r.status === 'completed';
             let cardClass = isOff ? 'status-off' : (isCompleted ? 'status-completed' : 'status-scheduled');
-            let statusBtn = isOff ? '' : `<button class="btn-outline-action ${isCompleted ? 'text-green' : 'text-muted'}" onclick="toggleScheduleStatus(${r.id})"><i class="${isCompleted ? 'fas fa-check-circle' : 'far fa-circle'}"></i></button>`;
+            let statusBtn = isOff ? '' : (isCompleted ? `<button class="btn-outline-action text-green" onclick="toggleScheduleStatus(${r.id})"><i class="fas fa-check-circle"></i></button>` : `<button class="btn-outline-action text-muted" onclick="toggleScheduleStatus(${r.id})"><i class="far fa-circle"></i></button>`);
             let editBtn = isOff ? '' : `<button class="btn-outline-action text-orange" onclick="openAdjustSchedule(${r.id})"><i class="fas fa-exchange-alt"></i></button>`;
 
             list.innerHTML += `
                 <div class="sched-card ${cardClass}">
-                    <div class="sched-top"><span>Tiết ${r.period} | ${r.className}</span> <span style="background:#f1f5f9; padding:2px 8px; border-radius:8px;">PPCT: ${r.ppct}</span></div>
-                    <div class="sched-mid"><h4>${r.subject}</h4><p>${r.content}</p></div>
-                    ${r.note ? `<div class="sched-note">${r.note}</div>` : ''}
-                    <div class="sched-bot">${statusBtn}<div style="display:flex; gap:8px;">${editBtn}</div></div>
+                    <div class="sched-top"><span>Tiết ${r.period} | ${r.className}</span> <span style="background: #f1f5f9; padding: 2px 8px; border-radius: 8px;">PPCT: ${r.ppct}</span></div>
+                    <div class="sched-mid">
+                        <div class="sched-info"><h4>${r.subject}</h4><p>${r.content}</p></div>
+                    </div>
+                    ${r.note ? `<div class="sched-note"><i class="fas fa-info-circle"></i> ${r.note}</div>` : ''}
+                    <div class="sched-bot">
+                        ${statusBtn}
+                        <div style="display:flex; gap:8px;">${editBtn}</div>
+                    </div>
                 </div>`;
         });
     });
-};
+}
 
 window.toggleScheduleStatus = function(id) {
-    let r = (appData.scheduleRecords || []).find(x => x.id == id);
-    if(r) { r.status = (r.status === 'completed') ? 'scheduled' : 'completed'; window.saveData(); renderSchedule(); }
-};
-
+    let r = appData.scheduleRecords.find(x => x.id == id);
+    if(r) { r.status = (r.status === 'completed') ? 'scheduled' : 'completed'; window.saveData(); window.renderSchedule(); }
+}
 window.openAdjustSchedule = function(id) {
-    let r = (appData.scheduleRecords || []).find(x => x.id == id); if(!r) return;
-    document.getElementById('adj-sched-id').value = r.id; 
-    document.getElementById('adj-sched-info').innerHTML = `Đổi lịch: <b>${r.subject} ${r.className} (Tiết ${r.period})</b>`; 
-    document.getElementById('adj-sched-date').value = r.date; 
-    document.getElementById('adj-sched-period').value = r.period; 
-    document.getElementById('adj-sched-note').value = r.note || '';
+    let r = appData.scheduleRecords.find(x => x.id == id); if(!r) return;
+    document.getElementById('adj-sched-id').value = r.id; document.getElementById('adj-sched-info').innerHTML = `Đang chỉnh sửa: <b>${r.subject} ${r.className} (Tiết ${r.period})</b> - PPCT: ${r.ppct}`; document.getElementById('adj-sched-date').value = r.date; document.getElementById('adj-sched-period').value = r.period; document.getElementById('adj-sched-note').value = r.note || '';
     window.openModal('modal-adjust-schedule');
-};
-
+}
 window.saveAdjustedSchedule = function() {
-    let id = document.getElementById('adj-sched-id').value; 
-    let r = (appData.scheduleRecords || []).find(x => x.id == id);
+    let id = document.getElementById('adj-sched-id').value; let r = appData.scheduleRecords.find(x => x.id == id);
     if(r) {
-        let nDate = document.getElementById('adj-sched-date').value; 
-        let nPeriod = document.getElementById('adj-sched-period').value;
+        let nDate = document.getElementById('adj-sched-date').value; let nPeriod = document.getElementById('adj-sched-period').value;
         if(!nDate || !nPeriod) return window.showToast("Nhập đủ ngày và tiết!", "error");
-        r.note = document.getElementById('adj-sched-note').value || 'Dạy bù';
-        r.date = nDate;
+        let dObj = new Date(nDate); let dow = dObj.getDay() === 0 ? 8 : dObj.getDay() + 1; 
+        if(nDate !== r.date) { r.note = `${document.getElementById('adj-sched-note').value || 'Dạy bù'} (Dời từ ${new Date(r.date).toLocaleDateString('vi-VN')})`; r.date = nDate; r.dayOfWeek = dow; }
+        else { r.note = document.getElementById('adj-sched-note').value; }
         r.period = parseInt(nPeriod);
-        window.saveData(); window.closeModal('modal-adjust-schedule'); renderSchedule(); window.showToast("Đã cập nhật lịch!");
+        window.saveData(); window.closeModal('modal-adjust-schedule'); window.renderSchedule(); window.showToast("Đã cập nhật lịch dạy!");
     }
-};
-
+}
 window.exportScheduleExcel = function() {
-    const sel = document.getElementById('ll-week-select'); if(!sel) return;
-    const w = parseInt(sel.value) || 1;
-    let records = (appData.scheduleRecords || []).filter(r => r.week == w);
+    const w = parseInt(document.getElementById('ll-week-select').value);
+    let records = appData.scheduleRecords.filter(r => r.week == w);
     if(records.length === 0) return window.showToast("Tuần này trống!", "error");
     let ws_data = [["Tuần", "Ngày", "Thứ", "Tiết", "Lớp", "Môn", "PPCT", "Nội dung", "Trạng thái", "Ghi chú"]];
     records.sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(r => {
-        ws_data.push([r.week, r.date, r.dayOfWeek, r.period, r.className, r.subject, r.ppct, r.content, r.status, r.note||""]);
+        let st = r.status==='off'?'Nghỉ':(r.status==='completed'?'Đã xong':'Chưa dạy');
+        ws_data.push([r.week, new Date(r.date).toLocaleDateString('vi-VN'), r.dayOfWeek, r.period, r.className, r.subject, r.ppct, r.content, st, r.note||""]);
     });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "SoBaoGiang");
-    XLSX.writeFile(wb, `So_Bao_Giang_Tuan_${w}.xlsx`);
-};
+    XLSX.writeFile(wb, `So_Bao_Giang_Tuan_${w}.xlsx`); window.showToast("Đã xuất Excel!");
+}
 
+
+// Hàm tự động chuẩn hóa Khối lớp (VD: 7A1, 7A2, 7A, 7/2, Khối 7 -> "7")
+function extractGrade(className) {
+    if (!className) return "";
+    let str = String(className).trim();
+    let match = str.match(/(?:Khối\s*)?([1-9]|1[0-2])/i);
+    return match ? match[1] : str.toLowerCase();
+}
+
+window.renderSetupData = function() {
+    let stp = appData.scheduleSetup;
+    if (!stp.mathRatios) stp.mathRatios = [];
+    document.getElementById('setup-week1-date').value = stp.week1Start || '';
+    document.getElementById('setup-tkb-count').innerText = stp.tkb.length + " bản ghi";
+    document.getElementById('setup-ppct-count').innerText = stp.ppct.length + " bài dạy";
+    document.getElementById('setup-holidays-count').innerText = stp.holidays.length + " sự kiện";
+    if (document.getElementById('setup-math-ratio-count')) {
+        document.getElementById('setup-math-ratio-count').innerText = stp.mathRatios.length + " cấu hình";
+    }
+
+    const tbodyTKB = document.getElementById('tkb-tbody'); tbodyTKB.innerHTML = '';
+    stp.tkb.forEach((t, i) => { tbodyTKB.innerHTML += `<tr><td>${t.dayOfWeek}</td><td>${t.period}</td><td>${t.className}</td><td>${t.subject}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('tkb', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
+    
+    const tbodyPPCT = document.getElementById('ppct-tbody'); tbodyPPCT.innerHTML = '';
+    stp.ppct.forEach((p, i) => { 
+        let br = p.branch ? `<span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:6px; font-weight:bold;">${p.branch}</span>` : '-';
+        tbodyPPCT.innerHTML += `<tr><td>${p.className}</td><td>${p.subject}</td><td>${br}</td><td>${p.ppct}</td><td>${p.content.substring(0,20)}...</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; 
+    });
+
+    const tbodyHol = document.getElementById('hol-tbody'); tbodyHol.innerHTML = '';
+    stp.holidays.forEach((h, i) => { tbodyHol.innerHTML += `<tr><td>${h.start}</td><td>${h.end}</td><td>${h.name}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('holidays', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
+
+    const tbodyMath = document.getElementById('math-ratio-tbody');
+    if (tbodyMath) {
+        tbodyMath.innerHTML = '';
+        stp.mathRatios.forEach((m, i) => {
+            tbodyMath.innerHTML += `<tr><td><b>Khối ${m.grade}</b></td><td>Tuần ${m.fromWeek} - ${m.toWeek}</td><td><b>${m.dai} Đại - ${m.hinh} Hình</b></td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('mathRatios', ${i})"><i class="fas fa-times"></i></button></td></tr>`;
+        });
+    }
+}
+
+window.delSetupData = function(type, index) { appData.scheduleSetup[type].splice(index, 1); window.saveData(); window.renderSetupData(); }
+
+window.clearAllSetupData = function(type) {
+    let typeName = (type === 'tkb') ? 'Thời khóa biểu' : ((type === 'ppct') ? 'Phân phối chương trình' : ((type === 'holidays') ? 'Lịch nghỉ lễ' : 'Cấu hình tỉ lệ'));
+    let currentCount = (appData.scheduleSetup[type] || []).length;
+    if (currentCount === 0) {
+        return window.showToast(`Danh sách ${typeName} đang trống!`, "error");
+    }
+    if (confirm(`⚠️ Bạn có chắc chắn muốn XÓA TẤT CẢ ${currentCount} dòng dữ liệu của ${typeName} không? (Thao tác này không thể hoàn tác)`)) {
+        appData.scheduleSetup[type] = [];
+        window.saveData();
+        window.renderSetupData();
+        window.showToast(`✅ Đã xóa toàn bộ ${typeName}!`, "success");
+    }
+}
+window.addTKB = function() {
+    let d = document.getElementById('add-tkb-day').value, p = document.getElementById('add-tkb-period').value, c = document.getElementById('add-tkb-class').value, s = document.getElementById('add-tkb-subject').value;
+    if(!d || !p || !c || !s) return window.showToast("Nhập đủ thông tin!", "error");
+    appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(d), period: parseInt(p), className: c.trim(), subject: s.trim() });
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm TKB!");
+}
+window.addPPCT = function() {
+    let c = document.getElementById('add-ppct-class').value, s = document.getElementById('add-ppct-subject').value, p = document.getElementById('add-ppct-period').value, n = document.getElementById('add-ppct-content').value;
+    let br = document.getElementById('add-ppct-branch') ? document.getElementById('add-ppct-branch').value.trim() : '';
+    if(!c || !s || !p || !n) return window.showToast("Nhập đủ thông tin!", "error");
+    
+    // Tự động nhận diện Phân môn nếu người dùng để trống
+    if(!br && s.toLowerCase().includes('toán')) {
+        let lowN = n.toLowerCase();
+        if(lowN.includes('hình') || lowN.includes('góc') || lowN.includes('tam giác') || lowN.includes('đo lường')) br = 'Hình';
+        else br = 'Đại';
+    }
+    
+    appData.scheduleSetup.ppct.push({ className: c.trim(), subject: s.trim(), branch: br, ppct: parseInt(p), content: n.trim() });
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm PPCT!");
+}
+
+window.addMathRatio = function() {
+    let grade = document.getElementById('add-math-grade').value.trim();
+    let fw = parseInt(document.getElementById('add-math-from-week').value);
+    let tw = parseInt(document.getElementById('add-math-to-week').value);
+    let dai = parseInt(document.getElementById('add-math-dai').value);
+    let hinh = parseInt(document.getElementById('add-math-hinh').value);
+    
+    if(!grade || isNaN(fw) || isNaN(tw) || isNaN(dai) || isNaN(hinh)) {
+        return window.showToast("Vui lòng điền đủ thông tin cấu hình!", "error");
+    }
+    if(fw > tw || fw < 1 || tw > 35) {
+        return window.showToast("Khoảng tuần không hợp lệ (từ 1 đến 35)!", "error");
+    }
+    
+    grade = extractGrade(grade);
+    if (!appData.scheduleSetup.mathRatios) appData.scheduleSetup.mathRatios = [];
+    
+    appData.scheduleSetup.mathRatios.push({ grade: grade, fromWeek: fw, toWeek: tw, dai: dai, hinh: hinh });
+    // Sắp xếp theo khối và tuần
+    appData.scheduleSetup.mathRatios.sort((a,b) => (a.grade === b.grade) ? (a.fromWeek - b.fromWeek) : a.grade.localeCompare(b.grade));
+    
+    window.saveData(); 
+    window.renderSetupData(); 
+    window.showToast(`Đã thêm cấu hình Khối ${grade} (Tuần ${fw}-${tw}: ${dai} Đại - ${hinh} Hình)!`);
+}
+window.addHoliday = function() {
+    let s = document.getElementById('add-hol-start').value, e = document.getElementById('add-hol-end').value, n = document.getElementById('add-hol-name').value;
+    if(!s || !e || !n) return window.showToast("Nhập đủ thông tin!", "error");
+    appData.scheduleSetup.holidays.push({ start: s, end: e, name: n.trim() });
+    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm ngày nghỉ!");
+}
+
+let currentImportType = '';
+window.triggerImport = function(type) { currentImportType = type; document.getElementById('general-import-file').click(); }
+window.handleGeneralImport = function(event) {
+    const file = event.target.files[0]; if (!file) return; const ext = file.name.split('.').pop().toLowerCase();
+    
+    if (ext === 'docx') {
+        if (typeof mammoth === 'undefined') { window.showToast("Thư viện Word chưa được tải!", "error"); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            mammoth.convertToHtml({arrayBuffer: ev.target.result}).then(function(result) {
+                let html = result.value; let parser = new DOMParser(); let doc = parser.parseFromString(html, 'text/html'); let tables = doc.querySelectorAll('table'); let count = 0;
+                let targetClass = document.getElementById('add-ppct-class').value || "Chung"; let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+                
+                tables.forEach(table => {
+                    let rows = table.querySelectorAll('tr'); let tietIdx = -1, ndIdx = -1;
+                    rows.forEach((tr) => {
+                        let cells = Array.from(tr.querySelectorAll('th, td')).map(c => c.innerText.trim());
+                        if (tietIdx === -1) {
+                            cells.forEach((txt, i) => { let low = txt.toLowerCase(); if(low === 'tiết' || low === 'tiết ppct' || low === 'tiết học') tietIdx = i; else if(low.includes('nội dung') || low.includes('tên bài') || low.includes('bài dạy')) ndIdx = i; });
+                            if(tietIdx === -1 && cells.length >= 2) { if(cells[0].toLowerCase().includes('tiết')) { tietIdx = 0; ndIdx = 1; } else if(cells[1].toLowerCase().includes('tiết')) { tietIdx = 1; ndIdx = 2; } }
+                        } else {
+                            if (cells.length > Math.max(tietIdx, ndIdx) && ndIdx !== -1) {
+                                let tiet = parseInt(cells[tietIdx]); let nd = cells[ndIdx];
+                                if(!isNaN(tiet) && nd) { appData.scheduleSetup.ppct.push({ className: targetClass, subject: targetSubject, ppct: tiet, content: nd }); count++; }
+                            }
+                        }
+                    });
+                });
+                window.saveData(); window.renderSetupData(); window.showToast(`Đã import thành công ${count} tiết PPCT từ Word!`);
+            }).catch(e => { window.showToast("Lỗi đọc file Word!", "error"); });
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' }); let rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]); let count = 0;
+                let targetClass = document.getElementById('add-ppct-class').value || "Chung"; let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+
+                rows.forEach(r => {
+                    if(currentImportType === 'tkb' && (r['Thứ'] || r['Thu']) && (r['Tiết'] || r['Tiet']) && r['Lớp']) {
+                        appData.scheduleSetup.tkb.push({ dayOfWeek: parseInt(r['Thứ']||r['Thu']), period: parseInt(r['Tiết']||r['Tiet']), className: String(r['Lớp']||r['Lop']), subject: String(r['Môn']||r['Mon']) }); count++;
+                    }
+                    else if(currentImportType === 'ppct' && (r['Tiết'] || r['Tiet'])) {
+                        let p = parseInt(r['Tiết'] || r['Tiet']); 
+                        let n = String(r['Nội dung'] || r['Noi dung'] || r['Tên bài'] || r['Ten bai'] || r['Chủ đề'] || r['Tên bài học / Chuyên đề'] || '');
+                        let subj = String(r['Môn'] || r['Mon'] || targetSubject);
+                        let br = String(r['Phân môn'] || r['Phan mon'] || r['Nhánh'] || r['Phân nhánh'] || '').trim();
+                        
+                        if(!br && subj.toLowerCase().includes('toán')) {
+                            let lowN = n.toLowerCase();
+                            if(lowN.includes('hình') || lowN.includes('góc') || lowN.includes('tam giác') || lowN.includes('đo lường') || lowN.includes('mặt phẳng')) br = 'Hình';
+                            else br = 'Đại';
+                        }
+                        
+                        if(!isNaN(p) && n) { 
+                            appData.scheduleSetup.ppct.push({ 
+                                className: String(r['Lớp'] || r['Lop'] || r['Khối'] || r['Khoi'] || targetClass), 
+                                subject: subj, 
+                                branch: br,
+                                ppct: p, 
+                                content: n 
+                            }); 
+                            count++; 
+                        }
+                    }
+                    else if(currentImportType === 'holidays' && r['Từ ngày'] && r['Đến ngày'] && r['Sự kiện']) {
+                        let sd = new Date(r['Từ ngày']); let ed = new Date(r['Đến ngày']);
+                        if(!isNaN(sd)) { appData.scheduleSetup.holidays.push({ start: sd.toISOString().split('T')[0], end: ed.toISOString().split('T')[0], name: r['Sự kiện'] }); count++; }
+                    }
+                });
+                window.saveData(); window.renderSetupData(); window.showToast(`Đã import thành công ${count} dòng!`); 
+            } catch (error) { window.showToast("Lỗi định dạng file Excel!", "error"); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    event.target.value = "";
+}
+
+window.checkIsHoliday = function(dateStr) {
+    let d = new Date(dateStr);
+    for(let h of appData.scheduleSetup.holidays) { if(d >= new Date(h.start) && d <= new Date(h.end)) return h; } return null;
+}
+
+// Hàm lấy tỉ lệ Phân môn Toán theo Khối và Tuần
+function getMathBranchForPeriod(grade, week, mathIndexInWeek) {
+    let ratios = appData.scheduleSetup.mathRatios || [];
+    let config = ratios.find(r => r.grade === grade && week >= r.fromWeek && week <= r.toWeek);
+    if (!config) {
+        // Tìm cấu hình chung nếu không ghi rõ khối
+        config = ratios.find(r => week >= r.fromWeek && week <= r.toWeek);
+    }
+    let numDai = config ? config.dai : 3;
+    return (mathIndexInWeek < numDai) ? 'Đại' : 'Hình';
+}
+
+window.generateAutoSchedule = function() {
+    let startDate = document.getElementById('setup-week1-date').value;
+    if(!startDate) return window.showToast("Vui lòng thiết lập Ngày bắt đầu Tuần 1!", "error");
+    if(appData.scheduleRecords.length > 0) { 
+        if(!confirm("CẢNH BÁO: Thao tác này sẽ TẠO LẠI TOÀN BỘ SỔ BÁO GIẢNG và ghi đè các tiết chưa hoàn thành. Các tiết Đã Dạy sẽ được bảo lưu. Bạn chắc chắn chứ?")) return; 
+    }
+
+    appData.scheduleSetup.week1Start = startDate; 
+    let records = []; 
+
+    // Gom kho PPCT master theo Khối + Môn (và phân nhánh Đại / Hình nếu có)
+    let ppctMaster = {}; 
+    appData.scheduleSetup.ppct.slice().sort((a,b) => a.ppct - b.ppct).forEach(p => { 
+        let grade = extractGrade(p.className);
+        let subj = p.subject.trim().toLowerCase();
+        let branch = (p.branch || '').trim();
+        
+        let key = branch ? `${subj}-${grade}-${branch}` : `${subj}-${grade}`;
+        if(!ppctMaster[key]) ppctMaster[key] = []; 
+        ppctMaster[key].push({...p}); 
+    });
+
+    // Tạo hàng đợi bài học riêng biệt cho từng lớp cụ thể
+    let classQueues = {};
+    let classes = [...new Set(appData.scheduleSetup.tkb.map(t => t.className.trim()))];
+    let subjects = [...new Set(appData.scheduleSetup.tkb.map(t => t.subject.trim()))];
+
+    classes.forEach(cName => {
+        let grade = extractGrade(cName);
+        subjects.forEach(sName => {
+            let sLower = sName.toLowerCase();
+            let cLower = cName.toLowerCase();
+            if (sLower.includes('toán')) {
+                let kDai = `${sLower}-${cLower}-Đại`;
+                let kHinh = `${sLower}-${cLower}-Hình`;
+                let mDai = `${sLower}-${grade}-Đại`;
+                let mHinh = `${sLower}-${grade}-Hình`;
+
+                classQueues[kDai] = ppctMaster[mDai] ? JSON.parse(JSON.stringify(ppctMaster[mDai])) : [];
+                classQueues[kHinh] = ppctMaster[mHinh] ? JSON.parse(JSON.stringify(ppctMaster[mHinh])) : [];
+            } else {
+                let kGen = `${sLower}-${cLower}`;
+                let mGen = `${sLower}-${grade}`;
+                classQueues[kGen] = ppctMaster[mGen] ? JSON.parse(JSON.stringify(ppctMaster[mGen])) : [];
+            }
+        });
+    });
+
+    let currentDate = new Date(startDate);
+    for(let w = 1; w <= 35; w++) {
+        let mathCountInWeek = {};
+
+        for(let d = 2; d <= 7; d++) {
+            let dateStr = currentDate.toISOString().split('T')[0]; 
+            let holiday = window.checkIsHoliday(dateStr);
+            let dayTKB = appData.scheduleSetup.tkb.filter(t => t.dayOfWeek == d); 
+            dayTKB.sort((a,b) => a.period - b.period);
+
+            dayTKB.forEach(tItem => {
+                let sLower = tItem.subject.trim().toLowerCase();
+                let cLower = tItem.className.trim().toLowerCase();
+                let grade = extractGrade(tItem.className);
+                let isMath = sLower.includes('toán');
+                let targetBranch = '';
+
+                if (isMath) {
+                    if (mathCountInWeek[cLower] === undefined) mathCountInWeek[cLower] = 0;
+                    targetBranch = getMathBranchForPeriod(grade, w, mathCountInWeek[cLower]);
+                }
+
+                let qKey = (isMath && targetBranch) ? `${sLower}-${cLower}-${targetBranch}` : `${sLower}-${cLower}`;
+                let oldR = appData.scheduleRecords.find(x => x.date === dateStr && x.period === tItem.period && x.className === tItem.className);
+                
+                if(oldR && (oldR.status === 'completed' || oldR.note)) {
+                    records.push(oldR);
+                    if(oldR.status === 'completed' && classQueues[qKey] && classQueues[qKey].length > 0 && classQueues[qKey][0].ppct == oldR.ppct) { 
+                        classQueues[qKey].shift(); 
+                    }
+                    if (isMath) mathCountInWeek[cLower]++;
+                    return; 
+                }
+                
+                if (holiday) { 
+                    // Ngày nghỉ: BẢO LƯU TIẾT HỌC, tự dồn sang buổi tiếp theo
+                    records.push({ 
+                        id: Date.now() + Math.random(), 
+                        week: w, date: dateStr, dayOfWeek: d, 
+                        period: tItem.period, className: tItem.className, subject: tItem.subject, 
+                        branch: targetBranch, ppct: "-", content: "NGHỈ LỄ - " + holiday.name, status: "off" 
+                    }); 
+                } else {
+                    if (classQueues[qKey] && classQueues[qKey].length > 0) { 
+                        let lesson = classQueues[qKey].shift(); 
+                        records.push({ 
+                            id: Date.now() + Math.random(), 
+                            week: w, date: dateStr, dayOfWeek: d, 
+                            period: tItem.period, className: tItem.className, subject: tItem.subject, 
+                            branch: targetBranch,
+                            ppct: lesson.ppct, 
+                            content: (targetBranch ? `[${targetBranch}] ` : '') + lesson.content, 
+                            status: "scheduled" 
+                        }); 
+                    } else { 
+                        records.push({ 
+                            id: Date.now() + Math.random(), 
+                            week: w, date: dateStr, dayOfWeek: d, 
+                            period: tItem.period, className: tItem.className, subject: tItem.subject, 
+                            branch: targetBranch,
+                            ppct: "-", content: "Ôn tập / Tự chọn (Hết PPCT)", status: "scheduled" 
+                        }); 
+                    }
+                    if (isMath) mathCountInWeek[cLower]++;
+                }
+            });
+            currentDate.setDate(currentDate.getDate() + 1); 
+        }
+        currentDate.setDate(currentDate.getDate() + 1); 
+    }
+    appData.scheduleRecords = records; 
+    window.saveData(); 
+    window.closeModal('modal-setup-lesson-log'); 
+    window.initLessonLogView(); 
+    window.showToast("🎉 Đã tự động sinh Sổ Báo Giảng chuẩn phân môn Đại & Hình!");
+}
+
+window.generateReportCard = async function(stuId) {
+    window.showToast("Đang tạo ảnh Phiếu liên lạc...", "success");
+    const stu = appData.students.find(s => s.id == stuId); if (!stu) return;
+
+    let currentMonth = new Date().getMonth() + 1; let points = 0; let absent = 0;
+    appData.behaviorRecords.forEach(r => { let rMonth = new Date(r.date).getMonth() + 1; if (rMonth === currentMonth && r.studentId == stu.id) points += Number(r.snapshotPoints); });
+    Object.values(appData.attendance).forEach(dayRecord => { if (dayRecord[stu.id] === 'unexcused') absent++; });
+
+    let classification = "Đạt"; let badgeBg = "#ffc107"; let feedback = "Con hoàn thành nhiệm vụ học tập. Cần cố gắng phát huy thêm trong tháng tới.";
+    if (points >= 15) { classification = "Xuất sắc"; badgeBg = "#198754"; feedback = "Con đi học chuyên cần, ngoan ngoãn và hăng hái phát biểu xây dựng bài. Thành tích rất đáng tự hào!"; } 
+    else if (points >= 5) { classification = "Khá"; badgeBg = "#0d6efd"; feedback = "Con có ý thức học tập tốt, ngoan ngoãn. Gia đình tiếp tục động viên con nhé!"; } 
+    else if (points < 0) { classification = "Cần cố gắng"; badgeBg = "#dc3545"; feedback = "Tháng này con còn vi phạm một số nội quy và chưa tập trung. Gia đình cần phối hợp nhắc nhở con sát sao hơn."; }
+    if (absent >= 3) { feedback += " (Lưu ý: Số buổi vắng không phép của con đang hơi nhiều)."; }
+
+    document.getElementById('rc-month-class').innerText = `Tháng ${currentMonth} - Lớp ${appData.settings.className}`;
+    document.getElementById('rc-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(stu.name)}&background=e0ecff&color=0d6efd&bold=true`;
+    document.getElementById('rc-name').innerText = stu.name; document.getElementById('rc-classification').innerText = `Xếp loại: ${classification}`; document.getElementById('rc-classification').style.background = badgeBg;
+    document.getElementById('rc-points').innerText = points > 0 ? `+${points}` : points; document.getElementById('rc-absent').innerText = `${absent} buổi`; document.getElementById('rc-feedback').innerText = `"${feedback}"`; document.getElementById('rc-teacher').innerText = appData.settings.teacherName;
+
+    const cardEl = document.getElementById('report-card-template'); cardEl.style.left = '0px'; cardEl.style.zIndex = '-1';
+    try {
+        const canvas = await html2canvas(cardEl, { scale: 2, backgroundColor: null });
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+        const link = document.createElement('a'); link.download = `Phieu_Lien_Lac_${stu.name.replace(/ /g, '_')}_T${currentMonth}.jpg`; link.href = imgData; link.click();
+        window.showToast("✅ Đã tải ảnh Phiếu liên lạc thành công!");
+    } catch(e) { console.error(e); window.showToast("Lỗi khi tạo ảnh!", "error"); } finally { cardEl.style.left = '-9999px'; }
+}
+
+// Gọi giao diện Soạn bằng AI cho Học sinh
+window.openAIForStudent = function(studentName) {
+    document.getElementById('ai-prompt').value = `Viết một đoạn nhận xét ngắn gọn, tích cực để gửi cho phụ huynh về tình hình học tập và nề nếp của em ${studentName}.`;
+    window.openModal('modal-compose-notify');
+}
+
+window.renderStudents = function() {
+    const list = document.getElementById('student-list'); list.innerHTML = ''; 
+    const searchInput = document.getElementById('search-student');
+    const filterText = searchInput ? searchInput.value.toLowerCase() : "";
+    let filtered = appData.students.filter(s => s.name.toLowerCase().includes(filterText));
+    if(filtered.length === 0) { list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy!</h4></div>'; return; }
+    filtered.forEach((stu, index) => { 
+        let cleanPhone = stu.phone ? String(stu.phone).replace(/[^0-9]/g, '') : '';
+        let zaloBtn = cleanPhone ? `<button class="btn-outline-action" style="color:white; background:#0068ff; border-color:#0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);" onclick="window.open('https://zalo.me/${cleanPhone}', '_blank')" title="Nhắn Zalo cho Phụ huynh"><i class="fas fa-comment-dots"></i></button>` : '';
+        
+        let aiBtn = `<button class="btn-ai-magic" onclick="openAIForStudent('${stu.name}')" title="Nhờ AI nhận xét"><i class="fas fa-magic"></i></button>`;
+        
+        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${aiBtn}${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
+    });
+}
+
+window.saveStudent = function() {
+    const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
+    if(!name) return window.showToast("Nhập tên!", "error");
+    const obj = { id: id ? parseInt(id) : Date.now(), name: name, gender: document.getElementById('stu-gender').value, dob: document.getElementById('stu-dob').value, phone: document.getElementById('stu-phone').value };
+    if(id) { appData.students[appData.students.findIndex(s => s.id == id)] = obj; window.showToast("Đã cập nhật!"); } else { appData.students.push(obj); window.showToast("Đã thêm!"); }
+    window.saveData(); window.renderStudents(); window.closeModal('modal-add-student');
+}
+window.editStudent = function(id) { const stu = appData.students.find(s => s.id === id); if(stu) { document.getElementById('stu-id').value = stu.id; document.getElementById('stu-name').value = stu.name; document.getElementById('stu-gender').value = stu.gender || 'Nam'; let fDob = stu.dob || ''; if(fDob.includes('/')) { const p = fDob.split('/'); if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; } document.getElementById('stu-dob').value = fDob; document.getElementById('stu-phone').value = stu.phone || ''; window.openModal('modal-add-student'); } }
+window.deleteStudent = function(id) { if(confirm("Xác nhận xóa?")) { appData.students = appData.students.filter(s => s.id !== id); window.saveData(); window.renderStudents(); window.showToast("Đã xóa"); } }
+
+let rawExcelData = [], parsedStudents = [], excelHeaders = []; let currentHeaderRowIndex = 0; 
+window.openImportModal = function() { document.getElementById('import-step-1').style.display = 'block'; document.getElementById('import-step-2').style.display = 'none'; document.getElementById('import-step-2-footer').style.display = 'none'; document.getElementById('excel-file').value = ""; rawExcelData = []; parsedStudents = []; currentHeaderRowIndex = 0; window.openModal('modal-import-excel'); }
+
+window.handleExcelUpload = function(event) {
+    const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); 
+            rawExcelData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: "" });
+            if (rawExcelData.length < 2) return window.showToast("File trống!", "error");
+            currentHeaderRowIndex = 0;
+            for(let i = 0; i < Math.min(15, rawExcelData.length); i++) {
+                let rowStr = rawExcelData[i].join('').toLowerCase();
+                if(rowStr.includes('họ và tên') || rowStr.includes('họ tên') || rowStr.includes('stt')) { currentHeaderRowIndex = i; break; }
+            }
+            excelHeaders = rawExcelData[currentHeaderRowIndex].map(h => (h || '').toString().trim());
+            const selects = ['map-name', 'map-gender', 'map-dob', 'map-phone'];
+            selects.forEach(id => { const sel = document.getElementById(id); sel.innerHTML = '<option value="-1">-- Bỏ qua --</option>'; excelHeaders.forEach((h, i) => { if(h) sel.innerHTML += `<option value="${i}">${h}</option>`; }); });
+            excelHeaders.forEach((h, i) => { 
+                if(!h) return; let low = h.toLowerCase(); 
+                if(low.includes('tên')||low.includes('name')) document.getElementById('map-name').value = i; 
+                else if(low.includes('giới')||low==='gt') document.getElementById('map-gender').value = i; 
+                else if(low.includes('sinh')||low.includes('date')) document.getElementById('map-dob').value = i; 
+                else if(low.includes('sđt')||low.includes('thoại')||low.includes('sll')) document.getElementById('map-phone').value = i; 
+            });
+            document.getElementById('import-step-1').style.display = 'none'; document.getElementById('import-step-2').style.display = 'block'; document.getElementById('import-step-2-footer').style.display = 'flex'; window.processParsedData();
+        } catch (error) { window.showToast("Lỗi đọc file!", "error"); console.error(error); }
+    }; reader.readAsArrayBuffer(file);
+}
+
+window.processParsedData = function() {
+    const mapName = parseInt(document.getElementById('map-name').value), mapGender = parseInt(document.getElementById('map-gender').value), mapDob = parseInt(document.getElementById('map-dob').value), mapPhone = parseInt(document.getElementById('map-phone').value);
+    parsedStudents = []; let dupCount = 0;
+    for (let i = currentHeaderRowIndex + 1; i < rawExcelData.length; i++) {
+        const row = rawExcelData[i]; if (!row || !row.length) continue;
+        let name = mapName !== -1 ? (row[mapName] || '').toString().trim() : ''; 
+        if (!name || name === '' || name.toLowerCase().includes('tổng')) continue;
+        let phoneVal = mapPhone !== -1 ? (row[mapPhone] || '').toString().trim() : '';
+        if(phoneVal.endsWith('.0')) phoneVal = phoneVal.replace('.0', ''); 
+        let stu = { name: name, gender: mapGender !== -1 ? (row[mapGender] || 'Nam').toString().trim() : 'Nam', dob: mapDob !== -1 ? (row[mapDob] || '').toString().trim() : '', phone: phoneVal };
+        stu.isDup = appData.students.some(s => s.name.toLowerCase() === stu.name.toLowerCase()); if(stu.isDup) dupCount++; parsedStudents.push(stu);
+    }
+    const tbody = document.getElementById('preview-tbody'); tbody.innerHTML = '';
+    parsedStudents.slice(0, 20).forEach((stu, i) => { tbody.innerHTML += `<tr ${stu.isDup?'style="background:#fef3c7"':''}><td>${i+1}</td><td>${stu.name}</td><td>${stu.phone}</td></tr>`; });
+    if(parsedStudents.length>20) tbody.innerHTML += `<tr><td colspan="3" class="text-center text-muted">... và ${parsedStudents.length-20} HS khác</td></tr>`;
+    document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
+}
+
+window.confirmImport = function() { let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "" }); c++; }); window.saveData(); window.renderStudents(); window.closeModal('modal-import-excel'); window.showToast(`Đã nhập ${c} HS!`); }
+window.exportExcel = function() { if(appData.students.length === 0) return window.showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); window.showToast("Đã xuất Excel!"); }
+window.downloadTemplate = function() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); window.showToast("Đã tải!"); }
+
+window.renderAttendance = function() {
+    const date = document.getElementById('attendance-date').value; const list = document.getElementById('attendance-list'); list.innerHTML = '';
+    if(!appData.attendance[date]) { appData.attendance[date] = {}; appData.students.forEach(s => appData.attendance[date][s.id] = 'present'); }
+    let stats = { present: 0, excused: 0, unexcused: 0 }; const records = appData.attendance[date];
+    appData.students.forEach((stu, index) => {
+        const status = records[stu.id] || 'present'; stats[status]++;
+        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong></div><div class="attendance-opts"><button class="att-btn ${status === 'present' ? 'active' : ''}" data-status="present" onclick="setAtt(this, ${stu.id}, 'present')"><i class="fas fa-check"></i></button><button class="att-btn ${status === 'excused' ? 'active' : ''}" data-status="excused" onclick="setAtt(this, ${stu.id}, 'excused')"><i class="fas fa-exclamation"></i></button><button class="att-btn ${status === 'unexcused' ? 'active' : ''}" data-status="unexcused" onclick="setAtt(this, ${stu.id}, 'unexcused')"><i class="fas fa-times"></i></button></div></div>`;
+    });
+    document.getElementById('attendance-summary').innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Có mặt: ${stats.present}</span><span style="color:var(--warning)"><i class="fas fa-exclamation-circle"></i> Phép: ${stats.excused}</span><span style="color:var(--danger)"><i class="fas fa-times-circle"></i> K.Phép: ${stats.unexcused}</span>`;
+}
+window.setAtt = function(btn, stuId, status) {
+    const parent = btn.parentElement; parent.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+    const date = document.getElementById('attendance-date').value; appData.attendance[date][stuId] = status;
+    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); if(tag) window.autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); }
+    window.renderAttendance(); 
+}
+window.saveAttendance = function() { window.saveData(); window.showToast("✅ Đã lưu Điểm danh!"); window.switchView('view-home'); }
+
+let currentDiscStuId = null, currentBehaviorTab = 'negative';
+window.renderDisciplineStudents = function() {
+    const txt = document.getElementById('search-disc-student').value.toLowerCase(); const list = document.getElementById('discipline-student-list'); list.innerHTML = '';
+    let ptsMap = {}; appData.behaviorRecords.forEach(r => { ptsMap[r.studentId] = (ptsMap[r.studentId] || 0) + Number(r.snapshotPoints); });
+    appData.students.filter(s => s.name.toLowerCase().includes(txt)).forEach(stu => {
+        let pts = ptsMap[stu.id] || 0; let color = pts > 0 ? 'var(--success)' : (pts < 0 ? 'var(--danger)' : 'var(--text-muted)');
+        list.innerHTML += `<div class="list-item" style="cursor:pointer;" onclick="openRecordBehavior(${stu.id}, '${stu.name}')"><div class="list-item-info"><strong>${stu.name}</strong></div><div><span style="color:${color}; font-weight:800; font-size:1.1rem;">${pts > 0 ? '+'+pts : pts} đ</span> <i class="fas fa-chevron-right text-muted ml-2"></i></div></div>`;
+    });
+}
+window.openRecordBehavior = function(stuId, stuName) { currentDiscStuId = stuId; document.getElementById('behavior-target-name').innerText = `Đang chọn: ${stuName}`; window.renderQuickTags(); window.openModal('modal-record-behavior'); }
+window.switchBehaviorTab = function(type, element) { currentBehaviorTab = type; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); element.classList.add('active'); window.renderQuickTags(); }
+window.renderQuickTags = function() {
+    const grid = document.getElementById('quick-tag-list'); grid.innerHTML = '';
+    appData.behaviorTags.filter(t => t.type === currentBehaviorTab && t.enabled).forEach(t => { grid.innerHTML += `<div class="quick-tag-btn ${t.color}" onclick="confirmTagRecord('${t.id}')"><div class="tag-icon"><i class="fas ${t.icon}"></i></div><div class="tag-name">${t.name}</div><div class="tag-pts">${t.currentPoints > 0 ? '+' : ''}${t.currentPoints}</div></div>`; });
+}
+window.confirmTagRecord = function(tagId) { const tag = appData.behaviorTags.find(t => t.id === tagId); if(!tag) return; document.getElementById('conf-tag-id').value = tag.id; document.getElementById('conf-stu-id').value = currentDiscStuId; document.getElementById('conf-tag-display').innerHTML = `<strong>Hành vi:</strong> ${tag.name} (Gốc: ${tag.currentPoints})`; document.getElementById('conf-points').value = tag.currentPoints; document.getElementById('conf-note').value = ''; window.openModal('modal-confirm-tag'); }
+window.submitBehaviorRecord = function() {
+    const tag = appData.behaviorTags.find(t => t.id === document.getElementById('conf-tag-id').value);
+    appData.behaviorRecords.push({ id: Date.now(), studentId: parseInt(document.getElementById('conf-stu-id').value), tagId: tag.id, snapshotName: tag.name, snapshotPoints: parseInt(document.getElementById('conf-points').value), type: tag.type, date: getTodayStr(), time: formatDateTime(), note: document.getElementById('conf-note').value });
+    window.saveData(); window.closeModal('modal-confirm-tag'); window.closeModal('modal-record-behavior'); window.showToast(`✅ Đã ghi nhận: ${tag.name}`); window.renderDisciplineStudents(); 
+}
+window.autoCreateBehavior = function(stuId, tag, date, note) { if(!appData.behaviorRecords.find(r => r.studentId === stuId && r.date === date && r.tagId === tag.id && r.note.includes("Hệ thống"))) { appData.behaviorRecords.push({ id: Date.now() + Math.random(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: tag.currentPoints, type: tag.type, date: date, time: formatDateTime(), note: note }); window.saveData(); } }
+window.renderManageTags = function() {
+    const list = document.getElementById('manage-tag-list'); list.innerHTML = '';
+    appData.behaviorTags.forEach(t => {
+        let toggleClr = t.enabled ? 'var(--success)' : '#cbd5e1'; let actionBtn = !t.isSystem ? `<button class="btn-outline-action ml-2" style="color:var(--danger)" onclick="deleteTag('${t.id}')"><i class="fas fa-trash"></i></button>` : '';
+        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${t.name}</strong><small>Điểm: <b>${t.currentPoints}</b> | ${t.type==='negative'?'Trừ':'Cộng'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:${toggleClr}" onclick="toggleTag('${t.id}')"><i class="fas ${t.enabled ? 'fa-eye' : 'fa-eye-slash'}"></i></button>${actionBtn}</div></div>`;
+    });
+}
+window.toggleTag = function(id) { const t = appData.behaviorTags.find(x => x.id === id); if(t) { t.enabled = !t.enabled; window.saveData(); window.renderManageTags(); } }
+window.deleteTag = function(id) { if(confirm("Xóa hành vi này?")) { appData.behaviorTags = appData.behaviorTags.filter(x => x.id !== id); window.saveData(); window.renderManageTags(); } }
+window.saveTag = function() { const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return window.showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); window.saveData(); window.renderManageTags(); window.closeModal('modal-add-tag'); window.showToast("Đã thêm!"); }
+
+window.applyNotifyTemplate = function() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
+
+// HÀM GỌI API GOOGLE GEMINI ĐÃ ĐƯỢC CẬP NHẬT MÁY CHỦ MỚI
+window.generateAINotify = async function() { 
+    const prompt = document.getElementById('ai-prompt').value;
+    if(!prompt) return window.showToast("Nhập nội dung cần nhờ AI", "error"); 
+    
+    const apiKey = appData.settings.apiKey;
+    if(!apiKey) {
+        document.getElementById('notify-content').value = "⚠️ Chưa có API Key. Vui lòng vào tab Cài đặt để nhập mã API Key Google Gemini.";
+        return window.showToast("Thiếu API Key!", "error");
+    }
+
+    window.showToast("🤖 AI đang soạn thảo...", "success");
+    document.getElementById('notify-content').value = "Đang tạo nội dung, thầy cô chờ một chút nhé...";
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: `Đóng vai một giáo viên chủ nhiệm, hãy soạn một thông báo gửi vào nhóm Zalo cho phụ huynh học sinh với nội dung cốt lõi sau: ${prompt}. Yêu cầu: Giọng văn lịch sự, chuyên nghiệp, súc tích, có biểu tượng cảm xúc (emoji) cho sinh động.` }] }]
+            })
+        });
+        
+        const data = await response.json();
+        
+        if(!response.ok) {
+            console.error("🔍 BẮT ĐƯỢC LỖI TỪ GOOGLE:", data);
+            throw new Error(data.error?.message || "Lỗi kết nối API");
+        }
+
+        if(data.candidates && data.candidates.length > 0) {
+            document.getElementById('notify-content').value = data.candidates[0].content.parts[0].text.trim();
+            window.showToast("✅ AI đã soạn xong!");
+        } else {
+            throw new Error("AI không trả về nội dung");
+        }
+    } catch(err) {
+        console.error("Chi tiết lỗi:", err);
+        document.getElementById('notify-content').value = `Lỗi AI: ${err.message}\nVui lòng kiểm tra lại API Key xem có chính xác và còn hoạt động không nhé!`;
+        window.showToast("Lỗi kết nối AI!", "error");
+    }
+}
+
+window.copyNotifyToZalo = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ nội dung!", "error"); navigator.clipboard.writeText(`📢 [${appData.settings.className}] - ${t}\n\n${c}`).then(() => { window.showToast("✅ Đã copy! Đang tự động mở Zalo..."); setTimeout(() => { window.open('https://chat.zalo.me', '_blank'); }, 1000); }); }
+window.saveNotify = function() { const t = document.getElementById('notify-title').value; const c = document.getElementById('notify-content').value; if(!t || !c) return window.showToast("Nhập đủ thông tin!", "error"); appData.notifications.push({ id: Date.now(), title: t, content: c, createdAt: formatDateTime() }); window.saveData(); window.closeModal('modal-compose-notify'); window.renderNotifies(); window.showToast("Đã lưu TB!"); }
+window.renderNotifies = function() { const list = document.getElementById('notify-list'); list.innerHTML = ''; let arr = [...appData.notifications].reverse(); if(arr.length===0) list.innerHTML = '<div class="empty-state">Chưa có thông báo</div>'; arr.forEach(n => { list.innerHTML += `<div class="list-item" style="flex-direction:column; align-items:flex-start; gap:10px;"><div class="w-full" style="display:flex; justify-content:space-between;"><strong>📢 ${n.title}</strong><small class="text-muted">${n.createdAt}</small></div><div style="font-size:0.85rem; color:var(--text-muted); white-space:pre-wrap;">${n.content}</div></div>`; }); }
+
+window.saveTask = function() { const id = document.getElementById('task-id').value; const title = document.getElementById('task-title').value; const status = document.getElementById('task-status').value; const prio = document.getElementById('task-priority').value; if(!title) return window.showToast("Nhập tiêu đề!", "error"); if(id) { let t = appData.tasks.find(x => x.id == id); t.title = title; t.status = status; t.priority = prio; } else { appData.tasks.push({ id: Date.now(), title: title, status: status, priority: prio }); } window.saveData(); window.closeModal('modal-add-task'); window.renderKanban(); }
+window.moveTask = function(id, newStatus) { let t = appData.tasks.find(x => x.id == id); if(t) { t.status = newStatus; window.saveData(); window.renderKanban(); } }
+window.renderKanban = function() { const todo = document.getElementById('kb-todo'), doing = document.getElementById('kb-doing'), done = document.getElementById('kb-done'); todo.innerHTML = ''; doing.innerHTML = ''; done.innerHTML = ''; appData.tasks.forEach(t => { let prioIcon = t.priority==='high' ? '🔴' : (t.priority==='medium'?'🟡':'🟢'); let nextBtn = t.status === 'todo' ? `<button class="btn-outline-action text-blue" onclick="moveTask(${t.id}, 'doing')"><i class="fas fa-arrow-right"></i></button>` : (t.status === 'doing' ? `<button class="btn-outline-action text-green" onclick="moveTask(${t.id}, 'done')"><i class="fas fa-check"></i></button>` : `<button class="btn-outline-action text-muted" onclick="moveTask(${t.id}, 'todo')"><i class="fas fa-undo"></i></button>`); let html = `<div class="kanban-card"><h4>${t.title}</h4><div class="kanban-meta"><span>Ưu tiên: ${prioIcon}</span></div><div class="kanban-actions"><button class="btn-outline-action text-red" onclick="deleteTask(${t.id})"><i class="fas fa-trash"></i></button>${nextBtn}</div></div>`; if(t.status === 'todo') todo.innerHTML += html; else if(t.status === 'doing') doing.innerHTML += html; else done.innerHTML += html; }); }
+window.deleteTask = function(id) { if(confirm("Xóa công việc này?")) { appData.tasks = appData.tasks.filter(x => x.id != id); window.saveData(); window.renderKanban(); } }
+
+window.saveDoc = async function() { const folder = document.getElementById('doc-folder').value; const fileInput = document.getElementById('doc-file'); if(fileInput.files.length === 0) return window.showToast("Chưa chọn file!", "error"); const file = fileInput.files[0]; if (file.size > 20 * 1024 * 1024) return window.showToast("File quá lớn (>20MB)!", "error"); const docId = Date.now(); try { await window.saveFileToDB(docId, file); appData.documents.push({ id: docId, name: file.name, folder: folder, type: file.type || file.name.split('.').pop(), size: (file.size / 1024 / 1024).toFixed(2) + ' MB', date: getTodayStr() }); window.saveData(); window.closeModal('modal-upload-doc'); window.renderDocs(); window.showToast("Đã tải lên và lưu file an toàn!"); fileInput.value = ""; } catch (err) { window.showToast("Lỗi lưu file!", "error"); } }
+let currentFolderFilter = 'all'; window.filterDocs = function(folder, el) { currentFolderFilter = folder; document.querySelectorAll('.doc-folder').forEach(x => x.classList.remove('active')); el.classList.add('active'); window.renderDocs(); }
+window.renderDocs = function() { const txt = document.getElementById('search-doc') ? document.getElementById('search-doc').value.toLowerCase() : ''; const list = document.getElementById('doc-list'); if(!list) return; list.innerHTML = ''; let docs = appData.documents.filter(d => d.name.toLowerCase().includes(txt)); if(currentFolderFilter !== 'all') docs = docs.filter(d => d.folder === currentFolderFilter); if(docs.length === 0) { list.innerHTML = '<div class="empty-state">Thư mục trống</div>'; return; } docs.forEach(d => { let icon = d.name.toLowerCase().includes('.pdf') ? 'fa-file-pdf text-red' : (d.name.toLowerCase().includes('.xls') ? 'fa-file-excel text-green' : (d.name.toLowerCase().includes('.doc') ? 'fa-file-word text-blue' : 'fa-file-alt')); let isViewable = d.type.includes('pdf') || d.type.includes('image') || d.name.toLowerCase().endsWith('.png') || d.name.toLowerCase().endsWith('.jpg'); let viewBtn = isViewable ? `<button class="btn-outline-action text-blue" onclick="previewDoc(${d.id})" title="Xem file"><i class="fas fa-eye"></i></button>` : ''; list.innerHTML += `<div class="doc-card"><div class="doc-card-header"><div class="doc-icon"><i class="fas ${icon}"></i></div><div class="doc-info"><h4>${d.name}</h4><p>${d.size} • ${d.folder} • ${d.date}</p></div></div><div class="doc-actions">${viewBtn}<button class="btn-outline-action text-green" onclick="downloadDoc(${d.id})" title="Tải xuống"><i class="fas fa-download"></i></button><button class="btn-outline-action text-orange" onclick="renameDocUI(${d.id})" title="Đổi tên"><i class="fas fa-pen"></i></button><button class="btn-outline-action text-red" onclick="deleteDoc(${d.id})" title="Xóa"><i class="fas fa-trash"></i></button></div></div>`; }); }
+let currentObjectURL = null; window.previewDoc = async function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error"); if (currentObjectURL) URL.revokeObjectURL(currentObjectURL); currentObjectURL = URL.createObjectURL(blob); const previewContainer = document.getElementById('preview-container'); previewContainer.innerHTML = ''; if (docInfo.type.includes('pdf') || docInfo.name.toLowerCase().endsWith('.pdf')) { previewContainer.innerHTML = `<iframe src="${currentObjectURL}#toolbar=0" style="width:100%; flex:1; border:none; display:block;"></iframe>`; } else { previewContainer.innerHTML = `<img src="${currentObjectURL}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block; margin: auto;">`; } document.getElementById('preview-doc-title').innerText = docInfo.name; window.openModal('modal-preview-doc'); }
+window.closePreviewModal = function() { window.closeModal('modal-preview-doc'); document.getElementById('preview-container').innerHTML = ''; }
+window.downloadDoc = async function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; const blob = await window.getFileFromDB(id); if (!blob) return window.showToast("Không tìm thấy file gốc!", "error"); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = docInfo.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); window.showToast(`Đang tải: ${docInfo.name}`); }
+window.renameDocUI = function(id) { const docInfo = appData.documents.find(d => d.id === id); if (!docInfo) return; document.getElementById('rename-doc-id').value = id; document.getElementById('rename-doc-name').value = docInfo.name; window.openModal('modal-rename-doc'); }
+window.saveRenameDoc = function() { const id = parseInt(document.getElementById('rename-doc-id').value); const newName = document.getElementById('rename-doc-name').value.trim(); if (!newName) return window.showToast("Nhập tên file!", "error"); const docInfo = appData.documents.find(d => d.id === id); if (docInfo) { docInfo.name = newName; window.saveData(); window.renderDocs(); window.closeModal('modal-rename-doc'); window.showToast("Đã cập nhật!"); } }
+window.deleteDoc = async function(id) { if(confirm("Xóa tài liệu vĩnh viễn?")) { appData.documents = appData.documents.filter(x => x.id != id); window.saveData(); window.renderDocs(); try { await window.deleteFileFromDB(id); window.showToast("Đã xóa file!"); } catch(e) {} } }
+
+window.backupData = function() { let dataStr = JSON.stringify(appData); let blob = new Blob([dataStr], {type: "application/json"}); let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; let date = new Date().toISOString().split('T')[0]; a.download = `DuLieu_GVCN_${date}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); window.showToast("Đã tải bản sao lưu (File .json) xuống máy!"); }
+window.restoreData = function(event) { let file = event.target.files[0]; if(!file) return; let reader = new FileReader(); reader.onload = function(e) { try { let parsed = JSON.parse(e.target.result); if(parsed.students && parsed.settings && parsed.attendance) { if(confirm("CẢNH BÁO: Dữ liệu hiện tại trên trình duyệt sẽ bị GHI ĐÈ hoàn toàn bởi dữ liệu từ file này. Bạn có chắc chắn muốn khôi phục?")) { appData = parsed; window.saveData(); window.showToast("Khôi phục thành công! Đang tải lại..."); setTimeout(() => location.reload(), 1500); } } else { window.showToast("File khôi phục không hợp lệ!", "error"); } } catch(err) { window.showToast("Lỗi đọc file!", "error"); } }; reader.readAsText(file); event.target.value = ''; }
+
+window.renderMonthlyTheme = function() { let currentMonth = new Date().getMonth() + 1; let selectedMonth = document.getElementById('rank-month-select') ? document.getElementById('rank-month-select').value : currentMonth; if(document.getElementById('rank-month-select') && !document.getElementById('rank-month-select').getAttribute('data-init')) { document.getElementById('rank-month-select').value = currentMonth; document.getElementById('rank-month-select').setAttribute('data-init', 'true'); selectedMonth = currentMonth; } let themes = appData.settings.monthlyThemes || {}; let themeName = themes[selectedMonth] || "RÈN LUYỆN CHĂM NGOAN"; if(document.getElementById('theme-month-display')) document.getElementById('theme-month-display').innerText = selectedMonth; if(document.getElementById('theme-name-display')) document.getElementById('theme-name-display').innerText = themeName; }
+window.saveMonthlyTheme = function() { let m = document.getElementById('edit-theme-month').value; let n = document.getElementById('edit-theme-name').value; if(!m || !n) return window.showToast("Vui lòng nhập đủ thông tin!", "error"); if(!appData.settings.monthlyThemes) appData.settings.monthlyThemes = {}; appData.settings.monthlyThemes[m] = n.toUpperCase(); window.saveData(); window.closeModal('modal-edit-theme'); document.getElementById('rank-month-select').value = m; window.updateLeaderboard(); window.showToast("Đã cập nhật Chủ điểm!"); }
+window.updateLeaderboard = function() { window.renderMonthlyTheme(); let month = parseInt(document.getElementById('rank-month-select').value); const list = document.getElementById('honor-roll-list'); list.innerHTML = ''; let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=e0ecff&color=0d6efd&bold=true` }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; if(recordMonth === month && stuPoints[r.studentId]) { stuPoints[r.studentId].points += Number(r.snapshotPoints); } }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); let topStudents = rankedStudents.slice(0, 5); if(topStudents.length === 0 || topStudents[0].points === 0) { list.innerHTML = '<div class="text-center text-muted w-full" style="padding: 20px; font-size: 0.9rem; background:#f8fafc; border-radius:12px;">Tháng này chưa có dữ liệu thi đua.</div>'; return; } let top1 = topStudents[0]; let htmlContent = ` <div class="star-top1"> <img src="${top1.avatar}" class="star-avatar-1"> <div class="star-info-1"> <div class="star-badge">Hạng 1</div> <div class="star-name-1">${top1.name}</div> <div class="star-pts-1"><i class="fas fa-arrow-up"></i> ${top1.points} điểm</div> </div> </div> <div class="star-list-others"> `; for(let i = 1; i < topStudents.length; i++) { let stu = topStudents[i]; if (stu.points > 0) { let rank = i + 1; htmlContent += `<div class="star-item"><div class="star-rank r${rank}">${rank}</div><img src="${stu.avatar}" class="star-avatar"><div class="star-name">${stu.name}</div><div class="star-pts">+${stu.points}</div></div>`; } } htmlContent += `</div>`; list.innerHTML = htmlContent; }
+window.renderRankingList = function() { let period = document.getElementById('full-rank-period-select').value; const list = document.getElementById('full-ranking-list'); list.innerHTML = ''; let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; let inPeriod = false; if (period === 'HK1' && (recordMonth >= 8 || recordMonth <= 12)) inPeriod = true; else if (period === 'HK2' && (recordMonth >= 1 && recordMonth <= 5)) inPeriod = true; else if (period === 'CA_NAM') inPeriod = true; else if (parseInt(period) === recordMonth) inPeriod = true; if (inPeriod && stuPoints[r.studentId]) { stuPoints[r.studentId].points += Number(r.snapshotPoints); } }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); if (rankedStudents.length === 0) { list.innerHTML = '<div class="empty-state">Chưa có học sinh nào.</div>'; return; } rankedStudents.forEach((stu, index) => { let rank = index + 1; let classification = "Đạt"; let badgeClass = "bg-orange"; if (stu.points >= 15) { classification = "Tốt"; badgeClass = "bg-green"; } else if (stu.points >= 5) { classification = "Khá"; badgeClass = "bg-blue"; } else if (stu.points >= 0) { classification = "Đạt"; badgeClass = "bg-orange"; } else { classification = "Cần cố gắng"; badgeClass = "bg-red"; } list.innerHTML += ` <div class="list-item" style="display:flex; align-items:center; gap:12px; padding: 12px 15px;"> <div style="width: 25px; font-weight:900; font-size: 1.1rem; color: ${rank <= 3 ? 'var(--warning)' : 'var(--text-muted)'}; text-align:center;">#${rank}</div> <div style="flex:1;"><strong style="font-size:0.95rem; color:var(--text-main);">${stu.name}</strong><div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Tổng điểm: <b class="${stu.points >= 0 ? 'text-green' : 'text-red'}">${stu.points > 0 ? '+'+stu.points : stu.points}</b></div></div> <div class="star-badge ${badgeClass}" style="margin:0; padding:6px 12px; font-size:0.75rem; border-radius: 8px; color:white;">${classification}</div> </div> `; }); }
+window.exportRankingExcel = function() { let selectEl = document.getElementById('full-rank-period-select'); let periodName = selectEl.options[selectEl.selectedIndex].text; let periodVal = selectEl.value; if (appData.students.length === 0) return window.showToast("Lớp chưa có học sinh!", "error"); let stuPoints = {}; appData.students.forEach(s => { stuPoints[s.id] = { id: s.id, name: s.name, points: 0 }; }); appData.behaviorRecords.forEach(r => { let recordMonth = new Date(r.date).getMonth() + 1; let inPeriod = false; if (periodVal === 'HK1' && (recordMonth >= 8 || recordMonth <= 12)) inPeriod = true; else if (periodVal === 'HK2' && (recordMonth >= 1 && recordMonth <= 5)) inPeriod = true; else if (periodVal === 'CA_NAM') inPeriod = true; else if (parseInt(periodVal) === recordMonth) inPeriod = true; if (inPeriod && stuPoints[r.studentId]) stuPoints[r.studentId].points += Number(r.snapshotPoints); }); let rankedStudents = Object.values(stuPoints).sort((a, b) => b.points - a.points); let ws_data = [ [`BẢNG TỔNG HỢP XẾP LOẠI THI ĐUA - ${periodName.toUpperCase()}`], ["Lớp: " + appData.settings.className, "GVCN: " + appData.settings.teacherName], [""], ["Xếp hạng", "Họ và tên", "Tổng điểm thi đua", "Xếp loại", "Ghi chú GVCN"] ]; rankedStudents.forEach((stu, index) => { let classification = "Đạt"; if (stu.points >= 15) classification = "Tốt"; else if (stu.points >= 5) classification = "Khá"; else if (stu.points >= 0) classification = "Đạt"; else classification = "Cần cố gắng"; ws_data.push([index + 1, stu.name, stu.points, classification, ""]); }); var wb = XLSX.utils.book_new(); var ws = XLSX.utils.aoa_to_sheet(ws_data); XLSX.utils.book_append_sheet(wb, ws, "Xep_Loai"); XLSX.writeFile(wb, `Bang_Xep_Loai_${periodVal}.xlsx`); window.showToast("Đã xuất file Excel Báo Cáo!"); }
+
+// ================= TẢI FILE MẪU TKB & PPCT =================
 window.downloadTemplateTKB = function() {
     const data = [
         ["Thứ", "Tiết", "Lớp", "Môn"],
-        [2, 1, "9A", "Toán"],
-        [2, 2, "9A", "Toán"],
-        ["(Chú ý: Xóa 2 dòng mẫu này đi và nhập dữ liệu của bạn vào)", "", "", ""]
+        [2, 1, "8A1", "Toán"],
+        [2, 2, "8A1", "Văn"],
+        ["(Chú ý: Xóa 2 dòng mẫu này đi và nhập dữ liệu thật của bạn vào. KHÔNG sửa tên cột ở hàng 1)", "", "", ""]
     ];
     var wb = XLSX.utils.book_new(); 
     var ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Tự động chỉnh độ rộng cột cho đẹp
     ws['!cols'] = [{wch: 10}, {wch: 10}, {wch: 15}, {wch: 20}];
+    
     XLSX.utils.book_append_sheet(wb, ws, "TKB_Mau");
-    XLSX.writeFile(wb, "Mau_Thoi_Khoa_Bieu_GVCN.xlsx");
+    XLSX.writeFile(wb, "Mau_Thoi_Khoa_Bieu.xlsx");
     window.showToast("Đã tải xuống File Mẫu TKB!", "success");
-};
+}
 
 window.downloadTemplatePPCT = function() {
     const data = [
         ["Khối", "Môn", "Phân môn", "Tiết", "Tên bài học / Chuyên đề", "Số tiết", "Thiết bị dạy học", "Địa điểm"],
-        ["9", "Toán", "Đại", 1, "Bài 1: Căn bậc hai", 1, "Máy chiếu", "Lớp học"],
-        ["9", "Toán", "Đại", 2, "Bài 2: Căn thức bậc hai", 1, "Bảng phụ", "Lớp học"],
-        ["9", "Toán", "Hình", 1, "Bài 1: Một số hệ thức về cạnh và đường cao", 1, "Thước kẻ, compa", "Lớp học"],
-        ["(Chú ý: Cột Phân môn dành cho môn Toán điền Đại hoặc Hình)", "", "", "", "", "", "", ""]
+        ["7", "Toán", "Đại", 1, "Bài 1: Tập hợp các số hữu tỉ", 1, "Slide bài giảng, Máy chiếu", "Lớp học"],
+        ["7", "Toán", "Đại", 2, "Bài 1: (Tiếp theo)", 1, "Trò chơi Quizizz", "Lớp học"],
+        ["7", "Toán", "Hình", 1, "Bài 1: Hình hộp chữ nhật và hình lập phương", 1, "Mô hình hình học", "Lớp học"],
+        ["(Chú ý: Cột Phân môn dành cho môn Toán điền Đại hoặc Hình. Xóa các dòng mẫu này đi và dán PPCT của bạn vào. KHÔNG sửa tên cột ở hàng 1)", "", "", "", "", "", "", ""]
     ];
     var wb = XLSX.utils.book_new(); 
     var ws = XLSX.utils.aoa_to_sheet(data);
+    
     ws['!cols'] = [{wch: 10}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 40}, {wch: 10}, {wch: 25}, {wch: 15}];
+    
     XLSX.utils.book_append_sheet(wb, ws, "PPCT_Mau");
-    XLSX.writeFile(wb, "Mau_Phan_Phoi_CT_GVCN.xlsx");
-    window.showToast("Đã tải xuống File Mẫu PPCT!", "success");
-};
-
-window.initAppUI = function() {
-    renderDashboard();
-    populateStudentSelects();
-    renderSetupData();
-};
-
-function populateStudentSelects() {
-    const select = document.getElementById('disc-student-select');
-    if(select) {
-        select.innerHTML = '<option value="">-- Chọn học sinh --</option>';
-        appData.students.forEach(st => { select.innerHTML += `<option value="${st.id}">${st.name} (Tổ ${st.team})</option>`; });
-    }
+    XLSX.writeFile(wb, "Mau_Phan_Phoi_CT.xlsx");
+    window.showToast("Đã tải xuống File Mẫu PPCT chuẩn phân môn!", "success");
 }
 
-function loadSettingsToUI() {
-    const s = appData.settings;
-    document.getElementById('set-class-name').value = s.className;
-    document.getElementById('set-teacher-name').value = s.teacherName;
-    document.getElementById('set-school-year').value = s.schoolYear;
-}
-
-window.saveSettingsInfo = function() {
-    appData.settings.className = document.getElementById('set-class-name').value.trim() || '9A';
-    appData.settings.teacherName = document.getElementById('set-teacher-name').value.trim() || 'Thầy/Cô';
-    appData.settings.schoolYear = document.getElementById('set-school-year').value.trim() || '2025-2026';
-    window.saveData();
-    window.showToast('Đã lưu thông tin cài đặt!');
-};
-
-window.resetClassData = function() {
-    if(confirm("CẢNH BÁO: Thao tác này sẽ XÓA SẠCH toàn bộ học sinh, điểm danh, quỹ lớp để làm lại từ đầu!")) {
-        localStorage.removeItem('gvcnData_v4');
-        location.reload();
+// KIỂM TRA VÀ HIỂN THỊ THÔNG BÁO CẬP NHẬT TÍNH NĂNG MỚI
+const CURRENT_APP_VERSION = 'v4.2_math_update';
+window.checkAppUpdateAnnouncement = function() {
+    let lastSeenVersion = localStorage.getItem('gvcn_seen_version');
+    if (lastSeenVersion !== CURRENT_APP_VERSION) {
+        setTimeout(() => {
+            if (document.getElementById('modal-update-announcement')) {
+                window.openModal('modal-update-announcement');
+            }
+        }, 1200);
     }
 };
 
-window.exportAllDataBackup = function() {
-    let dataStr = JSON.stringify(appData);
-    let blob = new Blob([dataStr], {type: "application/json"});
-    let a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `Backup_GVCN_${appData.settings.className}_${getTodayStr()}.json`;
-    a.click();
-};
-
-window.triggerExcelImport = function() { document.getElementById('excel-import-file').click(); };
-window.handleExcelImport = function(event) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            let count = 0;
-            rows.forEach((r, idx) => {
-                let name = r['Họ và tên'] || r['Họ tên'] || r['Tên'] || r['Name'];
-                if(name) {
-                    appData.students.push({
-                        id: Date.now() + idx,
-                        name: String(name).trim(),
-                        gender: r['Giới tính'] || 'Nam',
-                        team: parseInt(r['Tổ']) || (idx % 4 + 1),
-                        dob: r['Ngày sinh'] || '',
-                        parentPhone: r['SĐT'] || r['Số điện thoại'] || '',
-                        note: '',
-                        seatIndex: -1
-                    });
-                    count++;
-                }
-            });
-            window.saveData();
-            renderStudentsList();
-            populateStudentSelects();
-            window.showToast(`Đã nạp thành công ${count} học sinh!`);
-        } catch(err) { window.showToast("Lỗi đọc file Excel!", "error"); }
-    };
-    reader.readAsArrayBuffer(file);
-    event.target.value = '';
-};
-
-window.exportStudentsExcel = function() {
-    if(appData.students.length === 0) return window.showToast("Chưa có học sinh để xuất!", "error");
-    let ws_data = [["STT", "Họ và tên", "Giới tính", "Tổ", "Ngày sinh", "SĐT Phụ huynh", "Ghi chú"]];
-    appData.students.forEach((st, i) => {
-        ws_data.push([i+1, st.name, st.gender, st.team, st.dob, st.parentPhone, st.note]);
-    });
-    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws_data, "HocSinh");
-    XLSX.writeFile(wb, `Danh_Sach_Lop_${appData.settings.className}.xlsx`);
-};
-
-window.onload = () => {
-    window.initAppUI();
+window.dismissUpdateAnnouncement = function() {
+    localStorage.setItem('gvcn_seen_version', CURRENT_APP_VERSION);
+    window.closeModal('modal-update-announcement');
 };
