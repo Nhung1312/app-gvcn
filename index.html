@@ -3,71 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>APP GVBM - Quản Lý Lớp & Sổ Điểm</title>
+    <title>Sổ Tay Chủ Nhiệm Pro - GVCN 4.0</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-appgvcn.png">
     
-    <!-- THƯ VIỆN ĐỌC & XUẤT FILE EXCEL & WORD -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- SheetJS & Mammoth -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
     <div id="toast-container"></div>
 
-    <!-- SIDEBAR DRAWER MENU TRƯỢT TỪ BÊN TRÁI -->
-    <div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
-    <aside class="drawer" id="drawer">
-        <div class="drawer-brand">
-            <div class="drawer-logo">QL</div>
-            <div class="drawer-brand-info">
-                <h3>Quản lý lớp</h3>
-                <p>Gọn gàng trong từng tiết</p>
-            </div>
-        </div>
-
-        <div class="drawer-menu">
-            <div class="drawer-item active" onclick="switchView('view-overview'); toggleDrawer(false);"><i class="fas fa-home"></i> <span>Tổng quan</span></div>
-            <div class="drawer-item" onclick="switchView('view-students'); toggleDrawer(false);"><i class="fas fa-user-graduate"></i> <span>Học sinh</span></div>
-            <div class="drawer-item" onclick="switchView('view-groups'); toggleDrawer(false);"><i class="fas fa-users-cog"></i> <span>Chia tổ / nhóm</span></div>
-            <div class="drawer-item" onclick="switchView('view-in-class'); toggleDrawer(false);"><i class="fas fa-edit"></i> <span>Trong tiết</span></div>
-            <div class="drawer-item" onclick="switchView('view-gradebook'); toggleDrawer(false);"><i class="fas fa-table"></i> <span>Sổ điểm</span></div>
-            <div class="drawer-item" onclick="switchView('view-lesson-log'); toggleDrawer(false);"><i class="fas fa-book-open"></i> <span>Sổ báo giảng</span></div>
-            <div class="drawer-item" onclick="switchView('view-statistics'); toggleDrawer(false);"><i class="fas fa-chart-pie"></i> <span>Thống kê</span></div>
-            <div class="drawer-item" onclick="switchView('view-settings'); toggleDrawer(false);"><i class="fas fa-cog"></i> <span>Cài đặt</span></div>
-        </div>
-
-        <div class="drawer-footer">
-            <div class="sync-badge">
-                <div class="sync-dot"></div>
-                <span>Đã đồng bộ Cloud Firebase</span>
-            </div>
-            <div class="teacher-profile-chip">
-                <div class="teacher-avatar-mini" id="drawer-avatar">GV</div>
-                <div>
-                    <strong style="font-size: 0.9rem; color: var(--text-main); display: block;" id="drawer-teacher-name">Thầy Cô</strong>
-                    <small style="color: var(--text-muted); font-weight: 600;" id="drawer-subject-name">Môn Toán</small>
-                </div>
-            </div>
-        </div>
-    </aside>
-
-    <!-- MÀN HÌNH ĐĂNG NHẬP -->
+    <!-- Màn hình Đăng nhập Google -->
     <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <h2 style="color: #2563eb; margin-bottom: 10px; font-weight: 800; font-size: 2rem;">Trợ Lý GVBM Pro</h2>
-        <p style="color: #64748b; margin-bottom: 25px; font-weight: 600;">Đăng nhập để đồng bộ dữ liệu giảng dạy</p>
+        <h2 style="color: #4f46e5; margin-bottom: 10px; font-weight: 800; font-size: 2rem;">Sổ Chủ Nhiệm 4.0</h2>
+        <p style="color: #64748b; margin-bottom: 25px; font-weight: 600;">Đăng nhập để đồng bộ dữ liệu lớp học</p>
         <button id="btn-login" style="padding: 14px 28px; font-size: 16px; font-weight: bold; background: white; color: #333; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 10px;">
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px;"> Đăng nhập bằng Google
         </button>
     </div>
 
-    <!-- MÀN HÌNH HẾT HẠN DÙNG THỬ (15 NGÀY) -->
+    <!-- MÀN HÌNH HẾT HẠN DÙNG THỬ -->
     <div id="man-hinh-thu-phi" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(255, 255, 255, 0.98); z-index: 9999; text-align: center; padding-top: 5vh; font-family: 'Plus Jakarta Sans', sans-serif; overflow-y: auto;">
-        <h2 style="color: #ef4444; font-size: 26px; margin-bottom: 5px; font-weight: 800;">Đã hết 15 ngày trải nghiệm!</h2>
-        <p style="font-size: 15px; color: #64748b; margin-bottom: 25px; padding: 0 20px; line-height: 1.5;">Dữ liệu sổ điểm và giáo án của các lớp được lưu trữ an toàn trên Đám mây (Cloud). Vui lòng chọn gói gia hạn để tiếp tục sử dụng và phụ giúp tác giả duy trì máy chủ nhé! ❤️</p>
+        <h2 style="color: #ef4444; font-size: 26px; margin-bottom: 5px; font-weight: 800;">Đã hết thời gian trải nghiệm!</h2>
+        <p style="font-size: 15px; color: #64748b; margin-bottom: 25px; padding: 0 20px; line-height: 1.5;">Dữ liệu lớp học của thầy cô được lưu trữ an toàn trên Đám mây (Cloud). Vui lòng chọn gói gia hạn để tiếp tục sử dụng và phụ giúp tác giả duy trì máy chủ nhé! ❤️</p>
         
         <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 25px; padding: 0 10px;">
             <div style="border: 2px solid #0d6efd; border-radius: 16px; padding: 20px 16px; width: 160px; background: #fff; position: relative; box-shadow: 0 6px 16px rgba(13, 110, 253, 0.15);">
@@ -104,33 +69,41 @@
         <button onclick="logoutApp()" style="margin-top: 10px; margin-bottom: 25px; padding: 8px 16px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; border-radius: 10px; font-weight: 600; font-size: 12px; cursor: pointer;">Đăng xuất tài khoản</button>
     </div>
 
-    <!-- ================= ỨNG DỤNG CHÍNH ================= -->
+    <!-- App Container -->
     <div id="app">
-        <main id="main-content">
-            
-            <!-- TOP BAR CHUNG CHO TẤT CẢ CÁC MÀN HÌNH -->
-            <header class="top-nav">
-                <button class="btn-icon" onclick="toggleDrawer(true)"><i class="fas fa-bars"></i></button>
-                <div class="top-nav-title" id="page-title">Tổng quan</div>
-                <div class="class-selector-chip">
-                    <i class="fas fa-school" style="color: var(--primary);"></i>
-                    <select id="global-class-select" onchange="changeCurrentClass(this.value)">
-                        <!-- Danh sách lớp sẽ được đổ tự động -->
-                    </select>
+        <aside class="drawer" id="drawer">
+            <div class="drawer-header">
+                <div class="app-logo"><i class="fas fa-graduation-cap"></i></div>
+                <div>
+                    <h3 class="app-title">GVCN Pro</h3>
+                    <p class="app-subtitle">Trợ lý chủ nhiệm 4.0</p>
                 </div>
-            </header>
+            </div>
+            <div class="drawer-menu">
+                <div class="drawer-item active" onclick="switchView('view-dashboard')"><i class="fas fa-home"></i> <span>Tổng quan</span></div>
+                <div class="drawer-item" onclick="switchView('view-students')"><i class="fas fa-user-graduate"></i> <span>Học sinh & Sơ đồ</span></div>
+                <div class="drawer-item" onclick="switchView('view-attendance')"><i class="fas fa-calendar-check"></i> <span>Điểm danh</span></div>
+                <div class="drawer-item" onclick="switchView('view-discipline')"><i class="fas fa-award"></i> <span>Kỷ luật & Khen thưởng</span></div>
+                <div class="drawer-item" onclick="switchView('view-fees')"><i class="fas fa-wallet"></i> <span>Thu chi & Quỹ lớp</span></div>
+                <div class="drawer-item" onclick="switchView('view-lesson-log')"><i class="fas fa-book-open"></i> <span>Sổ báo giảng</span></div>
+                <div class="drawer-item" onclick="switchView('view-settings')"><i class="fas fa-cog"></i> <span>Cài đặt</span></div>
+            </div>
+            <div class="drawer-footer">
+                <div class="sync-status"><i class="fas fa-cloud text-green"></i> <span>Đã đồng bộ Cloud</span></div>
+            </div>
+        </aside>
+        <div class="drawer-overlay" id="drawer-overlay" onclick="toggleDrawer(false)"></div>
 
-            <!-- ================= 1. VIEW TỔNG QUAN (DASHBOARD) ================= -->
-            <section id="view-overview" class="view active">
-
-                <!-- BANNER CẢNH BÁO HẾT HẠN DÙNG THỬ -->
+        <main id="main-content">
+            <!-- 1. DASHBOARD -->
+            <section id="view-dashboard" class="view active">
                 <div id="trial-warning-banner" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 16px 20px; border-radius: 18px; color: white; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); align-items: center; justify-content: space-between;">
                     <div style="flex: 1; padding-right: 15px;">
                         <strong style="display: block; font-size: 1.05rem; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
                             <i class="fas fa-clock"></i> Chỉ còn <span id="trial-days-left" style="font-size: 1.3rem; color: #fffbeb;">-</span> ngày trải nghiệm
                         </strong>
                         <span style="font-size: 0.85rem; opacity: 0.95; line-height: 1.5; display: block;">
-                            Dữ liệu sổ điểm và giáo án được tự động bảo vệ trên <strong>Đám mây (Cloud)</strong> mỗi ngày. Thầy cô hãy gia hạn để phụ giúp tác giả duy trì máy chủ nhé! ❤️
+                            Dữ liệu lớp học được tự động bảo vệ trên <strong>Đám mây (Cloud)</strong> mỗi ngày. Thầy cô hãy gia hạn để phụ giúp tác giả duy trì máy chủ nhé! ❤️
                         </span>
                     </div>
                     <button onclick="openModal('modal-upgrade')" style="background: white; color: #d97706; padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; flex-shrink: 0; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer;">
@@ -138,15 +111,18 @@
                     </button>
                 </div>
 
-                <div class="hero-banner">
-                    <div class="hero-tag">☀️ CHÀO NGÀY MỚI</div>
-                    <h2>Chào <span id="dash-teacher-name">Thầy/Cô</span>!</h2>
-                    <p>Một ngày dạy học thật vui nhé. Mọi con số quan trọng của lớp đều ở đây.</p>
-                    <button class="btn-hero-action" onclick="switchView('view-students')">Mở danh sách lớp <i class="fas fa-arrow-right"></i></button>
-                    <i class="fas fa-graduation-cap hero-illustration"></i>
+                <div class="hero-card">
+                    <div class="hero-badge">NĂM HỌC <span id="dash-school-year">2025-2026</span></div>
+                    <h1 id="dash-class-name">Lớp 9A</h1>
+                    <p>Chào mừng <span id="dash-teacher-name">Thầy/Cô</span> trở lại lớp học!</p>
+                    <div class="hero-stats">
+                        <div class="stat-item"><span class="stat-num" id="dash-total-students">0</span><span class="stat-label">Sĩ số</span></div>
+                        <div class="stat-item"><span class="stat-num text-green" id="dash-present-today">0</span><span class="stat-label">Có mặt</span></div>
+                        <div class="stat-item"><span class="stat-num text-red" id="dash-absent-today">0</span><span class="stat-label">Vắng</span></div>
+                        <div class="stat-item"><span class="stat-num text-blue" id="dash-fund-balance">0đ</span><span class="stat-label">Quỹ lớp</span></div>
+                    </div>
                 </div>
 
-                <!-- LỊCH DẠY HÔM NAY (SỔ BÁO GIẢNG) -->
                 <div class="lesson-log-hero" onclick="switchView('view-lesson-log')" style="background: linear-gradient(135deg, #1d4ed8, #3b82f6); border-radius: 20px; padding: 20px; color: white; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3); cursor: pointer; position: relative; overflow: hidden;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;">
                         <div style="font-weight: 800; font-size: 1.05rem; display: flex; gap: 8px; align-items: center;"><i class="fas fa-book-open"></i> Lịch dạy hôm nay</div>
@@ -159,429 +135,171 @@
                     </div>
                 </div>
 
-                <div class="stats-grid-modern">
-                    <div class="stat-card-modern">
-                        <div class="stat-icon-wrapper" style="background: #eff6ff; color: #3b82f6;"><i class="fas fa-users"></i></div>
-                        <div class="stat-info"><h4 id="stat-class-size">0</h4><p>Sĩ số lớp</p></div>
-                    </div>
-                    <div class="stat-card-modern">
-                        <div class="stat-icon-wrapper" style="background: #fef3c7; color: #f59e0b;"><i class="fas fa-star"></i></div>
-                        <div class="stat-info"><h4 id="stat-class-avg">0.0</h4><p>Điểm trung bình</p></div>
-                    </div>
-                    <div class="stat-card-modern">
-                        <div class="stat-icon-wrapper" style="background: #d1fae5; color: #10b981;"><i class="fas fa-award"></i></div>
-                        <div class="stat-info"><h4 id="stat-good-rate">0%</h4><p>Tỷ lệ điểm giỏi</p></div>
-                    </div>
-                    <div class="stat-card-modern">
-                        <div class="stat-icon-wrapper" style="background: #ede9fe; color: #8b5cf6;"><i class="fas fa-book"></i></div>
-                        <div class="stat-info"><h4 id="stat-tx-count">4 cột</h4><p>Cột điểm TX</p></div>
-                    </div>
+                <div class="quick-actions">
+                    <button class="quick-btn text-blue" onclick="switchView('view-attendance')"><i class="fas fa-calendar-check"></i><span>Điểm danh</span></button>
+                    <button class="quick-btn text-orange" onclick="openModal('modal-add-discipline')"><i class="fas fa-exclamation-triangle"></i><span>Ghi lỗi</span></button>
+                    <button class="quick-btn text-green" onclick="openModal('modal-add-fund')"><i class="fas fa-plus-circle"></i><span>Thu tiền</span></button>
+                    <button class="quick-btn text-purple" onclick="switchView('view-students', 'seatmap')"><i class="fas fa-th"></i><span>Sơ đồ lớp</span></button>
                 </div>
 
-                <!-- TÌNH HÌNH HỌC TẬP -->
-                <div class="card-section">
-                    <div class="card-section-header">
-                        <div class="card-section-title">
-                            <h3>Tình hình học tập</h3>
-                            <p>Phân bố theo điểm trung bình</p>
-                        </div>
-                        <span class="badge-chip">Cả lớp</span>
-                    </div>
-                    <div class="progress-list">
-                        <div class="progress-row">
-                            <span class="progress-label">Xuất sắc</span>
-                            <div class="progress-track"><div class="progress-fill bg-grad-green" id="bar-xuat-sac" style="width: 0%;"></div></div>
-                            <span class="progress-count" id="count-xuat-sac">0</span>
-                        </div>
-                        <div class="progress-row">
-                            <span class="progress-label">Tốt</span>
-                            <div class="progress-track"><div class="progress-fill bg-grad-blue" id="bar-tot" style="width: 0%;"></div></div>
-                            <span class="progress-count" id="count-tot">0</span>
-                        </div>
-                        <div class="progress-row">
-                            <span class="progress-label">Khá</span>
-                            <div class="progress-track"><div class="progress-fill bg-grad-purple" id="bar-kha" style="width: 0%;"></div></div>
-                            <span class="progress-count" id="count-kha">0</span>
-                        </div>
-                        <div class="progress-row">
-                            <span class="progress-label">Cần cố gắng</span>
-                            <div class="progress-track"><div class="progress-fill bg-grad-orange" id="bar-can-co-gang" style="width: 0%;"></div></div>
-                            <span class="progress-count" id="count-can-co-gang">0</span>
-                        </div>
-                    </div>
+                <div class="section-title">
+                    <h3>Cần chú ý hôm nay</h3>
+                    <span class="badge" id="dash-badge-alerts">0 việc</span>
                 </div>
-
-                <!-- CẦN CHÚ Ý -->
-                <div class="card-section">
-                    <div class="card-section-header">
-                        <div class="card-section-title">
-                            <h3>Cần chú ý</h3>
-                            <p>Học sinh cần được động viên</p>
-                        </div>
-                        <button class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 10px;" onclick="switchView('view-gradebook')">Xem sổ điểm</button>
-                    </div>
-                    <div class="attention-list" id="attention-student-list"></div>
-                </div>
+                <div class="alerts-list" id="dash-alerts-container"></div>
             </section>
 
-            <!-- ================= 2. VIEW DANH SÁCH HỌC SINH ================= -->
+            <!-- 2. HỌC SINH & SƠ ĐỒ LỚP -->
             <section id="view-students" class="view">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <div style="flex: 1; position: relative;">
-                        <i class="fas fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                        <input type="text" id="search-student-input" placeholder="Tìm tên học sinh..." onkeyup="renderStudentsView()" style="width: 100%; padding: 12px 14px 12px 42px; border: 1.5px solid #e2e8f0; border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600; outline: none; background: white;">
-                    </div>
-                    <button class="btn-icon" onclick="openModal('modal-add-student')" title="Thêm học sinh"><i class="fas fa-plus text-blue"></i></button>
-                </div>
-
-                <div id="students-card-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
-            </section>
-
-            <!-- ================= 3. VIEW CHIA TỔ / NHÓM HỌC TẬP (2 CHẾ ĐỘ TỐI ƯU) ================= -->
-            <section id="view-groups" class="view">
-                <div class="card-section">
-                    <!-- THANH CHUYỂN ĐỔI CHẾ ĐỘ (TỔ CỐ ĐỊNH VS NHÓM HOẠT ĐỘNG) -->
-                    <div class="group-mode-toggle-bar">
-                        <button class="mode-tab-btn active" id="tab-btn-teams" onclick="switchGroupSubMode('teams')">
-                            <i class="fas fa-layer-group"></i> 1. Tổ lớp cố định (GVCN)
-                        </button>
-                        <button class="mode-tab-btn" id="tab-btn-activity" onclick="switchGroupSubMode('activity')">
-                            <i class="fas fa-random"></i> 2. Nhóm học tập linh hoạt
-                        </button>
-                    </div>
-
-                    <!-- CHẾ ĐỘ 1: TỔ LỚP CỐ ĐỊNH (CHO GVCN) -->
-                    <div id="submode-teams-panel">
-                        <div class="alert-item yellow mb-15">
-                            <div class="alert-icon"><i class="fas fa-info-circle"></i></div>
-                            <div class="alert-info">
-                                <strong>Tổ cố định của lớp:</strong> Dữ liệu tổ được lưu vĩnh viễn cùng hồ sơ học sinh, giúp GVCN quản lý nền nếp, trực nhật, chấm thi đua.
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-                            <button class="btn-primary" style="flex: 2; min-width: 140px;" onclick="autoDivideFixedTeams()"><i class="fas fa-magic"></i> Chia đều 4 Tổ</button>
-                            <button class="btn-outline text-green" style="flex: 1;" onclick="exportFixedTeamsExcel()"><i class="fas fa-file-excel"></i> Xuất Excel</button>
-                            <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
-                        </div>
-                    </div>
-
-                    <!-- CHẾ ĐỘ 2: NHÓM HOẠT ĐỘNG LINH HOẠT -->
-                    <div id="submode-activity-panel" style="display: none;">
-                        <div class="alert-item green mb-15">
-                            <div class="alert-icon"><i class="fas fa-dice"></i></div>
-                            <div class="alert-info">
-                                <strong>Nhóm thảo luận linh hoạt:</strong> Chia nhóm tức thì theo tiết học mà <u>không làm thay đổi</u> Tổ cố định của học sinh.
-                            </div>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px;">
-                            <div class="form-row">
-                                <div class="input-group" style="flex: 1;">
-                                    <label>Cách chia nhóm</label>
-                                    <select id="group-divide-type" onchange="toggleGroupInputMode()">
-                                        <option value="byGroupCount">Theo số lượng nhóm</option>
-                                        <option value="byMemberCount">Theo số HS / nhóm</option>
-                                    </select>
-                                </div>
-                                <div class="input-group" style="flex: 1;">
-                                    <label id="group-param-label">Số nhóm cần tạo</label>
-                                    <input type="number" id="group-param-value" min="2" max="20" value="4">
-                                </div>
-                            </div>
-
-                            <div class="input-group">
-                                <label>Tiêu chí phân chia</label>
-                                <select id="group-balance-mode">
-                                    <option value="balance">⚖️ Cân bằng học lực (theo ĐTB)</option>
-                                    <option value="random">🎲 Ngẫu nhiên hoàn toàn</option>
-                                </select>
-                            </div>
-
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="btn-primary" style="flex: 2; min-width: 140px;" onclick="generateActivityGroups()"><i class="fas fa-play"></i> Tạo nhóm ngay</button>
-                                <button class="btn-outline text-green" style="flex: 1;" onclick="exportActivityGroupsExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
-                                <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
-                            </div>
-                        </div>
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>Quản lý lớp học</h2></div>
+                    <div class="top-bar-actions">
+                        <button class="btn-outline-action" onclick="toggleStudentSubView()"><i class="fas fa-th" id="btn-toggle-subview-icon"></i></button>
+                        <button class="btn-outline-action" onclick="openModal('modal-add-student')"><i class="fas fa-user-plus"></i></button>
                     </div>
                 </div>
 
-                <!-- KHU VỰC HIỂN THỊ CÁC CARD TỔ / NHÓM -->
-                <div id="groups-container" style="display: flex; flex-direction: column; gap: 15px;"></div>
-            </section>
-
-            <!-- ================= 4. VIEW TRONG TIẾT ================= -->
-            <section id="view-in-class" class="view">
-                <div class="card-section" style="text-align: center;">
-                    <div class="card-section-title mb-15">
-                        <h3>🎲 Gọi tên ngẫu nhiên</h3>
-                        <p>Xoay vòng gọi học sinh trả lời bài</p>
+                <div id="subview-students-list">
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-student-input" placeholder="Tìm kiếm học sinh theo tên..." oninput="renderStudentsList()">
                     </div>
-                    
-                    <div id="random-picker-display" style="font-size: 1.6rem; font-weight: 900; color: var(--primary); padding: 25px 10px; background: var(--primary-light); border-radius: var(--radius-md); margin-bottom: 15px; min-height: 85px; display: flex; align-items: center; justify-content: center;">
-                        Nhấn nút để quay số!
+                    <div class="action-row mb-15">
+                        <button class="btn-outline text-blue" onclick="triggerExcelImport()"><i class="fas fa-file-excel"></i> Nhập từ Excel</button>
+                        <button class="btn-outline text-green" onclick="exportStudentsExcel()"><i class="fas fa-download"></i> Xuất Excel</button>
                     </div>
-
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-primary" onclick="pickRandomStudent()"><i class="fas fa-random"></i> Quay Gọi Tên</button>
-                        <button class="btn-outline" id="btn-plus-call" style="display: none;" onclick="confirmAddCall()"><i class="fas fa-check"></i> +1 Gọi tên</button>
-                    </div>
+                    <div class="list-container" id="students-container"></div>
                 </div>
 
-                <div class="card-section">
-                    <div class="card-section-title mb-15">
-                        <h3>📋 Ghi nhận nhanh trong tiết</h3>
-                        <p>Bấm vào học sinh để ghi nhận vi phạm hoặc điểm cộng</p>
+                <div id="subview-seatmap" style="display: none;">
+                    <div class="seatmap-controls mb-15">
+                        <div class="input-group mb-0" style="flex: 1;"><label>Dãy bàn</label><input type="number" id="seatmap-cols" value="4" min="2" max="6" onchange="updateSeatmapDimensions()"></div>
+                        <div class="input-group mb-0" style="flex: 1;"><label>Hàng ghế</label><input type="number" id="seatmap-rows" value="5" min="2" max="10" onchange="updateSeatmapDimensions()"></div>
                     </div>
-                    <div id="in-class-student-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto;"></div>
+                    <div class="seatmap-desk-board">BẢNG LỚP HỌC</div>
+                    <div class="seatmap-grid" id="seatmap-grid-container"></div>
                 </div>
             </section>
 
-            <!-- ================= 5. VIEW SỔ ĐIỂM CHI TIẾT ================= -->
-            <section id="view-gradebook" class="view">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
-                    <button class="btn-primary" style="white-space: nowrap; width: auto; padding: 10px 16px;" onclick="triggerEduImport()"><i class="fas fa-file-import"></i> Nhập từ EDU</button>
-                    <button class="btn-outline" style="white-space: nowrap; border-color: var(--success); color: var(--success);" onclick="exportEduFile()"><i class="fas fa-file-excel"></i> Xuất File EDU</button>
-                    <button class="btn-outline" style="white-space: nowrap;" onclick="addNewTxColumn()"><i class="fas fa-plus"></i> Thêm cột TX</button>
+            <!-- 3. ĐIỂM DANH -->
+            <section id="view-attendance" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>Sổ điểm danh</h2></div>
+                    <div class="top-bar-actions">
+                        <button class="btn-outline-action text-green" onclick="saveAttendance()"><i class="fas fa-save"></i></button>
+                    </div>
                 </div>
-
-                <div class="table-scroll-wrap">
-                    <table class="score-table">
-                        <thead>
-                            <tr id="score-table-header">
-                                <th>STT</th>
-                                <th class="text-left">Họ và tên</th>
-                                <th>TX1</th>
-                                <th>TX2</th>
-                                <th>TX3</th>
-                                <th>TX4</th>
-                                <th>GK</th>
-                                <th>CK</th>
-                                <th>ĐTB</th>
-                                <th>Nhận xét</th>
-                            </tr>
-                        </thead>
-                        <tbody id="score-table-body"></tbody>
-                    </table>
+                <div class="attendance-date-picker mb-15">
+                    <button class="btn-outline-action" onclick="changeAttendanceDate(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <input type="date" id="attendance-current-date" onchange="loadAttendanceByDate()">
+                    <button class="btn-outline-action" onclick="changeAttendanceDate(1)"><i class="fas fa-chevron-right"></i></button>
                 </div>
-                <input type="file" id="edu-import-input" style="display: none;" accept=".xlsx, .xls, .csv" onchange="handleEduImportFile(event)">
+                <div class="attendance-summary-card mb-15">
+                    <div><span>Sĩ số:</span> <strong id="att-summary-total">0</strong></div>
+                    <div><span class="text-green">Hiện diện:</span> <strong id="att-summary-present">0</strong></div>
+                    <div><span class="text-red">Vắng:</span> <strong id="att-summary-absent">0</strong></div>
+                </div>
+                <div class="list-container" id="attendance-container"></div>
             </section>
 
-            <!-- ================= 6. VIEW THỐNG KÊ CHI TIẾT ================= -->
-            <section id="view-statistics" class="view">
-                <div class="card-section">
-                    <div class="card-section-title mb-15">
-                        <h3>📊 Báo cáo học tập lớp <span id="stat-view-classname">...</span></h3>
-                        <p>Môn: <span id="stat-view-subject">...</span> • Năm học: <span id="stat-view-year">...</span></p>
-                    </div>
-                    <div class="stats-grid-modern">
-                        <div class="stat-card-modern"><div class="stat-info"><h4 id="stat-total-stu">0</h4><p>Tổng số HS</p></div></div>
-                        <div class="stat-card-modern"><div class="stat-info"><h4 id="stat-avg-all">0.0</h4><p>Điểm TB lớp</p></div></div>
-                        <div class="stat-card-modern"><div class="stat-info"><h4 id="stat-max-score" style="color: var(--success);">0.0</h4><p>Điểm cao nhất</p></div></div>
-                        <div class="stat-card-modern"><div class="stat-info"><h4 id="stat-min-score" style="color: var(--danger);">0.0</h4><p>Điểm thấp nhất</p></div></div>
-                    </div>
+            <!-- 4. KỶ LUẬT & KHEN THƯỞNG -->
+            <section id="view-discipline" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>Kỷ luật & Thi đua</h2></div>
+                    <button class="btn-outline-action text-red" onclick="openModal('modal-add-discipline')"><i class="fas fa-plus"></i></button>
                 </div>
-
-                <div class="card-section">
-                    <div class="card-section-title mb-15"><h3>Phân bố chi tiết theo nhóm</h3></div>
-                    <div id="stat-detailed-breakdown" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                <div class="tabs-nav mb-15">
+                    <button class="tab-btn active" onclick="switchDisciplineTab('violations', this)">Vi phạm</button>
+                    <button class="tab-btn" onclick="switchDisciplineTab('leaderboard', this)">Bảng sao hạnh kiểm</button>
+                </div>
+                <div id="tab-discipline-violations">
+                    <div class="list-container" id="discipline-records-container"></div>
+                </div>
+                <div id="tab-discipline-leaderboard" style="display: none;">
+                    <div class="list-container" id="discipline-leaderboard-container"></div>
                 </div>
             </section>
 
-            <!-- ================= 7. VIEW CÀI ĐẶT ================= -->
-            <section id="view-settings" class="view">
-                <div class="card-section">
-                    <div class="card-section-title mb-15"><h3>⚙️ Thông tin giảng dạy</h3></div>
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <div><label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Tên Giáo Viên</label><input type="text" id="set-teacher-name" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"></div>
-                        <div><label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Môn Giảng Dạy</label><input type="text" id="set-subject-name" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"></div>
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex: 1;"><label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Năm học</label><input type="text" id="set-school-year" value="2025-2026" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"></div>
-                            <div style="flex: 1;"><label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Học kỳ</label><select id="set-semester" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"><option value="HK1">Học kỳ 1</option><option value="HK2">Học kỳ 2</option></select></div>
-                        </div>
-                        <button class="btn-primary mt-10" onclick="saveTeacherSettings()">Lưu thiết lập</button>
+            <!-- 5. THU CHI & QUỸ LỚP -->
+            <section id="view-fees" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>Quản lý Thu - Chi</h2></div>
+                    <button class="btn-outline-action text-green" onclick="openModal('modal-add-fund')"><i class="fas fa-plus"></i></button>
+                </div>
+                <div class="fund-card mb-15">
+                    <span class="fund-label">Tổng quỹ lớp còn lại</span>
+                    <h2 class="fund-amount" id="fund-total-balance">0 VNĐ</h2>
+                    <div class="fund-details">
+                        <div><i class="fas fa-arrow-down text-green"></i> Tổng thu: <span id="fund-total-in">0đ</span></div>
+                        <div><i class="fas fa-arrow-up text-red"></i> Tổng chi: <span id="fund-total-out">0đ</span></div>
                     </div>
                 </div>
-
-                <!-- CÀI ĐẶT QUY TẮC NHẬN XÉT THEO KHOẢNG ĐIỂM -->
-                <div class="card-section">
-                    <div class="card-section-title mb-15">
-                        <h3>📝 Quy tắc nhận xét theo điểm</h3>
-                        <p>Tự động điền câu nhận xét khi tính ĐTB</p>
-                    </div>
-                    <div id="comment-rules-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;"></div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-outline" style="flex: 1;" onclick="addNewCommentRule()"><i class="fas fa-plus"></i> Thêm mốc</button>
-                        <button class="btn-outline" style="flex: 1; color: var(--danger);" onclick="resetDefaultCommentRules()">Khôi phục gốc</button>
-                    </div>
+                <div class="tabs-nav mb-15">
+                    <button class="tab-btn active" onclick="switchFundTab('campaigns', this)">Khoản thu theo đợt</button>
+                    <button class="tab-btn" onclick="switchFundTab('logs', this)">Nhật ký Thu - Chi</button>
                 </div>
-
-                <!-- KHU VỰC LIÊN HỆ HỖ TRỢ -->
-                <div class="card-section">
-                    <div class="card-section-title mb-15"><h3>💬 Hỗ trợ & Báo lỗi</h3></div>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; font-weight: 500;">Nếu thầy cô gặp lỗi hoặc có góp ý nâng cấp App, vui lòng liên hệ với Admin để được hỗ trợ nhanh nhất nhé!</p>
-                    <button class="btn-primary w-full mb-10" onclick="window.open('https://zalo.me/0775172026', '_blank')" style="background: #0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);"><i class="fas fa-comment-dots"></i> Nhắn Zalo cho Admin</button>
-                    <button class="btn-outline w-full" onclick="window.location.href='tel:0775172026'"><i class="fas fa-phone-alt text-green"></i> Gọi điện: 077.517.2026</button>
+                <div id="tab-fund-campaigns">
+                    <button class="btn-primary w-full mb-15" onclick="openModal('modal-create-campaign')"><i class="fas fa-folder-plus"></i> Tạo đợt thu mới</button>
+                    <div class="list-container" id="fund-campaigns-container"></div>
                 </div>
-
-                <!-- SAO LƯU & DỮ LIỆU -->
-                <div class="card-section">
-                    <div class="card-section-title mb-15"><h3>💾 Sao lưu & Dữ liệu</h3></div>
-                    <button class="btn-outline w-full mb-10" onclick="backupAppDataJSON()"><i class="fas fa-download"></i> Tải bản sao lưu (.json)</button>
-                    <button class="btn-outline w-full mb-10" onclick="logoutApp()" style="color: var(--text-muted);"><i class="fas fa-sign-out-alt"></i> Đăng xuất tài khoản</button>
-                    <button class="btn-primary w-full" style="background: var(--danger); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);" onclick="resetData()"><i class="fas fa-trash-alt"></i> Xóa toàn bộ dữ liệu lớp</button>
+                <div id="tab-fund-logs" style="display: none;">
+                    <div class="list-container" id="fund-logs-container"></div>
                 </div>
             </section>
-        
-            <!-- ================= 8. VIEW SỔ BÁO GIẢNG ================= -->
+
+            <!-- 6. SỔ BÁO GIẢNG -->
             <section id="view-lesson-log" class="view">
                 <div class="top-bar">
                     <div class="top-bar-title"><h2>📚 Sổ báo giảng</h2></div>
                     <button class="btn-outline-action" onclick="openModal('modal-setup-lesson-log')" title="Cấu hình hệ thống"><i class="fas fa-cogs"></i></button>
                 </div>
-                
                 <div class="ll-controls">
                     <div class="input-group mb-0" style="flex: 1;">
                         <select id="ll-week-select" onchange="renderSchedule()"></select>
                     </div>
                     <button class="btn-outline text-green" onclick="exportScheduleExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
-                    <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
+                    <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i> In</button>
                 </div>
-
                 <div class="ll-stats-bar mt-15" id="ll-stats-container"></div>
                 <div id="ll-schedule-list" class="list-container mt-15" style="padding-bottom: 70px;"></div>
             </section>
+
+            <!-- 7. CÀI ĐẶT -->
+            <section id="view-settings" class="view">
+                <div class="top-bar"><div class="top-bar-title"><h2>Cài đặt ứng dụng</h2></div></div>
+                <div class="settings-card mb-15">
+                    <h3>Thông tin lớp học</h3>
+                    <div class="input-group"><label>Tên Lớp</label><input type="text" id="set-class-name"></div>
+                    <div class="input-group"><label>Giáo viên chủ nhiệm</label><input type="text" id="set-teacher-name"></div>
+                    <div class="input-group"><label>Năm học</label><input type="text" id="set-school-year"></div>
+                    <button class="btn-primary w-full" onclick="saveSettingsInfo()">Lưu thông tin</button>
+                </div>
+                <div class="settings-card mb-15">
+                    <h3>Dữ liệu & Sao lưu</h3>
+                    <div class="action-row">
+                        <button class="btn-outline text-blue w-full" onclick="exportAllDataBackup()"><i class="fas fa-download"></i> Tải sao lưu (JSON)</button>
+                        <button class="btn-outline text-orange w-full" onclick="triggerRestoreBackup()"><i class="fas fa-upload"></i> Phục hồi</button>
+                    </div>
+                    <button class="btn-outline text-red w-full mt-10" onclick="resetClassData()"><i class="fas fa-trash"></i> Xóa toàn bộ dữ liệu lớp</button>
+                </div>
+                <div class="settings-card">
+                    <p class="text-muted" style="text-align: center; font-size: 0.85rem;">GVCN Pro v4.2 - Bản quyền tác giả<br>Hotline Zalo: 077.517.2026</p>
+                </div>
+            </section>
         </main>
 
-        <!-- BOTTOM BAR ĐIỀU HƯỚNG NHANH -->
         <nav id="bottom-bar">
-            <div class="nav-item active" onclick="switchView('view-overview', this)"><div class="nav-icon"><i class="fas fa-home"></i></div><span>Tổng quan</span></div>
-            <div class="nav-item" onclick="switchView('view-students', this)"><div class="nav-icon"><i class="fas fa-user-graduate"></i></div><span>Học sinh</span></div>
-            <div class="nav-item" onclick="switchView('view-groups', this)"><div class="nav-icon"><i class="fas fa-users-cog"></i></div><span>Chia nhóm</span></div>
-            <div class="nav-item" onclick="switchView('view-in-class', this)"><div class="nav-icon"><i class="fas fa-edit"></i></div><span>Trong tiết</span></div>
-            <div class="nav-item" onclick="switchView('view-gradebook', this)"><div class="nav-icon"><i class="fas fa-table"></i></div><span>Sổ điểm</span></div>
+            <div class="nav-item active" onclick="switchView('view-dashboard', this)"><div class="nav-icon"><i class="fas fa-home"></i></div><span>Tổng quan</span></div>
+            <div class="nav-item" onclick="switchView('view-students', this)"><div class="nav-icon"><i class="fas fa-user-graduate"></i></div><span>Lớp học</span></div>
+            <div class="nav-item" onclick="switchView('view-attendance', this)"><div class="nav-icon"><i class="fas fa-calendar-check"></i></div><span>Điểm danh</span></div>
+            <div class="nav-item" onclick="switchView('view-discipline', this)"><div class="nav-icon"><i class="fas fa-award"></i></div><span>Nề nếp</span></div>
+            <div class="nav-item" onclick="switchView('view-fees', this)"><div class="nav-icon"><i class="fas fa-wallet"></i></div><span>Quỹ lớp</span></div>
             <div class="nav-item" onclick="switchView('view-lesson-log', this)"><div class="nav-icon"><i class="fas fa-book-open"></i></div><span>Sổ giảng</span></div>
-            <div class="nav-item" onclick="switchView('view-settings', this)"><div class="nav-icon"><i class="fas fa-cog"></i></div><span>Cài đặt</span></div>
         </nav>
     </div>
 
-    <!-- ================= MODAL HỒ SƠ HỌC SINH ================= -->
-    <div id="modal-student-profile" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 style="font-size: 1.1rem; font-weight: 800;">HỒ SƠ HỌC SINH</h3>
-                <div class="btn-icon" style="width: 32px; height: 32px;" onclick="closeModal('modal-student-profile')"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="prof-student-id">
-                
-                <div class="student-profile-banner">
-                    <div class="spb-header">
-                        <div class="spb-avatar" id="prof-avatar">TK</div>
-                        <div class="spb-info">
-                            <h3 id="prof-header-name">Học sinh</h3>
-                            <p>Lớp <span id="prof-header-class">...</span> • STT <span id="prof-header-stt">1</span></p>
-                        </div>
-                    </div>
-                    <div class="spb-scores">
-                        <div>
-                            <span style="font-size: 0.75rem; opacity: 0.85; display: block;">Điểm TB</span>
-                            <span class="spb-dtb" id="prof-header-dtb">0.0</span>
-                        </div>
-                        <span class="badge-chip" id="prof-header-eval" style="background: white; color: var(--primary); font-weight: 800;">Đạt</span>
-                    </div>
-                </div>
-
-                <div class="section-label-row">
-                    <h4>Thông tin cần cập nhật</h4>
-                    <span>✏️ Có thể chỉnh sửa</span>
-                </div>
-
-                <div class="form-row">
-                    <div style="flex: 2;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Họ và tên</label>
-                        <input type="text" id="prof-name" style="width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-weight: 700;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Tổ cố định</label>
-                        <select id="prof-fixed-team" style="width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-weight: 800; color: var(--primary);">
-                            <option value="1">Tổ 1</option>
-                            <option value="2">Tổ 2</option>
-                            <option value="3">Tổ 3</option>
-                            <option value="4">Tổ 4</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="quick-counter-grid">
-                    <div class="counter-box">
-                        <label>Số lần gọi tên</label>
-                        <div class="counter-control">
-                            <button class="btn-step" onclick="stepCounter('prof-calls', -1)">-</button>
-                            <span class="counter-val" id="prof-calls">0</span>
-                            <button class="btn-step" onclick="stepCounter('prof-calls', 1)">+</button>
-                        </div>
-                    </div>
-                    <div class="counter-box">
-                        <label>Số lần vi phạm</label>
-                        <div class="counter-control">
-                            <button class="btn-step" onclick="stepCounter('prof-violations', -1)">-</button>
-                            <span class="counter-val" id="prof-violations" style="color: var(--danger);">0</span>
-                            <button class="btn-step" onclick="stepCounter('prof-violations', 1)">+</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section-label-row">
-                    <h4>Điểm thường xuyên</h4>
-                    <span>✏️ Có thể cập nhật</span>
-                </div>
-                <div class="tx-scores-grid" id="prof-tx-container"></div>
-
-                <div class="section-label-row">
-                    <h4>Điểm định kỳ</h4>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; margin-bottom: 15px;">
-                    <div class="tx-box"><span>GK</span><input type="number" id="prof-gk" step="0.1" min="0" max="10" oninput="recalcProfileScores()"></div>
-                    <div class="tx-box"><span>CK</span><input type="number" id="prof-ck" step="0.1" min="0" max="10" oninput="recalcProfileScores()"></div>
-                    <div class="tx-box" style="background: var(--primary-light);"><span style="color: var(--primary);">ĐTB</span><input type="text" id="prof-dtb" readonly style="color: var(--primary);"></div>
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Nhận xét môn học</label>
-                    <textarea id="prof-comment" rows="2" style="width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-weight: 600; font-family: inherit; font-size: 0.9rem;"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-outline" style="flex: 1;" onclick="closeModal('modal-student-profile')">Đóng</button>
-                <button class="btn-primary" style="flex: 2;" onclick="saveStudentProfile()"><i class="fas fa-check"></i> Lưu vào CSDL</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL THÊM HỌC SINH MỚI -->
-    <div id="modal-add-student" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Thêm học sinh mới</h3>
-                <div class="btn-icon" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body">
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div><label style="font-size: 0.85rem; font-weight: 700;">Họ và tên *</label><input type="text" id="add-stu-name" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"></div>
-                    <div><label style="font-size: 0.85rem; font-weight: 700;">Ngày sinh</label><input type="text" id="add-stu-dob" placeholder="dd/mm/yyyy" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"></div>
-                    <div class="form-row">
-                        <div style="flex: 1;"><label style="font-size: 0.85rem; font-weight: 700;">Giới tính</label><select id="add-stu-gender" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div>
-                        <div style="flex: 1;"><label style="font-size: 0.85rem; font-weight: 700;">Tổ cố định</label><select id="add-stu-team" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700;"><option value="1">Tổ 1</option><option value="2">Tổ 2</option><option value="3">Tổ 3</option><option value="4">Tổ 4</option></select></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary" onclick="confirmAddNewStudent()">Thêm vào lớp</button>
-            </div>
-        </div>
-    </div>
+    <!-- MODAL THÊM HỌC SINH -->
+    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Thêm học sinh mới</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Họ và tên</label><input type="text" id="add-stu-name" placeholder="VD: Nguyễn Văn A"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="add-stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Tổ</label><select id="add-stu-team"><option value="1">Tổ 1</option><option value="2">Tổ 2</option><option value="3">Tổ 3</option><option value="4">Tổ 4</option></select></div></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="add-stu-dob"></div><div class="input-group"><label>Số điện thoại phụ huynh</label><input type="tel" id="add-stu-parent-phone" placeholder="VD: 0912345678"></div><div class="input-group"><label>Địa chỉ / Ghi chú</label><input type="text" id="add-stu-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveNewStudent()">Lưu học sinh</button></div></div></div>
 
     <!-- MODAL CẤU HÌNH SỔ BÁO GIẢNG (CHA) -->
     <div id="modal-setup-lesson-log" class="modal" style="z-index: 1000;">
@@ -604,8 +322,7 @@
         </div>
     </div>
 
-    <!-- 4 MODAL CON NỔI LÊN TRÊN (Z-INDEX 1100) -->
-    <!-- 1. MODAL TKB -->
+    <!-- 4 MODAL CON NỔI LÊN TRÊN (Z-INDEX 1100 - ĐÃ SỬA LỖI MỞ KHÔNG RA) -->
     <div id="modal-setup-tkb" class="modal" style="z-index: 1100; display: none;">
         <div class="modal-content" style="height: 90vh;">
             <div class="modal-header">
@@ -623,7 +340,7 @@
                     <div class="input-group" style="flex: 1;"><label>Tiết (1-10)</label><input type="number" id="add-tkb-period" min="1" max="10" placeholder="VD: 1"></div>
                 </div>
                 <div class="form-row">
-                    <div class="input-group" style="flex: 1;"><label>Lớp</label><input type="text" id="add-tkb-class" placeholder="VD: 6A"></div>
+                    <div class="input-group" style="flex: 1;"><label>Lớp</label><input type="text" id="add-tkb-class" placeholder="VD: 9A"></div>
                     <div class="input-group" style="flex: 1;"><label>Môn</label><input type="text" id="add-tkb-subject" placeholder="VD: Toán"></div>
                 </div>
                 <button class="btn-primary w-full mb-20" onclick="addTKB()">Thêm TKB</button>
@@ -637,7 +354,6 @@
         </div>
     </div>
     
-    <!-- 2. MODAL PPCT -->
     <div id="modal-setup-ppct" class="modal" style="z-index: 1100; display: none;">
         <div class="modal-content" style="height: 90vh;">
             <div class="modal-header">
@@ -651,12 +367,12 @@
                     <button class="btn-outline text-red w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="clearAllSetupData('ppct')" title="Xóa toàn bộ PPCT để nhập lại"><i class="fas fa-trash-alt"></i> Xóa hết</button>
                 </div>
                 <div class="form-row">
-                    <div class="input-group" style="flex: 1;"><label>Khối / Lớp (VD: 6 hoặc 6A)</label><input type="text" id="add-ppct-class" placeholder="VD: 6"></div>
+                    <div class="input-group" style="flex: 1;"><label>Khối / Lớp (VD: 9 hoặc 9A)</label><input type="text" id="add-ppct-class" placeholder="VD: 9"></div>
                     <div class="input-group" style="flex: 1;"><label>Môn</label><input type="text" id="add-ppct-subject" placeholder="VD: Toán"></div>
                 </div>
                 <div class="form-row">
                     <div class="input-group" style="flex: 1;"><label>Tiết PPCT</label><input type="number" id="add-ppct-period" placeholder="VD: 1"></div>
-                    <div class="input-group" style="flex: 1;"><label>Phân môn (Đại / Hình)</label><input type="text" id="add-ppct-branch" placeholder="Đại hoặc Hình"></div>
+                    <div class="input-group" style="flex: 1;"><label>Phân môn (Đại / Hình nếu có)</label><input type="text" id="add-ppct-branch" placeholder="Đại hoặc Hình"></div>
                 </div>
                 <div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content" placeholder="Nhập tên bài dạy..."></div>
                 <button class="btn-primary w-full mb-20" onclick="addPPCT()">Thêm Bài</button>
@@ -670,7 +386,6 @@
         </div>
     </div>
     
-    <!-- 3. MODAL NGHỈ LỄ & SỰ KIỆN -->
     <div id="modal-setup-holidays" class="modal" style="z-index: 1100; display: none;">
         <div class="modal-content" style="height: 90vh;">
             <div class="modal-header">
@@ -694,8 +409,7 @@
             </div>
         </div>
     </div>
-
-    <!-- 4. MODAL TỈ LỆ ĐẠI / HÌNH -->
+    
     <div id="modal-setup-math-ratio" class="modal" style="z-index: 1100; display: none;">
         <div class="modal-content" style="height: 90vh;">
             <div class="modal-header">
@@ -705,13 +419,13 @@
             <div class="modal-body">
                 <div class="alert-item yellow mb-15">
                     <div class="alert-info">
-                        Tự do cấu hình tỉ lệ Đại/Hình theo từng khoảng tuần cho từng khối (VD: Khối 6 Tuần 1-14: 3 Đại 1 Hình; Tuần 15-18: 2 Đại 2 Hình...).
+                        Tự do cấu hình tỉ lệ Đại/Hình theo từng khoảng tuần cho từng khối (VD: Khối 9 Tuần 1-14: 3 Đại 1 Hình; Tuần 15-18: 2 Đại 2 Hình...).
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="input-group" style="flex: 1;">
                         <label>Khối (VD: 6, 7, 8, 9)</label>
-                        <input type="text" id="add-math-grade" placeholder="VD: 6">
+                        <input type="text" id="add-math-grade" placeholder="VD: 9">
                     </div>
                     <div class="input-group" style="flex: 1;">
                         <label>Từ tuần</label>
@@ -750,41 +464,28 @@
         </div>
     </div>
 
-    <!-- MODAL ĐỔI LỊCH / DẠY BÙ -->
-    <div id="modal-adjust-schedule" class="modal" style="z-index: 1200; display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🔄 Đổi lịch / Dạy bù</h3>
-                <div class="close" onclick="closeModal('modal-adjust-schedule')" style="cursor: pointer; font-size: 1.2rem;"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="adj-sched-id">
-                <div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div>
-                <div class="form-row">
-                    <div class="input-group" style="flex: 1;"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div>
-                    <div class="input-group" style="flex: 1;"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div>
-                </div>
-                <div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note" placeholder="VD: Dạy bù do nghỉ lễ..."></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button>
-            </div>
-        </div>
-    </div>
+    <!-- MODAL GHI LỖI KỶ LUẬT -->
+    <div id="modal-add-discipline" class="modal"><div class="modal-content"><div class="modal-header"><h3>Ghi nhận vi phạm / Khen thưởng</h3><div class="close" onclick="closeModal('modal-add-discipline')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn Học sinh</label><select id="disc-student-select"></select></div><div class="form-row"><div class="input-group"><label>Hình thức</label><select id="disc-type"><option value="violation">Vi phạm (- điểm)</option><option value="reward">Khen thưởng (+ điểm)</option></select></div><div class="input-group"><label>Điểm thi đua</label><input type="number" id="disc-points" value="2" min="1" max="20"></div></div><div class="input-group"><label>Hành vi / Lý do</label><input type="text" id="disc-reason" placeholder="VD: Đi học muộn, Không làm BTVN..."></div><div class="input-group"><label>Ngày ghi nhận</label><input type="date" id="disc-date"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDisciplineRecord()">Lưu ghi nhận</button></div></div></div>
 
-    <!-- DUY NHẤT 1 INPUT FILE CHO IMPORT CHUNG -->
-    <input type="file" id="general-import-file" style="display:none;" accept=".xlsx, .xls, .csv, .docx" onchange="handleGeneralImport(event)">
+    <!-- MODAL THU CHI QUỸ LỚP -->
+    <div id="modal-add-fund" class="modal"><div class="modal-content"><div class="modal-header"><h3>Ghi nhận Thu - Chi Quỹ</h3><div class="close" onclick="closeModal('modal-add-fund')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="form-row"><div class="input-group"><label>Loại giao dịch</label><select id="fund-log-type"><option value="in">Thu vào (+)</option><option value="out">Chi ra (-)</option></select></div><div class="input-group"><label>Số tiền (VNĐ)</label><input type="number" id="fund-log-amount" placeholder="VD: 50000" step="1000"></div></div><div class="input-group"><label>Nội dung thu chi</label><input type="text" id="fund-log-desc" placeholder="VD: Mua phấn bảng, Mua hoa..."></div><div class="input-group"><label>Ngày giao dịch</label><input type="date" id="fund-log-date"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveFundLog()">Lưu giao dịch</button></div></div></div>
+
+    <!-- MODAL TẠO ĐỢT THU MỚI -->
+    <div id="modal-create-campaign" class="modal"><div class="modal-content"><div class="modal-header"><h3>Tạo đợt thu quỹ lớp mới</h3><div class="close" onclick="closeModal('modal-create-campaign')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tên đợt thu</label><input type="text" id="camp-title" placeholder="VD: Quỹ lớp kỳ 1, Tiền áo đồng phục"></div><div class="input-group"><label>Số tiền mỗi học sinh (VNĐ)</label><input type="number" id="camp-amount" placeholder="VD: 100000" step="1000"></div><div class="input-group"><label>Hạn chót đóng</label><input type="date" id="camp-deadline"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="createFundCampaign()">Tạo đợt thu</button></div></div></div>
+
+    <!-- MODAL ĐỔI LỊCH DẠY BÙ -->
+    <div id="modal-adjust-schedule" class="modal" style="z-index: 1200; display: none;"><div class="modal-content"><div class="modal-header"><h3>🔄 Đổi lịch / Dạy bù</h3><div class="close" onclick="closeModal('modal-adjust-schedule')" style="cursor: pointer; font-size: 1.2rem;"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="adj-sched-id"><div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div><div class="form-row"><div class="input-group" style="flex: 1;"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div><div class="input-group" style="flex: 1;"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div></div><div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note" placeholder="VD: Dạy bù..."></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button></div></div></div>
 
     <!-- MODAL GIA HẠN SỚM (1 NĂM / TRỌN ĐỜI) -->
     <div id="modal-upgrade" class="modal" style="z-index: 9999;">
         <div class="modal-content" style="background: #f8fafc; text-align: center; max-height: 90vh;">
             <div class="modal-header">
-                <h3>🚀 Gia Hạn Bản Quyền GVBM</h3>
+                <h3>🚀 Gia Hạn Bản Quyền GVCN</h3>
                 <div class="close" onclick="closeModal('modal-upgrade')" style="cursor: pointer; font-size: 1.2rem;"><i class="fas fa-times"></i></div>
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <p style="font-size: 14px; color: #64748b; margin-bottom: 20px; font-weight: 600; line-height: 1.6; text-align: left;">
-                    🎉 <strong>Thầy cô đã trải nghiệm app trong 15 ngày!</strong> Hy vọng ứng dụng đã giúp việc tính ĐTB, quản lý lớp và làm Sổ Báo Giảng trở nên nhẹ nhàng, thuận tiện hơn.<br><br>
+                    🎉 <strong>Chào mừng thầy cô trải nghiệm app GVCN!</strong><br><br>
                     Để tiếp tục duy trì <strong>Cloud (Đám mây)</strong>, máy chủ và hệ thống đồng bộ dữ liệu ổn định, app cần một khoản chi phí vận hành nhỏ mỗi tháng.<br><br>
                     ❤️ Chỉ từ <strong>15.000đ/tháng</strong> – chưa bằng một ly cà phê – thầy cô có thể sử dụng đầy đủ mọi tính năng, đồng bộ Cloud an toàn và ủng hộ mình duy trì, nâng cấp app ngày càng tốt hơn.<br><br>
                     <strong>Cảm ơn thầy cô đã đồng hành và ủng hộ trong thời gian qua!</strong> 🙏
@@ -805,11 +506,6 @@
                         <p style="font-size: 11.5px; color: #64748b; font-weight: 600; margin: 0;">Cú pháp: <b>TD</b></p>
                     </div>
                 </div>
-                
-                <div style="background: #f1f5f9; padding: 10px; border-radius: 12px; margin-bottom: 15px; font-size: 13px; font-weight: 600; color: #334155;">
-                    Cú pháp CK: <strong style="color: #0d6efd;"><span id="upgrade-email-prefix"></span> [Mã Gói]</strong><br>
-                    <span style="font-size: 11.5px; color: #64748b;">(Trong đó Mã Gói là: <b>1N</b> hoặc <b>TD</b>)</span>
-                </div>
 
                 <img src="qr-thu-phi.jpg" alt="Mã QR Thanh Toán" style="width: 200px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 15px;">
                 
@@ -826,36 +522,12 @@
         </div>
     </div>
 
-    <!-- MODAL THÔNG BÁO CẬP NHẬT TÍNH NĂNG MỚI -->
-    <div id="modal-update-announcement" class="modal" style="z-index: 9999;">
-        <div class="modal-content" style="max-height: 90vh;">
-            <div class="modal-header">
-                <h3>🎉 Có gì mới trong bản cập nhật GVBM?</h3>
-                <div class="close" onclick="closeModal('modal-update-announcement')" style="cursor: pointer; font-size: 1.2rem;"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body" style="line-height: 1.6; color: var(--text-main);">
-                <div class="alert-item green mb-15">
-                    <div class="alert-info">
-                        <strong>🚀 Nâng cấp phiên bản v4.2</strong>
-                        <p>Hệ thống vừa tích hợp toàn diện Sổ Báo Giảng tự động và chức năng Chia tổ / nhóm học tập linh hoạt!</p>
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem;">
-                    <div><b>1. 👥 Tính năng Chia tổ / nhóm học tập:</b> Hỗ trợ cả 2 chế độ: Tổ lớp cố định (cho GVCN) và Nhóm hoạt động linh hoạt (cân bằng học lực).</div>
-                    <div><b>2. 📚 Tích hợp Sổ Báo Giảng tự động:</b> Tự động tạo lịch dạy cả năm, phân bổ bài dạy theo tuần, thống kê số tiết đã dạy/chưa dạy trực quan.</div>
-                    <div><b>3. 🏫 1 File PPCT dùng chung cả khối:</b> Chỉ cần nạp 1 file PPCT (VD: Toán 6), hệ thống tự gán chính xác cho các lớp 6A, 6B, 6C...</div>
-                    <div><b>4. 📐 Tùy biến số tiết Đại / Hình (Toán) theo tuần:</b> Tự do cấu hình tỉ lệ Đại số và Hình học theo từng khoảng tuần giảng dạy.</div>
-                    <div><b>5. 🏖️ Tự động bảo lưu khi nghỉ lễ:</b> Tiết học trùng ngày nghỉ sẽ tự động dồn sang buổi dạy tiếp theo, không lo mất bài hay lệch tiến độ.</div>
-                    <div><b>6. 💬 Hỗ trợ Admin 24/7:</b> Nút nhắn tin Zalo Admin được đặt ngay dưới mã QR để hỗ trợ thầy cô nhanh nhất.</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary w-full btn-large" onclick="dismissUpdateAnnouncement()">Tuyệt vời! Bắt đầu trải nghiệm</button>
-            </div>
-        </div>
-    </div>
+    <!-- Hidden Input Files -->
+    <input type="file" id="excel-import-file" style="display:none;" accept=".xlsx, .xls, .csv" onchange="handleExcelImport(event)">
+    <input type="file" id="general-import-file" style="display:none;" accept=".xlsx, .xls, .csv, .docx" onchange="handleGeneralImport(event)">
+    <input type="file" id="backup-restore-file" style="display:none;" accept=".json" onchange="handleRestoreBackup(event)">
 
-    <!-- SCRIPT CHÍNH DẠNG MODULE CHO FIREBASE -->
+    <!-- Firebase SDKs -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
