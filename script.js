@@ -611,6 +611,14 @@ window.checkIsHoliday = function(dateStr) {
     for(let h of appData.scheduleSetup.holidays) { if(d >= new Date(h.start) && d <= new Date(h.end)) return h; } return null;
 };
 
+// Hàm chuẩn hóa và bóc tách số khối (VD: "7A1", "Lớp 7A2", "Khối 7", "7" -> đều ra "7")
+function extractGrade(className) {
+    if (!className) return "";
+    let str = className.toString().trim();
+    let match = str.match(/(?:khối|lớp)?\s*([6-9]|1[0-2])/i);
+    return match ? match[1] : str;
+}
+
 function getMathBranchForPeriod(grade, week, mathIndexInWeek) {
     let ratios = appData.scheduleSetup.mathRatios || [];
     let config = ratios.find(r => r.grade === grade && week >= r.fromWeek && week <= r.toWeek);
