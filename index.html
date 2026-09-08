@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>APP GVCN - Trợ lý đắc lực</title>
+    <title>APP GVCN - Trợ lý đắc lực & Quản lý Phân quyền</title>
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,94 +21,96 @@
     <div id="toast-container"></div>
 
     <!-- MÀN HÌNH ĐĂNG NHẬP -->
-    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <h2 style="color: #2563eb; margin-bottom: 10px; font-weight: 800; font-size: 2rem;">Trợ Lý GVCN Pro</h2>
-        <p style="color: #64748b; margin-bottom: 25px; font-weight: 600;">Đăng nhập để đồng bộ dữ liệu đám mây</p>
-        <button id="btn-login" style="padding: 14px 28px; font-size: 16px; font-weight: bold; background: white; color: #333; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 10px;">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px;"> Đăng nhập bằng Google
+    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+        <div style="width: 70px; height: 70px; border-radius: 20px; background: #0d6efd; color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(13, 110, 253, 0.3);">
+            <i class="fas fa-graduation-cap"></i>
+        </div>
+        <h2 style="color: #0d6efd; margin-bottom: 8px; font-weight: 800; font-size: 1.8rem;">Sổ Chủ Nhiệm 4.0</h2>
+        <p style="color: #64748b; margin-bottom: 25px; font-weight: 600; font-size: 0.95rem;">Đăng nhập bằng Google (GVCN, Cán sự lớp hoặc Học sinh)</p>
+        
+        <button id="btn-login" style="padding: 14px 24px; font-size: 15px; font-weight: 700; background: white; color: #1e293b; border: 1.5px solid #e2e8f0; border-radius: 14px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); display: flex; align-items: center; gap: 12px;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px;"> Tiếp tục với Google
         </button>
+
+        <div id="login-status-msg" style="margin-top: 20px; font-size: 0.9rem; font-weight: 700; color: #64748b; min-height: 24px;"></div>
     </div>
 
-    <!-- MÀN HÌNH HẾT HẠN DÙNG THỬ -->
+    <!-- MÀN HÌNH CHẶN THU PHÍ (CHỈ CHO TÀI KHOẢN GVCN CHỦ LỚP KHI HẾT HẠN) -->
     <div id="man-hinh-thu-phi" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(255, 255, 255, 0.98); z-index: 9999; text-align: center; padding-top: 5vh; font-family: 'Plus Jakarta Sans', sans-serif; overflow-y: auto;">
-        <h2 style="color: #ef4444; font-size: 26px; margin-bottom: 5px; font-weight: 800;">Đã hết thời gian trải nghiệm!</h2>
-        <p style="font-size: 15px; color: #64748b; margin-bottom: 25px; padding: 0 20px; line-height: 1.5;">Dữ liệu của lớp được lưu trữ an toàn trên Đám mây (Cloud). Vui lòng chọn gói gia hạn để tiếp tục đồng bộ và phụ giúp tác giả duy trì máy chủ nhé! ❤️</p>
+        <h2 style="color: #ef4444; font-size: 26px; margin-bottom: 5px; font-weight: 800;">Đã hết 30 ngày trải nghiệm!</h2>
+        <p style="font-size: 15px; color: #64748b; margin-bottom: 25px; padding: 0 20px; line-height: 1.5;">Dữ liệu của lớp được lưu trữ an toàn trên Đám mây (Cloud). Vui lòng gia hạn để tiếp tục sử dụng hệ thống.</p>
         
-        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 25px; padding: 0 10px;">
-            <div style="border: 2px solid #0d6efd; border-radius: 16px; padding: 20px 16px; width: 160px; background: #fff; position: relative; box-shadow: 0 6px 16px rgba(13, 110, 253, 0.15);">
-                <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #0d6efd; color: white; padding: 3px 10px; border-radius: 10px; font-size: 10.5px; font-weight: 800; white-space: nowrap;">1 NĂM HỌC</span>
-                <h3 style="margin: 5px 0 0; color: #0d6efd; font-size: 17px; font-weight: 800;">1 Năm</h3>
-                <p style="font-size: 28px; color: #0d6efd; font-weight: 900; margin: 10px 0;">179K</p>
-                <p style="font-size: 12px; color: #64748b; margin-bottom: 12px; font-weight: 600;">Chỉ ~15k/tháng</p>
-                <p style="font-size: 12px; color: #475569; font-weight: 600; line-height: 1.4;">Nội dung CK:<br><strong style="color: #0d6efd; font-size: 13px;"><span class="email-user"></span> 1N</strong></p>
+        <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-bottom: 25px; padding: 0 10px;">
+            <div style="border: 2px solid #0d6efd; border-radius: 16px; padding: 18px 14px; width: 150px; background: #fff; box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);">
+                <h3 style="margin: 0; color: #0d6efd; font-size: 16px; font-weight: 800;">1 Năm</h3>
+                <p style="font-size: 24px; color: #0d6efd; font-weight: 900; margin: 8px 0;">179K</p>
+                <p style="font-size: 12px; color: #475569; font-weight: 600;">Cú pháp:<br><strong style="color: #0d6efd;"><span class="email-user"></span> 1N</strong></p>
             </div>
-
-            <div style="border: 2px solid #10b981; border-radius: 16px; padding: 20px 16px; width: 165px; background: #fff; position: relative; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.15);">
-                <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 3px 10px; border-radius: 10px; font-size: 10.5px; font-weight: 800; white-space: nowrap;">TIẾT KIỆM NHẤT</span>
-                <h3 style="margin: 5px 0 0; color: #059669; font-size: 17px; font-weight: 800;">Trọn Đời</h3>
-                <p style="font-size: 28px; color: #059669; font-weight: 900; margin: 10px 0;">399K</p>
-                <p style="font-size: 12px; color: #64748b; margin-bottom: 12px; font-weight: 600;">Sử dụng vĩnh viễn</p>
-                <p style="font-size: 12px; color: #475569; font-weight: 600; line-height: 1.4;">Nội dung CK:<br><strong style="color: #059669; font-size: 13px;"><span class="email-user"></span> TD</strong></p>
+            <div style="border: 2px solid #10b981; border-radius: 16px; padding: 18px 14px; width: 155px; background: #fff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);">
+                <h3 style="margin: 0; color: #059669; font-size: 16px; font-weight: 800;">Trọn Đời</h3>
+                <p style="font-size: 24px; color: #059669; font-weight: 900; margin: 8px 0;">399K</p>
+                <p style="font-size: 12px; color: #475569; font-weight: 600;">Cú pháp:<br><strong style="color: #059669;"><span class="email-user"></span> TD</strong></p>
             </div>
         </div>
 
-        <div style="margin: 20px auto;">
-            <img src="qr-thu-phi.jpg" alt="Mã QR Thanh Toán" style="width: 220px; border-radius: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15);">
+        <div style="margin: 15px auto;">
+            <img src="qr-thu-phi.jpg" alt="Mã QR" style="width: 200px; border-radius: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15);">
         </div>
-        
-        <p style="font-size: 13px; color: #64748b; padding: 0 20px; font-weight: 600;">Quét mã QR và nhập đúng <strong>Nội dung chuyển khoản</strong> để hệ thống nhận diện nhanh nhất.</p>
-        
-        <div style="margin: 15px auto; max-width: 300px; display: flex; flex-direction: column; gap: 10px; padding: 0 15px;">
-            <button onclick="window.open('https://zalo.me/0775172026', '_blank')" style="background: #0068ff; color: #fff; padding: 12px 20px; border-radius: 12px; border: none; font-weight: 800; font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,104,255,0.3); display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <i class="fas fa-comment-dots"></i> Nhắn Zalo Admin (Kích hoạt ngay)
-            </button>
-            <button onclick="window.location.href='tel:0775172026'" style="background: white; color: #1e293b; padding: 10px 18px; border-radius: 12px; border: 1px solid #cbd5e1; font-weight: 700; font-size: 13px; cursor: pointer;">
-                <i class="fas fa-phone-alt" style="color: #10b981;"></i> Hotline: 077.517.2026
-            </button>
-        </div>
-        <button onclick="logoutApp()" style="margin-top: 10px; margin-bottom: 25px; padding: 8px 16px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; border-radius: 10px; font-weight: 600; font-size: 12px; cursor: pointer;">Đăng xuất tài khoản</button>
+        <button onclick="logoutApp()" style="margin: 20px 0; padding: 10px 20px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; border-radius: 10px; font-weight: 700; cursor: pointer;">Đăng xuất tài khoản</button>
+    </div>
+
+    <!-- MÀN HÌNH TÀI KHOẢN CHƯA ĐƯỢC LIÊN KẾT -->
+    <div id="unauthorized-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9998; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center;">
+        <div style="font-size: 3rem; color: #f59e0b; margin-bottom: 15px;"><i class="fas fa-user-lock"></i></div>
+        <h3 style="font-size: 1.3rem; font-weight: 800; color: #1e293b; margin-bottom: 10px;">Chưa được liên kết với lớp học</h3>
+        <p style="color: #64748b; font-size: 0.95rem; line-height: 1.6; max-width: 320px; margin-bottom: 25px;">
+            Email <strong id="unauth-email" style="color: #0d6efd;"></strong> chưa được GVCN phân công quyền trong danh sách học sinh. Vui lòng báo GVCN nhập Gmail của bạn vào hồ sơ lớp.
+        </p>
+        <button class="btn-primary" onclick="logoutApp()" style="width: auto; padding: 12px 30px;"><i class="fas fa-sign-out-alt"></i> Đăng xuất & Dùng Gmail khác</button>
     </div>
 
     <div id="app">
         <main id="main-content">
-            <!-- ================= TRANG CHỦ ================= -->
+            <!-- ================= HEADER VÀ ROLE BADGE ================= -->
+            <header class="app-header">
+                <div class="greeting">
+                    <h2>Xin chào, <span id="dash-user-name">Cô/Thầy</span>! 👋</h2>
+                    <div style="margin-top: 4px;">
+                        <span id="current-user-role-badge" class="role-badge badge-teacher">👨‍🏫 GVCN</span>
+                        <span id="current-user-group-badge" class="role-badge badge-group" style="display: none;">⭐ Tổ 1</span>
+                    </div>
+                </div>
+                <img src="https://ui-avatars.com/api/?name=User&background=e0e7ff&color=4f46e5&bold=true" id="user-avatar-img" alt="Avatar" class="avatar">
+            </header>
+
+            <!-- ================= 1. TRANG CHỦ (ADAPTIVE THEO ROLE) ================= -->
             <section id="view-home" class="view active">
-                <header class="app-header">
-                    <div class="greeting">
-                        <h2>Xin chào, <span id="dash-teacher">Cô/Thầy</span>! 👋</h2>
-                        <p>Hôm nay là một ngày tuyệt vời ❤️</p>
+                
+                <!-- BANNER THÔNG TIN DÀNH CHO TỔ TRƯỞNG -->
+                <div id="group-leader-banner" style="display: none;" class="hero-card">
+                    <div class="hero-top">
+                        <div class="hero-class-name" id="gl-banner-group-title">⭐ Bảng Quản Lý Tổ</div>
+                        <div class="hero-badge" id="gl-banner-class">Lớp 8A1</div>
                     </div>
-                    <img src="https://ui-avatars.com/api/?name=GV&background=e0e7ff&color=4f46e5&bold=true" alt="Avatar" class="avatar">
-                </header>
-
-                <!-- BANNER CẢNH BÁO HẾT HẠN DÙNG THỬ -->
-                <div id="trial-warning-banner" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 16px 20px; border-radius: 18px; color: white; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); align-items: center; justify-content: space-between;">
-                    <div style="flex: 1; padding-right: 15px;">
-                        <strong style="display: block; font-size: 1.05rem; margin-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                            <i class="fas fa-clock"></i> Chỉ còn <span id="trial-days-left" style="font-size: 1.3rem; color: #fffbeb;">-</span> ngày trải nghiệm
-                        </strong>
-                        <span style="font-size: 0.85rem; opacity: 0.95; line-height: 1.5; display: block;">
-                            Dữ liệu của lớp được tự động bảo vệ trên <strong>Đám mây (Cloud)</strong> mỗi ngày. Chi phí thuê máy chủ Cloud khá tốn kém, thầy cô hãy gia hạn để phụ giúp tác giả duy trì hệ thống nhé! ❤️
-                        </span>
-                    </div>
-                    <button onclick="openModal('modal-upgrade')" style="background: white; color: #d97706; padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; flex-shrink: 0; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer;">
-                        Gia hạn
-                    </button>
-                </div>
-
-                <div class="lesson-log-hero" onclick="switchView('view-lesson-log')">
-                    <div class="ll-header">
-                        <div class="ll-title"><i class="fas fa-book-open"></i> Lịch dạy hôm nay</div>
-                        <div class="ll-date" id="dash-ll-date">--/--</div>
-                    </div>
-                    <div id="dash-ll-list" class="ll-list"></div>
-                    <div class="ll-footer">
-                        <span>Tuần này: <b id="dash-ll-week-count">0</b> tiết</span>
-                        <button class="btn-sm"><i class="fas fa-arrow-right"></i> Xem sổ</button>
+                    <div class="hero-bottom">
+                        <div class="hero-stat"><i class="fas fa-users"></i> Sĩ số tổ: <strong id="gl-member-count">0</strong></div>
+                        <div class="hero-stat"><i class="fas fa-star"></i> Thi đua: <strong id="gl-total-pts">0đ</strong></div>
                     </div>
                 </div>
 
-                <div class="hero-card">
+                <!-- BANNER THÔNG TIN DÀNH CHO HỌC SINH -->
+                <div id="student-banner" style="display: none;" class="hero-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+                    <div class="hero-top">
+                        <div class="hero-class-name">🎓 Góc Học Tập Cá Nhân</div>
+                        <div class="hero-badge" id="stu-banner-team">Tổ 1</div>
+                    </div>
+                    <div class="hero-bottom">
+                        <div class="hero-stat"><i class="fas fa-award"></i> Điểm thi đua của em: <strong id="stu-self-points">100đ</strong></div>
+                    </div>
+                </div>
+
+                <!-- HERO CARD CHÍNH CỦA GVCN / LỚP TRƯỞNG -->
+                <div id="main-class-hero" class="hero-card">
                     <div class="hero-top">
                         <div class="hero-class-name">🏫 Lớp <span id="dash-class">8A1</span></div>
                         <div class="hero-badge" id="dash-year">2026 - 2027</div>
@@ -120,15 +122,28 @@
                     <div class="hero-bg-pattern"></div>
                 </div>
 
-                <!-- BANNER CHỦ ĐIỂM THÁNG -->
-                <div class="monthly-theme-banner mt-15" onclick="openModal('modal-edit-theme')">
-                    <div class="theme-subtitle">CHỦ ĐIỂM THÁNG <span id="theme-month-display">8</span></div>
-                    <div class="theme-title" id="theme-name-display">VĂN MINH - XANH - AN TOÀN</div>
-                    <i class="fas fa-edit edit-theme-icon"></i>
+                <!-- SỔ BÁO GIẢNG CARD -->
+                <div class="lesson-log-hero teacher-only" onclick="switchView('view-lesson-log')">
+                    <div class="ll-header">
+                        <div class="ll-title"><i class="fas fa-book-open"></i> Lịch dạy hôm nay</div>
+                        <div class="ll-date" id="dash-ll-date">--/--</div>
+                    </div>
+                    <div id="dash-ll-list" class="ll-list"></div>
+                    <div class="ll-footer">
+                        <span>Tuần này: <b id="dash-ll-week-count">0</b> tiết</span>
+                        <button class="btn-sm"><i class="fas fa-arrow-right"></i> Xem sổ</button>
+                    </div>
                 </div>
 
-                <!-- NGÔI SAO LỚP HỌC -->
-                <div class="stars-section mt-20">
+                <!-- CHỦ ĐIỂM THÁNG -->
+                <div class="monthly-theme-banner" onclick="openThemeEditorIfAllowed()">
+                    <div class="theme-subtitle">CHỦ ĐIỂM THÁNG <span id="theme-month-display">8</span></div>
+                    <div class="theme-title" id="theme-name-display">VĂN MINH - XANH - AN TOÀN</div>
+                    <i class="fas fa-edit edit-theme-icon teacher-only"></i>
+                </div>
+
+                <!-- THI ĐƯA & NGÔI SAO LỚP HỌC -->
+                <div class="stars-section">
                     <div class="section-title mb-15">
                         <h3 style="display: flex; gap: 8px; align-items: center; color: var(--primary-dark);">
                             <i class="fas fa-medal text-orange"></i> NGÔI SAO THI ĐUA
@@ -153,82 +168,149 @@
                     </button>
                 </div>
 
-                <div class="section-title mt-20"><h3>Hôm nay của lớp</h3><span class="date-badge" id="today-date">--/--</span></div>
-                <div class="today-stats-grid">
-                    <div class="stat-box"><div class="stat-icon" style="color:#3b82f6; background:#dbeafe;"><i class="fas fa-users"></i></div><div class="stat-num" id="stat-total">0</div><div class="stat-label">Sĩ số</div></div>
-                    <div class="stat-box"><div class="stat-icon" style="color:#10b981; background:#d1fae5;"><i class="fas fa-check-circle"></i></div><div class="stat-num" id="stat-present">0</div><div class="stat-label">Có mặt</div></div>
-                    <div class="stat-box"><div class="stat-icon" style="color:#ef4444; background:#fee2e2;"><i class="fas fa-times-circle"></i></div><div class="stat-num" id="stat-absent">0</div><div class="stat-label">Nghỉ</div></div>
-                    <div class="stat-box"><div class="stat-icon" style="color:#f59e0b; background:#fef3c7;"><i class="fas fa-star"></i></div><div class="stat-num" id="stat-good">0</div><div class="stat-label">Việc tốt</div></div>
-                </div>
-
-                <div class="section-title mt-20"><h3>Truy cập nhanh</h3></div>
-                <div class="dashboard-grid">
-                    <div class="menu-card" onclick="switchView('view-students')"><div class="menu-icon bg-blue"><i class="fas fa-users-cog"></i></div><div class="menu-info"><h4>Quản lý học sinh</h4><p>Hồ sơ & Danh sách</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-groups')"><div class="menu-icon bg-purple"><i class="fas fa-layer-group"></i></div><div class="menu-info"><h4>Chia tổ / nhóm</h4><p>Tổ lớp & Thảo luận</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-attendance')"><div class="menu-icon bg-green"><i class="fas fa-calendar-check"></i></div><div class="menu-info"><h4>Điểm danh</h4><p>Cập nhật hôm nay</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-discipline')"><div class="menu-icon bg-red"><i class="fas fa-clipboard-list"></i></div><div class="menu-info"><h4>Nề nếp</h4><p>Thi đua 1 chạm</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-announcements')"><div class="menu-icon bg-purple"><i class="fas fa-bullhorn"></i></div><div class="menu-info"><h4>Thông báo</h4><p id="dash-notify-count">0 TB</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-plans')"><div class="menu-icon bg-orange"><i class="fas fa-tasks"></i></div><div class="menu-info"><h4>Kế hoạch</h4><p id="dash-task-count">0 công việc</p></div></div>
-                    <div class="menu-card" onclick="switchView('view-docs')"><div class="menu-icon bg-slate"><i class="fas fa-folder-open"></i></div><div class="menu-info"><h4>Kho tài liệu</h4><p id="dash-doc-count">0 file</p></div></div>
+                <!-- TRUY CẬP NHANH (DASHBOARD MENU) -->
+                <div class="section-title mt-20"><h3>Chức năng</h3></div>
+                <div class="dashboard-grid" id="main-dashboard-grid">
+                    <div class="menu-card" id="menu-item-students" onclick="switchView('view-students')">
+                        <div class="menu-icon bg-blue"><i class="fas fa-users-cog"></i></div>
+                        <div class="menu-info"><h4>Quản lý học sinh</h4><p>Hồ sơ & Tài khoản</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-permissions" onclick="switchView('view-permissions')">
+                        <div class="menu-icon bg-purple"><i class="fas fa-user-shield"></i></div>
+                        <div class="menu-info"><h4>Phân quyền cán sự</h4><p>Cấp quyền theo Gmail</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-groups" onclick="switchView('view-groups')">
+                        <div class="menu-icon bg-green"><i class="fas fa-layer-group"></i></div>
+                        <div class="menu-info"><h4>Tổ & Nhóm</h4><p id="menu-group-desc">Quản lý tổ học sinh</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-attendance" onclick="switchView('view-attendance')">
+                        <div class="menu-icon bg-green"><i class="fas fa-calendar-check"></i></div>
+                        <div class="menu-info"><h4>Điểm danh</h4><p>Cập nhật chuyên cần</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-discipline" onclick="switchView('view-discipline')">
+                        <div class="menu-icon bg-red"><i class="fas fa-clipboard-list"></i></div>
+                        <div class="menu-info"><h4>Nề nếp</h4><p>Ghi nhận thi đua</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-activity-logs" onclick="switchView('view-activity-logs')">
+                        <div class="menu-icon bg-orange"><i class="fas fa-history"></i></div>
+                        <div class="menu-info"><h4>Nhật ký hoạt động</h4><p>Theo dõi ghi nhận cán sự</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-notify" onclick="switchView('view-announcements')">
+                        <div class="menu-icon bg-purple"><i class="fas fa-bullhorn"></i></div>
+                        <div class="menu-info"><h4>Thông báo</h4><p id="dash-notify-count">0 TB</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-plans" onclick="switchView('view-plans')">
+                        <div class="menu-icon bg-orange"><i class="fas fa-tasks"></i></div>
+                        <div class="menu-info"><h4>Kế hoạch</h4><p id="dash-task-count">0 công việc</p></div>
+                    </div>
+                    <div class="menu-card" id="menu-item-docs" onclick="switchView('view-docs')">
+                        <div class="menu-icon bg-slate"><i class="fas fa-folder-open"></i></div>
+                        <div class="menu-info"><h4>Kho tài liệu</h4><p id="dash-doc-count">0 file</p></div>
+                    </div>
                 </div>
             </section>
 
-            <!-- ================= SỔ BÁO GIẢNG ================= -->
-            <section id="view-lesson-log" class="view">
+            <!-- ================= 2. QUẢN LÝ HỌC SINH (KÈM GMAIL & TÀI KHOẢN) ================= -->
+            <section id="view-students" class="view">
                 <div class="top-bar">
-                    <div class="top-bar-title"><h2>📚 Sổ báo giảng</h2></div>
-                    <button class="btn-outline-action" onclick="openModal('modal-setup-lesson-log')" title="Cấu hình hệ thống"><i class="fas fa-cogs"></i></button>
+                    <div class="top-bar-title"><h2>👥 Lớp học</h2></div>
+                    <button class="btn-primary teacher-only" onclick="openModal('modal-add-student')"><i class="fas fa-plus"></i></button>
                 </div>
                 
-                <div class="ll-controls">
-                    <div class="input-group mb-0" style="flex: 1;">
-                        <select id="ll-week-select" onchange="renderSchedule()"></select>
-                    </div>
-                    <button class="btn-outline text-green" onclick="exportScheduleExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
-                    <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
+                <div class="excel-actions teacher-only">
+                    <button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button>
+                    <button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button>
+                    <button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button>
+                    <button class="btn-action-chip text-red" onclick="clearAllStudents()"><i class="fas fa-trash-alt"></i> Xóa hết</button>
                 </div>
 
-                <div class="ll-stats-bar mt-15" id="ll-stats-container"></div>
-                <div id="ll-schedule-list" class="list-container mt-15" style="padding-bottom: 70px;"></div>
+                <div class="search-bar mt-15">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-student" placeholder="Tìm kiếm học sinh theo tên..." onkeyup="renderStudents()">
+                </div>
+                <div id="student-list" class="list-container"></div>
             </section>
 
-            <!-- ================= CHIA TỔ / NHÓM HỌC TẬP (MỚI BỔ SUNG) ================= -->
+            <!-- ================= 3. MÀN HÌNH PHÂN QUYỀN CÁN SỰ (CHỈ GVCN) ================= -->
+            <section id="view-permissions" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>👥 Phân quyền cán sự</h2></div>
+                    <button class="btn-outline-action text-blue" onclick="switchView('view-home')"><i class="fas fa-arrow-left"></i></button>
+                </div>
+
+                <div class="alert-item green mb-15">
+                    <div class="alert-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="alert-info">
+                        <strong>Quản lý cán sự lớp:</strong> Cấp Gmail và vai trò để học sinh đăng nhập vào hệ thống quản lý theo đúng phạm vi trách nhiệm.
+                    </div>
+                </div>
+
+                <div id="permissions-overview-card" class="settings-card mb-20">
+                    <h3 style="color: var(--primary);"><i class="fas fa-crown"></i> Lớp trưởng & Lớp phó</h3>
+                    <div id="cadres-list" class="list-container mt-15"></div>
+                </div>
+
+                <div class="settings-card mb-20">
+                    <h3 style="color: var(--warning);"><i class="fas fa-users"></i> Danh sách Tổ trưởng</h3>
+                    <div id="group-leaders-list" class="list-container mt-15"></div>
+                </div>
+            </section>
+
+            <!-- ================= 4. NHẬT KÝ HOẠT ĐỘNG (AUDIT LOGS) ================= -->
+            <section id="view-activity-logs" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>🕒 Nhật ký hoạt động</h2></div>
+                    <button class="btn-outline-action text-blue" onclick="switchView('view-home')"><i class="fas fa-arrow-left"></i></button>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <select id="filter-log-role" class="w-full" onchange="renderActivityLogs()" style="padding: 10px; border-radius: 12px; font-weight: 700;">
+                        <option value="all">Tất cả người thực hiện</option>
+                        <option value="teacher">GVCN</option>
+                        <option value="class_leader">Lớp trưởng</option>
+                        <option value="vice_leader">Lớp phó</option>
+                        <option value="group_leader">Tổ trưởng</option>
+                    </select>
+                    <input type="date" id="filter-log-date" onchange="renderActivityLogs()" style="padding: 10px; border-radius: 12px; font-weight: 700;">
+                </div>
+
+                <div id="activity-logs-container" class="list-container" style="padding-bottom: 70px;"></div>
+            </section>
+
+            <!-- ================= 5. TỔ & NHÓM HỌC TẬP ================= -->
             <section id="view-groups" class="view">
                 <div class="top-bar">
-                    <div class="top-bar-title"><h2>👥 Quản lý Tổ & Nhóm học tập</h2></div>
+                    <div class="top-bar-title"><h2 id="groups-view-title">👥 Quản lý Tổ & Nhóm</h2></div>
+                    <button class="btn-outline-action text-blue" onclick="switchView('view-home')"><i class="fas fa-arrow-left"></i></button>
                 </div>
 
-                <!-- Thanh chuyển 2 chế độ -->
                 <div class="group-mode-toggle-bar mb-15">
                     <button class="mode-tab-btn active" id="tab-btn-teams" onclick="switchGroupSubMode('teams')">
-                        <i class="fas fa-layer-group"></i> 1. Tổ lớp cố định (GVCN)
+                        <i class="fas fa-layer-group"></i> 1. Tổ cố định
                     </button>
                     <button class="mode-tab-btn" id="tab-btn-activity" onclick="switchGroupSubMode('activity')">
-                        <i class="fas fa-dice"></i> 2. Nhóm học tập linh hoạt
+                        <i class="fas fa-dice"></i> 2. Nhóm học tập tức thì
                     </button>
                 </div>
 
-                <!-- Chế độ 1: Tổ lớp cố định -->
                 <div id="submode-teams-panel">
                     <div class="alert-item yellow mb-15">
                         <div class="alert-icon"><i class="fas fa-info-circle"></i></div>
                         <div class="alert-info">
-                            <p><strong>Tổ lớp cố định:</strong> Tổ được lưu vĩnh viễn theo hồ sơ học sinh (phục vụ trực nhật, chấm thi đua, nề nếp). Bạn có thể đổi tổ trực tiếp cho từng em bên dưới.</p>
+                            <p><strong>Tổ cố định:</strong> Tổ trưởng quản lý nề nếp và thành viên theo từng tổ tại đây.</p>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <div class="teacher-only" style="display: flex; gap: 10px; margin-bottom: 15px;">
                         <button class="btn-primary" style="flex: 2;" onclick="autoDivideFixedTeams()"><i class="fas fa-magic"></i> Chia đều 4 Tổ</button>
                         <button class="btn-outline text-green" style="flex: 1;" onclick="exportFixedTeamsExcel()"><i class="fas fa-file-excel"></i> Xuất Excel</button>
-                        <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
                     </div>
                 </div>
 
-                <!-- Chế độ 2: Nhóm học tập linh hoạt -->
                 <div id="submode-activity-panel" style="display: none;">
                     <div class="alert-item green mb-15">
                         <div class="alert-icon"><i class="fas fa-random"></i></div>
                         <div class="alert-info">
-                            <p><strong>Nhóm thảo luận linh hoạt:</strong> Chia nhóm ngẫu nhiên theo tiết học mà <u>không làm thay đổi</u> Tổ cố định của học sinh.</p>
+                            <p><strong>Nhóm học tập linh hoạt:</strong> Chia nhóm thảo luận nhanh theo bài học.</p>
                         </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px;">
@@ -236,19 +318,18 @@
                             <div class="input-group" style="flex: 1;">
                                 <label>Cách chia</label>
                                 <select id="group-divide-type" onchange="toggleGroupInputMode()">
-                                    <option value="byGroupCount">Theo số lượng nhóm</option>
+                                    <option value="byGroupCount">Theo số nhóm</option>
                                     <option value="byMemberCount">Theo số HS / nhóm</option>
                                 </select>
                             </div>
                             <div class="input-group" style="flex: 1;">
-                                <label id="group-param-label">Số nhóm cần tạo</label>
+                                <label id="group-param-label">Số lượng</label>
                                 <input type="number" id="group-param-value" min="2" max="20" value="4">
                             </div>
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button class="btn-primary" style="flex: 2;" onclick="generateActivityGroups()"><i class="fas fa-play"></i> Tạo nhóm ngay</button>
                             <button class="btn-outline text-green" style="flex: 1;" onclick="exportActivityGroupsExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
-                            <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i></button>
                         </div>
                     </div>
                 </div>
@@ -256,10 +337,90 @@
                 <div id="groups-container" style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 70px;"></div>
             </section>
 
-            <!-- ================= BẢNG XẾP LOẠI CHI TIẾT ================= -->
+            <!-- ================= 6. ĐIỂM DANH ================= -->
+            <section id="view-attendance" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📅 Điểm danh</h2></div>
+                    <input type="date" id="attendance-date" class="date-picker" onchange="renderAttendance()">
+                </div>
+                <div class="attendance-summary-card" id="attendance-summary"></div>
+                <div id="attendance-list" class="list-container" style="padding-bottom: 70px;"></div>
+                <div class="floating-action"><button class="btn-primary btn-large shadow-lg w-full" onclick="saveAttendance()">Lưu Điểm Danh</button></div>
+            </section>
+
+            <!-- ================= 7. NỀ NẾP & THI ĐUA ================= -->
+            <section id="view-discipline" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>⚠️ Nề nếp</h2></div>
+                    <button class="btn-outline-action teacher-only" onclick="openModal('modal-manage-tags')"><i class="fas fa-cog"></i></button>
+                </div>
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-disc-student" placeholder="Tìm học sinh cần ghi nhận..." onkeyup="renderDisciplineStudents()">
+                </div>
+                <div id="discipline-student-list" class="list-container mb-20"></div>
+            </section>
+
+            <!-- ================= 8. THÔNG BÁO ================= -->
+            <section id="view-announcements" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📢 Thông báo</h2></div>
+                    <button class="btn-primary" id="btn-add-notify" onclick="openModal('modal-compose-notify')"><i class="fas fa-plus"></i></button>
+                </div>
+                <div id="notify-list" class="list-container"></div>
+            </section>
+
+            <!-- ================= 9. KẾ HOẠCH KANBAN ================= -->
+            <section id="view-plans" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📋 Kế hoạch</h2></div>
+                    <button class="btn-primary" id="btn-add-task" onclick="openModal('modal-add-task')"><i class="fas fa-plus"></i></button>
+                </div>
+                <div class="kanban-board">
+                    <div class="kanban-col"><div class="kanban-header text-orange"><i class="fas fa-thumbtack"></i> CẦN LÀM</div><div id="kb-todo" class="kanban-list"></div></div>
+                    <div class="kanban-col"><div class="kanban-header text-blue"><i class="fas fa-spinner"></i> ĐANG LÀM</div><div id="kb-doing" class="kanban-list"></div></div>
+                    <div class="kanban-col"><div class="kanban-header text-green"><i class="fas fa-check-double"></i> ĐÃ XONG</div><div id="kb-done" class="kanban-list"></div></div>
+                </div>
+            </section>
+
+            <!-- ================= 10. KHO TÀI LIỆU ================= -->
+            <section id="view-docs" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📁 Tài liệu</h2></div>
+                    <button class="btn-primary teacher-only" onclick="openModal('modal-upload-doc')"><i class="fas fa-upload"></i></button>
+                </div>
+                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-doc" placeholder="Tìm tài liệu..." onkeyup="renderDocs()"></div>
+                <div class="doc-folders">
+                    <div class="doc-folder active" onclick="filterDocs('all', this)"><i class="fas fa-layer-group"></i> Tất cả</div>
+                    <div class="doc-folder" onclick="filterDocs('Giáo án', this)"><i class="fas fa-book"></i> Giáo án</div>
+                    <div class="doc-folder" onclick="filterDocs('Biên bản', this)"><i class="fas fa-file-signature"></i> Biên bản</div>
+                </div>
+                <div id="doc-list" class="doc-grid mt-15"></div>
+            </section>
+
+            <!-- ================= 11. SỔ BÁO GIẢNG ================= -->
+            <section id="view-lesson-log" class="view">
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>📚 Sổ báo giảng</h2></div>
+                    <button class="btn-outline-action teacher-only" onclick="openModal('modal-setup-lesson-log')" title="Cấu hình hệ thống"><i class="fas fa-cogs"></i></button>
+                </div>
+                
+                <div class="ll-controls">
+                    <div class="input-group mb-0" style="flex: 1;">
+                        <select id="ll-week-select" onchange="renderSchedule()"></select>
+                    </div>
+                    <button class="btn-outline text-green" onclick="exportScheduleExcel()"><i class="fas fa-file-excel"></i> Xuất</button>
+                    <button class="btn-outline text-blue" onclick="window.print()"><i class="fas fa-print"></i> In</button>
+                </div>
+
+                <div class="ll-stats-bar mt-15" id="ll-stats-container"></div>
+                <div id="ll-schedule-list" class="list-container mt-15" style="padding-bottom: 70px;"></div>
+            </section>
+
+            <!-- ================= 12. BẢNG XẾP LOẠI CHI TIẾT ================= -->
             <section id="view-ranking" class="view">
                 <div class="top-bar">
-                    <div class="top-bar-title"><h2>🏆 Bảng xếp loại</h2></div>
+                    <div class="top-bar-title"><h2>🏆 Bảng xếp loại thi đua</h2></div>
                     <button class="btn-outline-action text-blue" onclick="switchView('view-home')"><i class="fas fa-arrow-left"></i></button>
                 </div>
                 
@@ -275,9 +436,9 @@
                         <option value="3">Tháng 3</option>
                         <option value="4">Tháng 4</option>
                         <option value="5">Tháng 5</option>
-                        <option value="HK1" style="font-weight: bold; color: var(--primary);">Học kỳ 1 (T8 - T12)</option>
-                        <option value="HK2" style="font-weight: bold; color: var(--primary);">Học kỳ 2 (T1 - T5)</option>
-                        <option value="CA_NAM" style="font-weight: bold; color: var(--danger);">Cả Năm Học</option>
+                        <option value="HK1">Học kỳ 1 (T8 - T12)</option>
+                        <option value="HK2">Học kỳ 2 (T1 - T5)</option>
+                        <option value="CA_NAM">Cả Năm Học</option>
                     </select>
                 </div>
                 
@@ -285,343 +446,139 @@
                 <div id="full-ranking-list" class="list-container" style="padding-bottom: 70px;"></div>
             </section>
 
-            <!-- QUẢN LÝ HỌC SINH -->
-            <section id="view-students" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>👥 Lớp học</h2></div><button class="btn-primary" onclick="openModal('modal-add-student')"><i class="fas fa-plus"></i></button></div>
-                
-                <!-- HÀNG NÚT THAO TÁC: ĐÃ BỔ SUNG NÚT XÓA HẾT DANH SÁCH LỚP -->
-                <div class="excel-actions">
-                    <button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button>
-                    <button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button>
-                    <button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button>
-                    <button class="btn-action-chip" onclick="clearAllStudents()" style="color: var(--danger); border-color: #fecaca;"><i class="fas fa-trash-alt text-red"></i> Xóa hết danh sách</button>
-                </div>
-
-                <div class="search-bar mt-15"><i class="fas fa-search"></i><input type="text" id="search-student" placeholder="Tìm tên..." onkeyup="renderStudents()"></div>
-                <div id="student-list" class="list-container"></div>
-            </section>
-            
-            <!-- ĐIỂM DANH -->
-            <section id="view-attendance" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>📅 Điểm danh</h2></div><input type="date" id="attendance-date" class="date-picker" onchange="renderAttendance()"></div>
-                <div class="attendance-summary-card" id="attendance-summary"></div>
-                <div id="attendance-list" class="list-container" style="padding-bottom: 70px;"></div>
-                <div class="floating-action"><button class="btn-primary btn-large shadow-lg w-full" onclick="saveAttendance()">Lưu Điểm Danh</button></div>
-            </section>
-
-            <!-- NỀ NẾP -->
-            <section id="view-discipline" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>⚠️ Nề nếp</h2></div><button class="btn-outline-action" onclick="openModal('modal-manage-tags')"><i class="fas fa-cog"></i></button></div>
-                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-disc-student" placeholder="Tìm học sinh..." onkeyup="renderDisciplineStudents()"></div>
-                <div id="discipline-student-list" class="list-container mb-20"></div>
-            </section>
-
-            <!-- THÔNG BÁO -->
-            <section id="view-announcements" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>📢 Thông báo</h2></div><button class="btn-primary" onclick="openModal('modal-compose-notify')"><i class="fas fa-plus"></i></button></div>
-                <div id="notify-list" class="list-container"></div>
-            </section>
-
-            <!-- KẾ HOẠCH -->
-            <section id="view-plans" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>📋 Kế hoạch</h2></div><button class="btn-primary" onclick="openModal('modal-add-task')"><i class="fas fa-plus"></i></button></div>
-                <div class="kanban-board">
-                    <div class="kanban-col"><div class="kanban-header text-orange"><i class="fas fa-thumbtack"></i> CẦN LÀM</div><div id="kb-todo" class="kanban-list"></div></div>
-                    <div class="kanban-col"><div class="kanban-header text-blue"><i class="fas fa-spinner"></i> ĐANG LÀM</div><div id="kb-doing" class="kanban-list"></div></div>
-                    <div class="kanban-col"><div class="kanban-header text-green"><i class="fas fa-check-double"></i> ĐÃ XONG</div><div id="kb-done" class="kanban-list"></div></div>
-                </div>
-            </section>
-
-            <!-- KHO TÀI LIỆU -->
-            <section id="view-docs" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>📁 Tài liệu</h2></div><button class="btn-primary" onclick="openModal('modal-upload-doc')"><i class="fas fa-upload"></i></button></div>
-                <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-doc" placeholder="Tìm tài liệu..." onkeyup="renderDocs()"></div>
-                <div class="doc-folders">
-                    <div class="doc-folder active" onclick="filterDocs('all', this)"><i class="fas fa-layer-group"></i> Tất cả</div>
-                    <div class="doc-folder" onclick="filterDocs('Giáo án', this)"><i class="fas fa-book"></i> Giáo án</div>
-                    <div class="doc-folder" onclick="filterDocs('Biên bản', this)"><i class="fas fa-file-signature"></i> Biên bản</div>
-                </div>
-                <div id="doc-list" class="doc-grid mt-15"></div>
-            </section>
-
-            <!-- CÀI ĐẶT -->
+            <!-- ================= 13. CÀI ĐẶT (CHỈ GVCN) ================= -->
             <section id="view-settings" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>⚙️ Cài đặt</h2></div></div>
+                <div class="top-bar"><div class="top-bar-title"><h2>⚙️ Cài đặt lớp</h2></div></div>
                 
                 <div class="settings-card mb-20">
-                    <div class="input-group"><label>Tên Giáo Viên</label><input type="text" id="set-teacher"></div>
+                    <div class="input-group"><label>Tên Giáo Viên Chủ Nhiệm</label><input type="text" id="set-teacher"></div>
                     <div class="input-group"><label>Tên Lớp</label><input type="text" id="set-class"></div>
                     <div class="input-group"><label>Năm học</label><input type="text" id="set-year"></div>
                     <button class="btn-primary w-full mt-10" onclick="saveSettings()">Lưu cài đặt</button>
                 </div>
-                
-                <div class="section-title"><h3>Tự động & Cảnh báo</h3></div>
-                <div class="settings-card mb-20">
-                    <label class="toggle-row"><span>Tự trừ điểm thi đua khi Vắng không phép</span><input type="checkbox" id="set-auto-absent"></label>
-                    <label class="toggle-row"><span>Tự trừ điểm thi đua khi Đi muộn</span><input type="checkbox" id="set-auto-late"></label>
-                    <div class="input-group mt-15"><label>Cảnh báo nếu Vắng (buổi) >=</label><input type="number" id="set-warn-absent"></div>
-                    <div class="input-group"><label>Cảnh báo nếu Điểm thi đua <=</label><input type="number" id="set-warn-behavior"></div>
-                    <button class="btn-outline w-full" onclick="saveConfig()">Lưu cấu hình</button>
-                </div>
 
-                <!-- CHỌN MÀU SẮC GIAO DIỆN -->
-                <div class="section-title"><h3>🎨 Màu sắc & Giao diện</h3></div>
+                <div class="section-title"><h3>🎨 Giao diện</h3></div>
                 <div class="settings-card mb-20">
-                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Cá nhân hóa tông màu chủ đạo của App theo sở thích của bạn.</p>
                     <div style="display: flex; gap: 15px; justify-content: center; padding: 10px 0;">
-                        <div class="theme-btn active" style="background: #0d6efd;" onclick="changeTheme('default', this)" title="Xanh dương"></div>
-                        <div class="theme-btn" style="background: #10b981;" onclick="changeTheme('theme-green', this)" title="Xanh lá"></div>
-                        <div class="theme-btn" style="background: #8b5cf6;" onclick="changeTheme('theme-purple', this)" title="Tím Pastel"></div>
-                        <div class="theme-btn" style="background: #ec4899;" onclick="changeTheme('theme-pink', this)" title="Hồng Ruby"></div>
+                        <div class="theme-btn active" style="background: #0d6efd;" onclick="changeTheme('default', this)"></div>
+                        <div class="theme-btn" style="background: #10b981;" onclick="changeTheme('theme-green', this)"></div>
+                        <div class="theme-btn" style="background: #8b5cf6;" onclick="changeTheme('theme-purple', this)"></div>
+                        <div class="theme-btn" style="background: #ec4899;" onclick="changeTheme('theme-pink', this)"></div>
                     </div>
                 </div>
 
-                <!-- CẤU HÌNH AI -->
-                <div class="section-title"><h3>🤖 Cấu hình Trợ lý AI</h3></div>
-                <div class="settings-card mb-20">
-                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Nhập API Key (Google Gemini) để sử dụng tính năng AI tự động soạn thông báo & nhận xét.</p>
-                    <div class="input-group mb-0">
-                        <label>Mã API Key</label>
-                        <input type="text" id="set-api-key" placeholder="Dán mã API Key vào đây...">
-                    </div>
-                    <button class="btn-primary w-full mt-15" onclick="saveSettings()">Lưu API Key</button>
-                </div>
-
-                <!-- HƯỚNG DẪN SỬ DỤNG GVCN -->
-                <div class="section-title"><h3>📖 Hướng dẫn sử dụng</h3></div>
-                <div class="settings-card mb-20">
-                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Nắm bắt toàn bộ tính năng siêu việt của Trợ lý GVCN chỉ trong 2 phút.</p>
-                    <button class="btn-primary w-full btn-large" onclick="openModal('modal-guide')" style="background: var(--warning); color: #fff; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
-                        <i class="fas fa-book-open"></i> XEM HƯỚNG DẪN TÂN THỦ
-                    </button>
-                </div>
-
-                <!-- Sao lưu & Khôi phục -->
-                <div class="section-title"><h3>Sao lưu & Khôi phục (Thủ công)</h3></div>
-                <div class="settings-card mb-20">
-                    <div class="alert-item green mb-15"><div class="alert-info">Ngoài việc hệ thống tự động lưu lên mây, bạn có thể tải bản sao lưu dự phòng về máy.</div></div>
-                    
-                    <button class="btn-primary w-full btn-large mb-15" onclick="backupData()" style="font-weight: 800; font-size: 1.05rem;">
-                        <i class="fas fa-download"></i> TẢI XUỐNG BẢN SAO LƯU
-                    </button>
-                    
-                    <button class="btn-outline w-full btn-large" onclick="document.getElementById('restore-file').click()" style="color: var(--danger); border-color: var(--danger);">
-                        <i class="fas fa-upload"></i> KHÔI PHỤC TỪ FILE
-                    </button>
-                    <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="restoreData(event)">
-                </div>
-
-                <!-- KHU VỰC LIÊN HỆ HỖ TRỢ -->
-                <div class="section-title"><h3>💬 Hỗ trợ & Báo lỗi</h3></div>
-                <div class="settings-card mb-20">
-                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">
-                        Trong quá trình sử dụng, nếu thầy cô gặp lỗi hoặc có góp ý nâng cấp App, vui lòng liên hệ trực tiếp với người phát triển để được hỗ trợ nhanh nhất nhé!
-                    </p>
-                    <button class="btn-primary w-full btn-large" onclick="window.open('https://zalo.me/0775172026', '_blank')" style="background: #0068ff; color: #fff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);">
-                        <i class="fas fa-comment-dots"></i> NHẮN ZALO CHO ADMIN
-                    </button>
-                    <button class="btn-outline w-full mt-10" onclick="window.location.href='tel:0775172026'">
-                        <i class="fas fa-phone-alt text-green"></i> GỌI ĐIỆN: 077.517.2026
-                    </button>
-                </div>
-                
+                <div class="section-title"><h3>Tài khoản</h3></div>
                 <div class="settings-card">
-                    <button class="btn-outline w-full mb-15" onclick="logoutApp()" style="color: #64748b; border-color: #cbd5e1; font-weight: 800;">
+                    <button class="btn-outline w-full mb-15" onclick="logoutApp()" style="color: #ef4444; border-color: #fca5a5; font-weight: 800;">
                         <i class="fas fa-sign-out-alt"></i> ĐĂNG XUẤT TÀI KHOẢN
                     </button>
-                    <button class="btn-danger w-full" onclick="resetData()">Xóa toàn bộ CSDL cục bộ</button>
                 </div>
             </section>
         </main>
 
+        <!-- ================= BOTTOM NAVIGATION ADAPTIVE ================= -->
         <nav id="bottom-bar">
             <div class="nav-item active" onclick="switchView('view-home', this)"><div class="nav-icon"><i class="fas fa-home"></i></div><span>Trang chủ</span></div>
-            <div class="nav-item" onclick="switchView('view-students', this)"><div class="nav-icon"><i class="fas fa-users"></i></div><span>Lớp học</span></div>
-            <div class="nav-item" onclick="switchView('view-groups', this)"><div class="nav-icon"><i class="fas fa-users-cog"></i></div><span>Chia tổ</span></div>
-            <div class="nav-item" onclick="switchView('view-lesson-log', this)"><div class="nav-icon"><i class="fas fa-book"></i></div><span>Sổ giảng</span></div>
-            <div class="nav-item" onclick="switchView('view-plans', this)"><div class="nav-icon"><i class="fas fa-tasks"></i></div><span>Kế hoạch</span></div>
-            <div class="nav-item" onclick="switchView('view-settings', this)"><div class="nav-icon"><i class="fas fa-cog"></i></div><span>Cài đặt</span></div>
+            <div class="nav-item" id="nav-students" onclick="switchView('view-students', this)"><div class="nav-icon"><i class="fas fa-users"></i></div><span>Lớp học</span></div>
+            <div class="nav-item" id="nav-groups" onclick="switchView('view-groups', this)"><div class="nav-icon"><i class="fas fa-layer-group"></i></div><span>Tổ nhóm</span></div>
+            <div class="nav-item" id="nav-attendance" onclick="switchView('view-attendance', this)"><div class="nav-icon"><i class="fas fa-calendar-check"></i></div><span>Điểm danh</span></div>
+            <div class="nav-item" id="nav-discipline" onclick="switchView('view-discipline', this)"><div class="nav-icon"><i class="fas fa-award"></i></div><span>Nề nếp</span></div>
+            <div class="nav-item" id="nav-settings" onclick="switchView('view-settings', this)"><div class="nav-icon"><i class="fas fa-cog"></i></div><span>Cài đặt</span></div>
         </nav>
     </div>
 
-    <!-- ================= MODALS ================= -->
-    <!-- MODAL CẤU HÌNH SỔ BÁO GIẢNG -->
-    <div id="modal-setup-lesson-log" class="modal">
-        <div class="modal-content" style="height: 95vh; background: #f8fafc;">
+    <!-- ================= MODAL HỒ SƠ HỌC SINH (KÈM PHÂN QUYỀN GMAIL) ================= -->
+    <div id="modal-add-student" class="modal">
+        <div class="modal-content" style="max-height: 95vh;">
             <div class="modal-header">
-                <h3>⚙️ Cấu hình Sổ báo giảng</h3>
-                <div class="close" onclick="closeModal('modal-setup-lesson-log')"><i class="fas fa-times"></i></div>
+                <h3>Hồ sơ & Tài khoản học sinh</h3>
+                <div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div>
             </div>
             <div class="modal-body">
-                <div class="alert-item yellow" style="margin-bottom:15px;"><div class="alert-icon"><i class="fas fa-lightbulb"></i></div><div class="alert-info"><p>Cấu hình 1 lần, hệ thống tự động sinh lịch dạy cả năm!</p></div></div>
-                <div class="settings-card mb-20"><label>📅 Ngày bắt đầu Tuần 1 (Thứ 2)</label><input type="date" id="setup-week1-date" class="mb-0"></div>
-                <div class="setup-grid">
-                    <div class="setup-card" onclick="openModal('modal-setup-tkb')"><div class="setup-icon text-blue"><i class="fas fa-table"></i></div><div class="setup-info"><h4>Thời khóa biểu</h4><p id="setup-tkb-count">0 bản ghi</p></div><i class="fas fa-chevron-right text-muted"></i></div>
-                    <div class="setup-card" onclick="openModal('modal-setup-ppct')"><div class="setup-icon text-green"><i class="fas fa-list-ol"></i></div><div class="setup-info"><h4>Phân phối chương trình</h4><p id="setup-ppct-count">0 bài dạy</p></div><i class="fas fa-chevron-right text-muted"></i></div>
-                    <div class="setup-card" onclick="openModal('modal-setup-holidays')"><div class="setup-icon text-red"><i class="fas fa-umbrella-beach"></i></div><div class="setup-info"><h4>Lịch Nghỉ & Sự kiện</h4><p id="setup-holidays-count">0 ngày nghỉ</p></div><i class="fas fa-chevron-right text-muted"></i></div>
-                    <div class="setup-card" onclick="openModal('modal-setup-math-ratio')"><div class="setup-icon" style="background:#f59e0b; box-shadow:0 4px 10px rgba(245,158,11,0.3);"><i class="fas fa-calculator"></i></div><div class="setup-info"><h4>Tỉ lệ Đại / Hình (Toán)</h4><p id="setup-math-ratio-count">0 cấu hình</p></div><i class="fas fa-chevron-right text-muted"></i></div>
+                <input type="hidden" id="stu-id">
+                <div class="input-group"><label>Họ và tên *</label><input type="text" id="stu-name" placeholder="VD: Nguyễn Văn A"></div>
+                <div class="form-row">
+                    <div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div>
+                    <div class="input-group"><label>Tổ cố định</label><select id="stu-team"><option value="1">Tổ 1</option><option value="2">Tổ 2</option><option value="3">Tổ 3</option><option value="4">Tổ 4</option></select></div>
                 </div>
-                <button class="btn-primary btn-large w-full mt-20 shadow-lg" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));" onclick="generateAutoSchedule()"><i class="fas fa-magic"></i> 🤖 TỰ ĐỘNG TẠO SỔ BÁO GIẢNG</button>
+                <div class="form-row">
+                    <div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div>
+                    <div class="input-group"><label>SĐT Phụ huynh</label><input type="tel" id="stu-phone" placeholder="0912345678"></div>
+                </div>
+                
+                <!-- KHU VỰC TÀI KHOẢN & PHÂN QUYỀN GOOGLE (CHỈ GVCN QUẢN LÝ) -->
+                <div class="settings-card teacher-only" style="background: #f8fafc; border: 1.5px solid #cbd5e1; margin-top: 10px;">
+                    <h4 style="color: var(--primary); margin-bottom: 12px; font-weight: 800;"><i class="fab fa-google"></i> Tài khoản Google & Vai trò</h4>
+                    <div class="input-group">
+                        <label>Email Google / Gmail học sinh</label>
+                        <input type="email" id="stu-email" placeholder="VD: hocsinh.a@gmail.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Vai trò trong lớp</label>
+                        <select id="stu-role">
+                            <option value="student">🎓 Học sinh</option>
+                            <option value="group_leader">👥 Tổ trưởng</option>
+                            <option value="vice_leader">📚 Lớp phó</option>
+                            <option value="class_leader">⭐ Lớp trưởng</option>
+                        </select>
+                    </div>
+                    
+                    <div id="stu-permissions-box" style="display: none; padding: 10px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
+                        <label style="font-size: 0.8rem; margin-bottom: 8px;">Quyền hạn bổ sung:</label>
+                        <label class="toggle-row" style="margin-bottom: 6px;"><span>Quản lý nề nếp</span><input type="checkbox" id="perm-discipline"></label>
+                        <label class="toggle-row" style="margin-bottom: 6px;"><span>Điểm danh</span><input type="checkbox" id="perm-attendance"></label>
+                        <label class="toggle-row" style="margin-bottom: 6px;"><span>Đăng thông báo</span><input type="checkbox" id="perm-notify"></label>
+                        <label class="toggle-row" style="margin-bottom: 0;"><span>Giao nhiệm vụ</span><input type="checkbox" id="perm-tasks"></label>
+                    </div>
+                </div>
             </div>
+            <div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu thông tin học sinh</button></div>
         </div>
     </div>
 
-    <!-- 4 MODAL CON NỔI LÊN TRÊN (Z-INDEX 1050) -->
-    <div id="modal-setup-tkb" class="modal" style="z-index: 1050;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🕒 Thời khóa biểu</h3><div class="close" onclick="closeModal('modal-setup-tkb')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="btn-outline text-orange w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="downloadTemplateTKB()"><i class="fas fa-download"></i> Tải Mẫu</button><button class="btn-outline text-blue w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="triggerImport('tkb')"><i class="fas fa-file-excel"></i> Import</button><button class="btn-outline text-red w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="clearAllSetupData('tkb')" title="Xóa toàn bộ TKB để nhập lại"><i class="fas fa-trash-alt"></i> Xóa hết</button></div><div class="form-row"><div class="input-group"><label>Thứ (2-7)</label><input type="number" id="add-tkb-day" min="2" max="7"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="add-tkb-period" min="1" max="10"></div></div><div class="form-row"><div class="input-group"><label>Lớp</label><input type="text" id="add-tkb-class"></div><div class="input-group"><label>Môn</label><input type="text" id="add-tkb-subject"></div></div><button class="btn-primary w-full mb-20" onclick="addTKB()">Thêm TKB</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Thứ</th><th>Tiết</th><th>Lớp</th><th>Môn</th><th>Xóa</th></tr></thead><tbody id="tkb-tbody"></tbody></table></div></div></div></div>
-    
-    <div id="modal-setup-ppct" class="modal" style="z-index: 1050;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>📚 Phân phối chương trình</h3><div class="close" onclick="closeModal('modal-setup-ppct')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="btn-outline text-orange w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="downloadTemplatePPCT()"><i class="fas fa-download"></i> Tải Mẫu</button><button class="btn-outline text-green w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="triggerImport('ppct')"><i class="fas fa-file-excel"></i> Import</button><button class="btn-outline text-red w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="clearAllSetupData('ppct')" title="Xóa toàn bộ PPCT để nhập lại"><i class="fas fa-trash-alt"></i> Xóa hết</button></div><div class="form-row"><div class="input-group"><label>Khối / Lớp (VD: 8 hoặc 8A1)</label><input type="text" id="add-ppct-class" placeholder="VD: 8 hoặc 8A1"></div><div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject" placeholder="VD: Toán"></div></div><div class="form-row"><div class="input-group"><label>Tiết PPCT</label><input type="number" id="add-ppct-period"></div><div class="input-group"><label>Phân môn (Đại / Hình nếu có)</label><input type="text" id="add-ppct-branch" placeholder="Đại hoặc Hình"></div></div><div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content"></div><button class="btn-primary w-full mb-20" onclick="addPPCT()">Thêm Bài</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Khối/Lớp</th><th>Môn</th><th>Phân môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div></div></div></div>
-    
-    <div id="modal-setup-holidays" class="modal" style="z-index: 1050;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🏖️ Ngày nghỉ & Sự kiện</h3><div class="close" onclick="closeModal('modal-setup-holidays')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-red w-full mb-15" onclick="triggerImport('holidays')"><i class="fas fa-file-excel"></i> Import Lịch từ Excel</button><div class="form-row"><div class="input-group"><label>Ngày bắt đầu</label><input type="date" id="add-hol-start"></div><div class="input-group"><label>Ngày kết thúc</label><input type="date" id="add-hol-end"></div></div><div class="input-group"><label>Tên sự kiện / Lễ</label><input type="text" id="add-hol-name" placeholder="VD: Nghỉ Tết Nguyên Đán"></div><button class="btn-primary w-full mb-20" onclick="addHoliday()">Thêm Ngày Nghỉ</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Từ ngày</th><th>Đến ngày</th><th>Tên sự kiện</th><th>Xóa</th></tr></thead><tbody id="hol-tbody"></tbody></table></div></div></div></div>
-    
-    <div id="modal-setup-math-ratio" class="modal" style="z-index: 1050;">
+    <!-- MODAL GHI NHẬN HÀNH VI -->
+    <div id="modal-record-behavior" class="modal">
         <div class="modal-content" style="height: 90vh;">
             <div class="modal-header">
-                <h3>📐 Tỉ lệ Đại / Hình môn Toán</h3>
-                <div class="close" onclick="closeModal('modal-setup-math-ratio')"><i class="fas fa-times"></i></div>
+                <h3>Ghi nhận Nề nếp</h3>
+                <div class="close" onclick="closeModal('modal-record-behavior')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div class="behavior-student-info" id="behavior-target-name"></div>
+                <div class="tab-container">
+                    <div class="tab-btn active" onclick="switchBehaviorTab('negative', this)">🔴 VI PHẠM</div>
+                    <div class="tab-btn" onclick="switchBehaviorTab('positive', this)">🟢 BIỂU DƯƠNG</div>
+                </div>
+                <div class="quick-tag-grid" id="quick-tag-list" style="padding: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XÁC NHẬN ĐIỂM HÀNH VI -->
+    <div id="modal-confirm-tag" class="modal" style="z-index: 1200;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Xác nhận điểm</h3>
+                <div class="close" onclick="closeModal('modal-confirm-tag')"><i class="fas fa-times"></i></div>
             </div>
             <div class="modal-body">
-                <div class="alert-item yellow mb-15">
-                    <div class="alert-info">
-                        Tự do cấu hình tỉ lệ Đại/Hình theo từng khoảng tuần cho từng khối (VD: Khối 8 Tuần 1-14: 3 Đại 1 Hình; Tuần 15-18: 2 Đại 2 Hình...).
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="input-group">
-                        <label>Khối (VD: 6, 7, 8, 9)</label>
-                        <input type="text" id="add-math-grade" placeholder="VD: 8">
-                    </div>
-                    <div class="input-group">
-                        <label>Từ tuần</label>
-                        <input type="number" id="add-math-from-week" min="1" max="35" placeholder="1">
-                    </div>
-                    <div class="input-group">
-                        <label>Đến tuần</label>
-                        <input type="number" id="add-math-to-week" min="1" max="35" placeholder="14">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="input-group">
-                        <label>Số tiết Đại / tuần</label>
-                        <input type="number" id="add-math-dai" min="0" max="10" value="3">
-                    </div>
-                    <div class="input-group">
-                        <label>Số tiết Hình / tuần</label>
-                        <input type="number" id="add-math-hinh" min="0" max="10" value="1">
-                    </div>
-                </div>
-                <button class="btn-primary w-full mb-20" onclick="addMathRatio()">Thêm cấu hình khoảng tuần</button>
-                <div class="table-responsive">
-                    <table class="preview-table">
-                        <thead>
-                            <tr>
-                                <th>Khối</th>
-                                <th>Khoảng tuần</th>
-                                <th>Tỉ lệ (Đại - Hình)</th>
-                                <th>Xóa</th>
-                            </tr>
-                        </thead>
-                        <tbody id="math-ratio-tbody"></tbody>
-                    </table>
-                </div>
+                <input type="hidden" id="conf-tag-id">
+                <input type="hidden" id="conf-stu-id">
+                <div class="alert-item" style="margin-bottom: 15px; background:#f8fafc;" id="conf-tag-display"></div>
+                <div class="input-group"><label>Số điểm</label><input type="number" id="conf-points" style="font-size: 1.2rem; font-weight: bold;"></div>
+                <div class="input-group mb-0"><label>Ghi chú (Lý do, tiết học...)</label><input type="text" id="conf-note" placeholder="Nhập lý do cụ thể..."></div>
             </div>
+            <div class="modal-footer"><button class="btn-primary w-full" onclick="submitBehaviorRecord()">LƯU GHI NHẬN</button></div>
         </div>
     </div>
 
-    <!-- Đổi tiết, Edit Theme, Học sinh... -->
-    <input type="file" id="general-import-file" style="display:none;" accept=".xlsx, .xls, .csv, .docx" onchange="handleGeneralImport(event)">
-
-    <div id="modal-adjust-schedule" class="modal" style="z-index: 1200;"><div class="modal-content"><div class="modal-header"><h3>🔄 Đổi lịch / Dạy bù</h3><div class="close" onclick="closeModal('modal-adjust-schedule')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="adj-sched-id"><div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div><div class="form-row"><div class="input-group"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div></div><div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button></div></div></div>
-    <div id="modal-edit-theme" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi Chủ điểm tháng</h3><div class="close" onclick="closeModal('modal-edit-theme')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tháng</label><input type="number" id="edit-theme-month" min="1" max="12"></div><div class="input-group mb-0"><label>Tên Chủ điểm</label><input type="text" id="edit-theme-name" placeholder="VD: VĂN MINH - XANH - AN TOÀN"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveMonthlyTheme()">Lưu thay đổi</button></div></div></div>
-    
-    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Tổ cố định</label><select id="stu-team"><option value="1">Tổ 1</option><option value="2">Tổ 2</option><option value="3">Tổ 3</option><option value="4">Tổ 4</option></select></div></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
-    
+    <!-- CÁC MODAL HỖ TRỢ KHÁC (GIỮ NGUYÊN HOÀN TOÀN) -->
     <div id="modal-import-excel" class="modal"><div class="modal-content" style="max-height: 95vh;"><div class="modal-header"><h3>📥 Nhập danh sách</h3><div class="close" onclick="closeModal('modal-import-excel')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 15px;"><div id="import-step-1"><div class="drop-zone" id="drop-zone" onclick="document.getElementById('excel-file').click()"><div class="drop-icon"><i class="fas fa-cloud-upload-alt"></i></div><h4>Kéo thả hoặc Nhấn chọn</h4><input type="file" id="excel-file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelUpload(event)"></div></div><div id="import-step-2" style="display: none;"><div class="mapping-section"><h4>Xác nhận cột:</h4><div class="mapping-grid"><div class="map-group"><label>Họ tên</label><select id="map-name" onchange="processParsedData()"></select></div><div class="map-group"><label>Giới tính</label><select id="map-gender" onchange="processParsedData()"></select></div><div class="map-group"><label>Ngày sinh</label><select id="map-dob" onchange="processParsedData()"></select></div><div class="map-group"><label>SĐT</label><select id="map-phone" onchange="processParsedData()"></select></div></div></div><div id="import-warnings"></div><div class="table-responsive"><table class="preview-table"><thead><tr><th>STT</th><th>Họ tên</th><th>SĐT</th></tr></thead><tbody id="preview-tbody"></tbody></table></div></div></div><div class="modal-footer" id="import-step-2-footer" style="display: none; gap:10px;"><button class="btn-outline w-full" onclick="resetImport()">Quay lại</button><button class="btn-primary w-full" id="btn-confirm-import" onclick="confirmImport()">✅ Xác nhận</button></div></div></div>
-    
-    <div id="modal-record-behavior" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Ghi nhận Nề nếp</h3><div class="close" onclick="closeModal('modal-record-behavior')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0;"><div class="behavior-student-info" id="behavior-target-name"></div><div class="tab-container"><div class="tab-btn active" onclick="switchBehaviorTab('negative', this)">🔴 VI PHẠM</div><div class="tab-btn" onclick="switchBehaviorTab('positive', this)">🟢 BIỂU DƯƠNG</div></div><div class="quick-tag-grid" id="quick-tag-list" style="padding: 20px;"></div></div></div></div>
-    <div id="modal-confirm-tag" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Xác nhận ghi nhận</h3><div class="close" onclick="closeModal('modal-confirm-tag')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="conf-tag-id"><input type="hidden" id="conf-stu-id"><div class="alert-item" style="margin-bottom: 15px; background:#f8fafc;" id="conf-tag-display"></div><div class="input-group"><label>Điểm thực tế</label><input type="number" id="conf-points" style="font-size: 1.2rem; font-weight: bold;"></div><div class="input-group mb-0"><label>Ghi chú</label><input type="text" id="conf-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="submitBehaviorRecord()">LƯU GHI NHẬN</button></div></div></div>
-    <div id="modal-manage-tags" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>⚙️ Quản lý Hành vi</h3><div class="close" onclick="closeModal('modal-manage-tags')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-primary w-full mb-20" onclick="openModal('modal-add-tag')">+ Thêm mới</button><div id="manage-tag-list" class="list-container"></div></div></div></div>
-    <div id="modal-add-tag" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Thêm hành vi</h3><div class="close" onclick="closeModal('modal-add-tag')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="edit-tag-id"><div class="input-group"><label>Tên hành vi *</label><input type="text" id="tag-name"></div><div class="form-row"><div class="input-group"><label>Phân loại</label><select id="tag-type"><option value="negative">🔴 Điểm trừ</option><option value="positive">🟢 Điểm cộng</option></select></div><div class="input-group"><label>Điểm</label><input type="number" id="tag-points"></div></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveTag()">LƯU</button></div></div></div>
-    
     <div id="modal-compose-notify" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Soạn Thông Báo</h3><div class="close" onclick="closeModal('modal-compose-notify')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn Template</label><select id="notify-template" onchange="applyNotifyTemplate()"><option value="">-- Tự soạn thảo --</option><option value="T1">📌 Đóng tiền</option><option value="T2">📌 Họp phụ huynh</option><option value="T3">📌 Nhắc mang sách vở</option></select></div><div class="input-group"><label>✨ Nhờ AI Soạn</label><div style="display:flex; gap:10px;"><input type="text" id="ai-prompt" style="flex:1;"><button class="btn-primary" onclick="generateAINotify()"><i class="fas fa-magic"></i></button></div></div><div class="input-group"><label>Tiêu đề *</label><input type="text" id="notify-title"></div><div class="input-group mb-0"><label>Nội dung *</label><textarea id="notify-content" rows="8"></textarea></div></div><div class="modal-footer" style="display: flex; gap:10px;"><button class="btn-outline w-full" onclick="copyNotifyToZalo()"><i class="fas fa-copy"></i> Copy Zalo</button><button class="btn-primary w-full" onclick="saveNotify()"><i class="fas fa-save"></i> Lưu</button></div></div></div>
     <div id="modal-add-task" class="modal"><div class="modal-content"><div class="modal-header"><h3>Thêm công việc</h3><div class="close" onclick="closeModal('modal-add-task')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="task-id"><div class="input-group"><label>Tiêu đề *</label><input type="text" id="task-title"></div><div class="form-row"><div class="input-group"><label>Trạng thái</label><select id="task-status"><option value="todo">📌 Cần làm</option><option value="doing">⏳ Đang làm</option><option value="done">✅ Đã xong</option></select></div><div class="input-group"><label>Mức ưu tiên</label><select id="task-priority"><option value="high">🔴 Cao</option><option value="medium">🟡 TB</option><option value="low">🟢 Thấp</option></select></div></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveTask()">Lưu</button></div></div></div>
-    
-    <div id="modal-upload-doc" class="modal"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>Tải lên tài liệu</h3><div class="close" onclick="closeModal('modal-upload-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn thư mục</label><select id="doc-folder"><option value="Giáo án">Giáo án</option><option value="Biên bản họp">Biên bản họp</option><option value="Khác">Khác</option></select></div><div class="input-group"><label>Chọn File *</label><input type="file" id="doc-file" style="padding: 8px;"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDoc()"><i class="fas fa-cloud-upload-alt"></i> Lưu file</button></div></div></div>
+    <div id="modal-upload-doc" class="modal"><div class="modal-content"><div class="modal-header"><h3>Tải lên tài liệu</h3><div class="close" onclick="closeModal('modal-upload-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Chọn thư mục</label><select id="doc-folder"><option value="Giáo án">Giáo án</option><option value="Biên bản họp">Biên bản họp</option><option value="Khác">Khác</option></select></div><div class="input-group"><label>Chọn File *</label><input type="file" id="doc-file" style="padding: 8px;"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveDoc()"><i class="fas fa-cloud-upload-alt"></i> Lưu file</button></div></div></div>
     <div id="modal-preview-doc" class="modal"><div class="modal-content" style="height: 90vh; max-width: 800px; display: flex; flex-direction: column;"><div class="modal-header"><h3 id="preview-doc-title">Đang xem</h3><div class="close" onclick="closePreviewModal()"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 0; background: #e2e8f0; flex: 1; display: flex; flex-direction: column;" id="preview-container"></div></div></div>
     <div id="modal-rename-doc" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi tên</h3><div class="close" onclick="closeModal('modal-rename-doc')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="rename-doc-id"><div class="input-group mb-0"><label>Tên mới</label><input type="text" id="rename-doc-name"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveRenameDoc()"><i class="fas fa-save"></i> Cập nhật</button></div></div></div>
-
-    <!-- MODAL HƯỚNG DẪN SỬ DỤNG GVCN -->
-    <div id="modal-guide" class="modal">
-        <div class="modal-content" style="max-height: 90vh;">
-            <div class="modal-header">
-                <h3>📖 Hướng dẫn sử dụng</h3>
-                <div class="close" onclick="closeModal('modal-guide')"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body" style="line-height: 1.6; color: var(--text-main);">
-                <div class="alert-item green mb-15">
-                    <div class="alert-info">
-                        Quy trình 5 bước để làm chủ Trợ lý GVCN, tiết kiệm 80% thời gian!
-                    </div>
-                </div>
-                <ol style="padding-left: 20px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-                    <li><strong>Bước 1: Cấu hình ban đầu.</strong> Vào tab Cài đặt đổi tên lớp. Vào "Sổ giảng" -> "Cấu hình" -> Nhập TKB và PPCT để app tự động sinh Sổ Báo Giảng cả năm.</li>
-                    <li><strong>Bước 2: Nhập danh sách.</strong> Vào "Lớp học", dùng tính năng Import để tải lên danh sách học sinh từ file Excel tiện lợi. Nếu up nhầm lớp, có nút "Xóa hết danh sách" nhanh chóng.</li>
-                    <li><strong>Bước 3: Chia tổ & Nhóm.</strong> Quản lý 4 Tổ cố định của lớp và chia nhóm thảo luận nhanh theo tiết học.</li>
-                    <li><strong>Bước 4: Điểm danh & Thi đua.</strong> Điểm danh 1 chạm mỗi ngày. Chuyển sang tab "Nề nếp" để cộng/trừ điểm thi đua. Hệ thống sẽ tự xếp loại Ngôi sao.</li>
-                    <li><strong>Bước 5: Tổng kết cuối tháng.</strong> Xem bảng Xếp loại chi tiết, tải xuống báo cáo, và xuất <strong>Phiếu liên lạc ảnh</strong> cực kỳ chuyên nghiệp gửi phụ huynh.</li>
-                </ol>
-                <p class="text-sm text-muted text-center">Chúc thầy cô có những giờ lên lớp thật tuyệt vời! ❤️</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary w-full btn-large" onclick="closeModal('modal-guide')">Đã hiểu & Bắt đầu dùng</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL GIA HẠN / NÂNG CẤP SỚM -->
-    <div id="modal-upgrade" class="modal" style="z-index: 9999;">
-        <div class="modal-content" style="background: #f8fafc; text-align: center; max-height: 90vh;">
-            <div class="modal-header">
-                <h3>🚀 Gia Hạn Bản Quyền</h3>
-                <div class="close" onclick="closeModal('modal-upgrade')"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body" style="padding: 20px;">
-                <p style="font-size: 14px; color: #64748b; margin-bottom: 20px; font-weight: 600; line-height: 1.6; text-align: left;">
-                    🎉 <strong>Chào mừng thầy cô trải nghiệm app GVCN!</strong><br><br>
-                    Để tiếp tục duy trì <strong>Cloud (Đám mây)</strong>, máy chủ và hệ thống đồng bộ dữ liệu ổn định, app cần một khoản chi phí vận hành nhỏ mỗi tháng.<br><br>
-                    ❤️ Chỉ từ <strong>15.000đ/tháng</strong> – chưa bằng một ly cà phê – thầy cô có thể sử dụng đầy đủ mọi tính năng, đồng bộ Cloud an toàn và ủng hộ mình duy trì, nâng cấp app ngày càng tốt hơn.<br><br>
-                    <strong>Cảm ơn thầy cô đã đồng hành và góp ý trong thời gian qua!</strong> 🙏
-                </p>
-                
-                <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
-                    <div style="border: 2px solid #0d6efd; border-radius: 16px; padding: 16px 12px; width: 140px; background: #fff; position: relative; box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);">
-                        <span style="position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #0d6efd; color: white; padding: 2px 8px; border-radius: 8px; font-size: 9.5px; font-weight: 800; white-space: nowrap;">1 NĂM HỌC</span>
-                        <h4 style="margin: 4px 0 0; color: #0d6efd; font-size: 15px; font-weight: 800;">1 Năm</h4>
-                        <p style="font-size: 24px; color: #0d6efd; font-weight: 900; margin: 8px 0;">179K</p>
-                        <p style="font-size: 11.5px; color: #64748b; font-weight: 600; margin: 0;">Cú pháp: <b>1N</b></p>
-                    </div>
-
-                    <div style="border: 2px solid #10b981; border-radius: 16px; padding: 16px 12px; width: 145px; background: #fff; position: relative; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);">
-                        <span style="position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 2px 8px; border-radius: 8px; font-size: 9.5px; font-weight: 800; white-space: nowrap;">TIẾT KIỆM NHẤT</span>
-                        <h4 style="margin: 4px 0 0; color: #059669; font-size: 15px; font-weight: 800;">Trọn Đời</h4>
-                        <p style="font-size: 24px; color: #059669; font-weight: 900; margin: 8px 0;">399K</p>
-                        <p style="font-size: 11.5px; color: #64748b; font-weight: 600; margin: 0;">Cú pháp: <b>TD</b></p>
-                    </div>
-                </div>
-
-                <img src="qr-thu-phi.jpg" alt="Mã QR Thanh Toán" style="width: 200px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 15px;">
-                
-                <p style="font-size: 13px; color: #ef4444; font-weight: 700; font-style: italic;">
-                    Lưu ý: Quét mã QR và giữ nguyên Nội dung chuyển khoản để hệ thống tự động cộng thêm 1 năm sử dụng nhé!
-                </p>
-            </div>
-            <div class="modal-footer" style="display: flex; flex-direction: column; gap: 10px;">
-                <button class="btn-primary w-full btn-large" onclick="window.open('https://zalo.me/0775172026', '_blank')" style="background: #0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);">
-                    <i class="fas fa-comment-dots"></i> Nhắn Zalo Admin xác nhận kích hoạt
-                </button>
-                <button class="btn-outline w-full" onclick="closeModal('modal-upgrade')">Đóng cửa sổ</button>
-            </div>
-        </div>
-    </div>
 
     <!-- KHUNG ẨN CHỨA THIẾT KẾ PHIẾU LIÊN LẠC ẢNH -->
     <div id="report-card-template" style="position: absolute; left: -9999px; top: -9999px; width: 400px; background: linear-gradient(135deg, #eff6ff, #ffffff); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 2px solid #bfdbfe; font-family: 'Plus Jakarta Sans', sans-serif;">
@@ -655,36 +612,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT DẠNG MODULE CHO FIREBASE -->
+    <!-- SCRIPT DẠNG MODULE BẮT BUỘC -->
     <script type="module" src="script.js"></script>
-
-    <!-- MODAL THÔNG BÁO CẬP NHẬT TÍNH NĂNG MỚI -->
-    <div id="modal-update-announcement" class="modal" style="z-index: 9999;">
-        <div class="modal-content" style="max-height: 90vh;">
-            <div class="modal-header">
-                <h3>🎉 Có gì mới trong bản cập nhật?</h3>
-                <div class="close" onclick="closeModal('modal-update-announcement')"><i class="fas fa-times"></i></div>
-            </div>
-            <div class="modal-body" style="line-height: 1.6; color: var(--text-main);">
-                <div class="alert-item green mb-15">
-                    <div class="alert-info">
-                        <strong>🚀 Phiên bản nâng cấp v4.2</strong>
-                        <p>Hệ thống vừa tích hợp toàn diện Sổ Báo Giảng tự động, chức năng Chia tổ / nhóm học tập linh hoạt và nút Xóa hết danh sách lớp nhanh chóng!</p>
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem;">
-                    <div><b>1. 🗑️ Nút "Xóa hết danh sách lớp":</b> Giúp làm sạch danh sách học sinh cũ chỉ với 1 chạm nếu lỡ import nhầm lớp khác.</div>
-                    <div><b>2. 👥 Tính năng Chia tổ / nhóm học tập:</b> Hỗ trợ cả 2 chế độ: Tổ lớp cố định (quản lý nền nếp cả năm) và Nhóm học tập linh hoạt (thảo luận nhanh theo tiết).</div>
-                    <div><b>3. 📚 1 File PPCT dùng chung cả khối:</b> Giáo viên chỉ cần tải lên 1 file PPCT, hệ thống tự động nhận diện và gán chuẩn xác cho các lớp.</div>
-                    <div><b>4. 📐 Tùy biến Đại / Hình theo tuần:</b> Tự do cấu hình tỉ lệ số tiết Đại số & Hình học theo từng khoảng tuần.</div>
-                    <div><b>5. 🏖️ Tự động bảo lưu khi nghỉ lễ:</b> Tiết học rơi vào ngày nghỉ sẽ tự động dồn sang buổi dạy tiếp theo, không lo mất bài hay lệch tiến độ.</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary w-full btn-large" onclick="dismissUpdateAnnouncement()">Tuyệt vời! Bắt đầu trải nghiệm</button>
-            </div>
-        </div>
-    </div>
-
 </body>
 </html>
