@@ -72,8 +72,13 @@
             <section id="view-home" class="view active">
                 <header class="app-header">
                     <div class="greeting">
-                        <h2>Xin chào, <span id="dash-teacher">Cô/Thầy</span>! 👋</h2>
-                        <p>Hôm nay là một ngày tuyệt vời ❤️</p>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h2 style="margin: 0;">Xin chào, <span id="dash-teacher">Cô/Thầy</span>! 👋</h2>
+                            <span id="user-role-badge" class="role-badge-pill" onclick="window.openAccountPermissionsModal()" title="Bấm để xem/quản lý phân quyền tài khoản" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; cursor: pointer; transition: all 0.2s ease;">
+                                <i class="fas fa-user-shield"></i> <span id="user-role-text">Giáo viên</span>
+                            </span>
+                        </div>
+                        <p id="dash-subtitle">Hôm nay là một ngày tuyệt vời ❤️</p>
                     </div>
                     <img src="https://ui-avatars.com/api/?name=GV&background=e0e7ff&color=4f46e5&bold=true" alt="Avatar" class="avatar">
                 </header>
@@ -239,15 +244,23 @@
                         <button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button>
                         <button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button>
                         <button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button>
+                        <button class="btn-action-chip btn-perm-chip" onclick="window.openAccountPermissionsModal()"><i class="fas fa-user-shield text-purple"></i> Phân quyền</button>
                     </div>
 
                     <!-- BỘ LỌC THEO TỔ CỐ ĐỊNH -->
-                    <div class="group-filter-bar mt-15" id="student-group-filters">
-                        <button class="group-filter-chip active" onclick="filterStudentsByGroup('all', this)">Tất cả</button>
-                        <button class="group-filter-chip" onclick="filterStudentsByGroup(1, this)">Tổ 1</button>
-                        <button class="group-filter-chip" onclick="filterStudentsByGroup(2, this)">Tổ 2</button>
-                        <button class="group-filter-chip" onclick="filterStudentsByGroup(3, this)">Tổ 3</button>
-                        <button class="group-filter-chip" onclick="filterStudentsByGroup(4, this)">Tổ 4</button>
+                    <div class="group-filter-bar" id="student-group-filters">
+                        <div class="group-filter-grid">
+                            <button class="group-filter-chip active" onclick="filterStudentsByGroup('all', this)"><i class="fas fa-layer-group"></i> <span>Tất cả</span></button>
+                            <button class="group-filter-chip" onclick="filterStudentsByGroup(1, this)"><span>Tổ 1</span></button>
+                            <button class="group-filter-chip" onclick="filterStudentsByGroup(2, this)"><span>Tổ 2</span></button>
+                            <button class="group-filter-chip" onclick="filterStudentsByGroup(3, this)"><span>Tổ 3</span></button>
+                            <button class="group-filter-chip" onclick="filterStudentsByGroup(4, this)"><span>Tổ 4</span></button>
+                            <button class="group-filter-chip chip-unassigned" onclick="filterStudentsByGroup('unassigned', this)"><i class="fas fa-user-clock"></i> <span>Chưa có tổ</span></button>
+                        </div>
+                        <div class="group-filter-actions">
+                            <button class="group-filter-chip chip-action-add" onclick="addNewFixedGroup()"><i class="fas fa-plus"></i> <span>Thêm tổ</span></button>
+                            <button class="group-filter-chip chip-action-del" onclick="openDeleteFixedGroupModal()"><i class="fas fa-trash-alt"></i> <span>Xóa tổ...</span></button>
+                        </div>
                     </div>
 
                     <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-student" placeholder="Tìm tên..." onkeyup="renderStudents()"></div>
@@ -636,7 +649,7 @@
     <div id="modal-adjust-schedule" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>🔄 Đổi lịch / Dạy bù</h3><div class="close" onclick="closeModal('modal-adjust-schedule')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="adj-sched-id"><div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div><div class="form-row"><div class="input-group"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div></div><div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button></div></div></div>
     <div id="modal-edit-theme" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi Chủ điểm tháng</h3><div class="close" onclick="closeModal('modal-edit-theme')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tháng</label><input type="number" id="edit-theme-month" min="1" max="12"></div><div class="input-group mb-0"><label>Tên Chủ điểm</label><input type="text" id="edit-theme-name" placeholder="VD: VĂN MINH - XANH - AN TOÀN"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveMonthlyTheme()">Lưu thay đổi</button></div></div></div>
     
-    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên *</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="form-row"><div class="input-group"><label>Tổ cố định</label><select id="stu-group"><option value="0">-- Chưa phân tổ --</option></select></div><div class="input-group"><label>Vai trò trong tổ</label><select id="stu-role"><option value="member">Thành viên</option><option value="leader">⭐ Tổ trưởng</option><option value="vice">🎖️ Tổ phó</option></select></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
+    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên *</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="form-row"><div class="input-group"><label>Tổ cố định</label><select id="stu-group"><option value="0">-- Chưa phân tổ --</option></select></div><div class="input-group"><label>Vai trò trong tổ</label><select id="stu-role"><option value="member">Thành viên</option><option value="leader">⭐ Tổ trưởng</option><option value="vice">🎖️ Tổ phó</option></select></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div><div class="form-row" style="margin-top: 5px; padding-top: 10px; border-top: 1px dashed #e2e8f0;"><div class="input-group" style="flex: 1;"><label style="font-size: 0.78rem; font-weight: 700; color: #6d28d9;"><i class="fas fa-envelope"></i> Email tài khoản (nếu cấp)</label><input type="email" id="stu-account-email" placeholder="VD: hocsinh@gmail.com"></div><div class="input-group" style="flex: 1;"><label style="font-size: 0.78rem; font-weight: 700; color: #6d28d9;"><i class="fas fa-user-shield"></i> Quyền ứng dụng</label><select id="stu-account-role"><option value="none">Không có quyền</option><option value="class_leader">Lớp trưởng</option><option value="class_vice">Lớp phó</option><option value="group_leader">Tổ trưởng</option></select></div></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
 
     <!-- MODAL TỰ ĐỘNG CHIA TỔ CỐ ĐỊNH -->
     <div id="modal-auto-fixed-groups" class="modal" style="z-index: 300;">
@@ -856,6 +869,95 @@
         <div style="text-align: right; margin-top: 20px;">
             <p style="color: #0f172a; font-weight: 700; font-size: 0.9rem; margin-bottom: 2px;">Giáo viên chủ nhiệm</p>
             <p style="color: #3b82f6; font-weight: 800; font-size: 1rem;" id="rc-teacher">Nguyễn Thu Hà</p>
+        </div>
+    </div>
+
+    <!-- MODAL PHÂN QUYỀN TÀI KHOẢN CÁN BỘ LỚP -->
+    <div id="modal-account-permissions" class="modal" style="z-index: 320;">
+        <div class="modal-content" style="max-height: 92vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3>🛡️ Phân quyền tài khoản cán bộ lớp</h3>
+                <div class="close" onclick="closeModal('modal-account-permissions')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="padding: 16px; overflow-y: auto; flex: 1;">
+                <div class="alert-item" style="background: #f5f3ff; border-left: 4px solid #7c3aed; margin-bottom: 14px;">
+                    <div class="alert-icon" style="background: #ede9fe; color: #7c3aed;"><i class="fas fa-shield-alt"></i></div>
+                    <div class="alert-info">
+                        <strong style="color: #6d28d9;">Phân quyền tài khoản cán bộ lớp</strong>
+                        <p style="font-size: 0.8rem; color: #4b5563; margin-top: 2px;">Chức vụ trong tổ (Tổ trưởng/Tổ phó trong dữ liệu lớp) hoàn toàn độc lập với quyền đăng nhập ứng dụng. Chỉ khi gán vai trò tại đây, học sinh mới có quyền đăng nhập và thực hiện nhiệm vụ.</p>
+                    </div>
+                </div>
+
+                <div id="perm-form-container" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                    <div class="input-group">
+                        <label style="font-weight: 700; font-size: 0.85rem;">Chọn học sinh cần phân quyền *</label>
+                        <select id="perm-student-select" onchange="window.onSelectPermStudent(this.value)" style="font-weight: 600;">
+                            <option value="">-- Chọn học sinh --</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label style="font-weight: 700; font-size: 0.85rem;">Email tài khoản Google *</label>
+                        <input type="email" id="perm-student-email" placeholder="VD: hocsinh@gmail.com">
+                        <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 3px;">Email học sinh dùng để đăng nhập vào ứng dụng.</small>
+                    </div>
+
+                    <div class="input-group">
+                        <label style="font-weight: 700; font-size: 0.85rem;">Vai trò quyền hạn *</label>
+                        <select id="perm-student-role" onchange="window.onPermRoleChanged(this.value)">
+                            <option value="none">❌ Không có quyền (Chưa cấp / Hủy quyền)</option>
+                            <option value="class_leader">⭐ Lớp trưởng (Điểm danh, nề nếp toàn lớp)</option>
+                            <option value="class_vice">🎖️ Lớp phó (Điểm danh, nề nếp toàn lớp)</option>
+                            <option value="group_leader">👥 Tổ trưởng (Chỉ quản lý học sinh trong Tổ của mình)</option>
+                        </select>
+                    </div>
+
+                    <div id="perm-group-hint" style="display: none; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; color: #b45309; margin-bottom: 12px;">
+                        <i class="fas fa-info-circle"></i> <span id="perm-group-hint-text"></span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-primary" style="flex: 1;" onclick="window.saveStudentPermission()"><i class="fas fa-save"></i> Lưu phân quyền</button>
+                        <button class="btn-outline text-danger" id="btn-perm-revoke" style="display: none;" onclick="window.revokeStudentPermission()"><i class="fas fa-user-times"></i> Hủy quyền</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 0.9rem; color: var(--text-main);"><i class="fas fa-users-cog"></i> Danh sách tài khoản đã cấp quyền</strong>
+                    <span id="perm-count-badge" style="font-size: 0.75rem; font-weight: 700; background: #ede9fe; color: #7c3aed; padding: 2px 8px; border-radius: 10px;">0 tài khoản</span>
+                </div>
+                <div id="assigned-accounts-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
+
+                <!-- KHU VỰC CHUYỂN NHANH VAI TRÒ ĐỂ KIỂM TRA (DÀNH CHO KIỂM THỬ) -->
+                <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 12px;">
+                    <div style="font-size: 0.82rem; font-weight: 800; color: #334155; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-flask" style="color: #7c3aed;"></i> <span>Chuyển đổi vai trò để kiểm tra nhanh (Test 4 quyền):</span>
+                    </div>
+                    <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px; line-height: 1.4;">
+                        Bấm vào vai trò bên dưới để kiểm tra trải nghiệm và giới hạn của từng quyền ngay trên ứng dụng:
+                    </p>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="btn-sm" style="background: #4f46e5; color: white; border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none;" onclick="window.switchTestRole('teacher')">
+                            <i class="fas fa-user-shield"></i> Giáo viên
+                        </button>
+                        <button type="button" class="btn-sm" style="background: #15803d; color: white; border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none;" onclick="window.switchTestRole('class_leader')">
+                            <i class="fas fa-star"></i> Lớp trưởng
+                        </button>
+                        <button type="button" class="btn-sm" style="background: #0369a1; color: white; border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none;" onclick="window.switchTestRole('class_vice')">
+                            <i class="fas fa-medal"></i> Lớp phó
+                        </button>
+                        <button type="button" class="btn-sm" style="background: #b45309; color: white; border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none;" onclick="window.switchTestRole('group_leader', 1)">
+                            <i class="fas fa-users"></i> Tổ trưởng Tổ 1
+                        </button>
+                        <button type="button" class="btn-sm" style="background: #64748b; color: white; border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none;" onclick="window.switchTestRole('none')">
+                            <i class="fas fa-ban"></i> Không quyền
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline w-full" onclick="closeModal('modal-account-permissions')">Đóng</button>
+            </div>
         </div>
     </div>
 

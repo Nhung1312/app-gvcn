@@ -19,6 +19,285 @@ const provider = new GoogleAuthProvider();
 
 let currentUser = null;
 
+// ================= HỆ THỐNG PHÂN QUYỀN CÁN BỘ LỚP (RBAC) =================
+// 4 Vai trò: 'teacher' (Giáo viên), 'class_leader' (Lớp trưởng), 'class_vice' (Lớp phó), 'group_leader' (Tổ trưởng)
+// 'none': Học sinh chưa được cấp quyền
+window.authRole = {
+    role: 'teacher',
+    email: '',
+    studentId: null,
+    studentName: '',
+    fixedGroup: null,
+    isTestRole: false
+};
+
+window.isTeacher = function() {
+    return window.authRole.role === 'teacher';
+};
+
+window.isClassLeader = function() {
+    return window.authRole.role === 'class_leader';
+};
+
+window.isClassVice = function() {
+    return window.authRole.role === 'class_vice';
+};
+
+window.isGroupLeader = function(targetGroupId = null) {
+    if (window.authRole.role !== 'group_leader') return false;
+    if (targetGroupId !== null && targetGroupId !== undefined) {
+        return String(window.authRole.fixedGroup) === String(targetGroupId);
+    }
+    return true;
+};
+
+window.hasPermission = function(action, target = null) {
+    const role = window.authRole.role;
+    if (role === 'teacher') return true;
+    if (role === 'none') return false;
+
+    // Các tác vụ CHỈ DÀNH RIÊNG CHO GIÁO VIÊN CHỦ NHIỆM
+    const teacherOnlyActions = [
+        'manage_permissions',
+        'assign_role',
+        'revoke_role',
+        'edit_settings',
+        'edit_ppct',
+        'edit_tkb',
+        'edit_holidays',
+        'delete_student',
+        'add_student',
+        'edit_student_profile',
+        'manage_groups',
+        'manage_tags',
+        'system_config',
+        'import_data',
+        'export_excel'
+    ];
+    if (teacherOnlyActions.includes(action)) return false;
+
+    // Tác vụ Điểm danh và Nề nếp
+    if (action === 'attendance:mark' || action === 'behavior:record') {
+        if (role === 'class_leader' || role === 'class_vice') {
+            return true; // Lớp trưởng và Lớp phó được thao tác toàn lớp
+        }
+        if (role === 'group_leader') {
+            if (!target) return false;
+            let stu = typeof target === 'object' ? target : (appData.students || []).find(s => s.id == target);
+            if (!stu) return false;
+            // Chỉ thao tác trên học sinh cùng tổ cố định với Tổ trưởng
+            return String(stu.fixedGroup) === String(window.authRole.fixedGroup);
+        }
+        return false;
+    }
+
+    if (action === 'attendance:save') {
+        return role === 'class_leader' || role === 'class_vice' || role === 'group_leader';
+    }
+
+    if (action === 'view_students') {
+        return true;
+    }
+
+    return false;
+};
+
+window.resolveUserRole = function(user = currentUser) {
+    if (window.authRole && window.authRole.isTestRole) {
+        window.updateRoleUI();
+        return;
+    }
+
+    if (!user) {
+        // Chế độ Khách / Cục bộ: Giữ quyền Giáo viên để không gián đoạn
+        window.authRole = {
+            role: 'teacher',
+            email: 'giaovien@gvcn.local',
+            studentId: null,
+            studentName: (appData.settings && appData.settings.teacherName) ? appData.settings.teacherName : 'Giáo viên',
+            fixedGroup: null,
+            isTestRole: false
+        };
+        window.updateRoleUI();
+        return;
+    }
+
+    const email = (user.email || '').toLowerCase().trim();
+
+    // 1. Nếu chưa lưu email giáo viên, lưu email đầu tiên đăng nhập làm Giáo viên
+    if (!appData.teacherEmail) {
+        appData.teacherEmail = email;
+        appData.teacherUid = user.uid;
+        window.saveData();
+    }
+
+    // 2. Nếu là Giáo viên
+    if (appData.teacherEmail && appData.teacherEmail.toLowerCase() === email) {
+        window.authRole = {
+            role: 'teacher',
+            email: email,
+            studentId: null,
+            studentName: (appData.settings && appData.settings.teacherName) ? appData.settings.teacherName : 'Giáo viên',
+            fixedGroup: null,
+            isTestRole: false
+        };
+        window.updateRoleUI();
+        return;
+    }
+
+    // 3. Kiểm tra xem có phải học sinh được cấp quyền cán bộ lớp không
+    const assignedStu = (appData.students || []).find(s => 
+        s.accountEmail && s.accountEmail.toLowerCase().trim() === email
+    );
+
+    if (assignedStu && assignedStu.accountRole && assignedStu.accountRole !== 'none') {
+        window.authRole = {
+            role: assignedStu.accountRole,
+            email: email,
+            studentId: assignedStu.id,
+            studentName: assignedStu.name,
+            fixedGroup: assignedStu.fixedGroup || null,
+            isTestRole: false
+        };
+        window.updateRoleUI();
+        return;
+    }
+
+    // 4. Tài khoản bình thường chưa được cấp quyền
+    window.authRole = {
+        role: 'none',
+        email: email,
+        studentId: null,
+        studentName: user.displayName || email.split('@')[0],
+        fixedGroup: null,
+        isTestRole: false
+    };
+    window.updateRoleUI();
+};
+
+window.updateRoleUI = function() {
+    const roleBadge = document.getElementById('user-role-badge');
+    const teacherNameEl = document.getElementById('dash-teacher');
+    
+    let badgeLabel = "Giáo viên";
+    let badgeBg = "#e0e7ff";
+    let badgeColor = "#4338ca";
+    let badgeBorder = "#c7d2fe";
+    let iconClass = "fa-user-shield";
+    let displayName = (appData.settings && appData.settings.teacherName) ? appData.settings.teacherName : "Cô/Thầy";
+
+    if (window.authRole.role === 'teacher') {
+        badgeLabel = "Giáo viên";
+        badgeBg = "#e0e7ff";
+        badgeColor = "#4338ca";
+        badgeBorder = "#c7d2fe";
+        iconClass = "fa-user-shield";
+        displayName = (appData.settings && appData.settings.teacherName) ? appData.settings.teacherName : "Cô/Thầy";
+    } else if (window.authRole.role === 'class_leader') {
+        badgeLabel = "Lớp trưởng";
+        badgeBg = "#dcfce7";
+        badgeColor = "#15803d";
+        badgeBorder = "#bbf7d0";
+        iconClass = "fa-star";
+        displayName = window.authRole.studentName || "Lớp trưởng";
+    } else if (window.authRole.role === 'class_vice') {
+        badgeLabel = "Lớp phó";
+        badgeBg = "#e0f2fe";
+        badgeColor = "#0369a1";
+        badgeBorder = "#bae6fd";
+        iconClass = "fa-medal";
+        displayName = window.authRole.studentName || "Lớp phó";
+    } else if (window.authRole.role === 'group_leader') {
+        badgeLabel = `Tổ trưởng – Tổ ${window.authRole.fixedGroup || 1}`;
+        badgeBg = "#fef3c7";
+        badgeColor = "#b45309";
+        badgeBorder = "#fde68a";
+        iconClass = "fa-users";
+        displayName = window.authRole.studentName || `Tổ trưởng Tổ ${window.authRole.fixedGroup || 1}`;
+    } else if (window.authRole.role === 'none') {
+        badgeLabel = "Chưa cấp quyền";
+        badgeBg = "#f1f5f9";
+        badgeColor = "#64748b";
+        badgeBorder = "#cbd5e1";
+        iconClass = "fa-ban";
+        displayName = window.authRole.studentName || "Học sinh";
+    }
+
+    if (roleBadge) {
+        roleBadge.style.background = badgeBg;
+        roleBadge.style.color = badgeColor;
+        roleBadge.style.borderColor = badgeBorder;
+        roleBadge.innerHTML = `<i class="fas ${iconClass}"></i> <span id="user-role-text">${badgeLabel}</span>`;
+    }
+    if (teacherNameEl) {
+        teacherNameEl.innerText = displayName;
+    }
+};
+
+window.switchTestRole = function(testRole, targetGroup = 1) {
+    if (testRole === 'teacher') {
+        window.authRole = {
+            role: 'teacher',
+            email: currentUser ? currentUser.email : 'giaovien@gvcn.local',
+            studentId: null,
+            studentName: (appData.settings && appData.settings.teacherName) ? appData.settings.teacherName : 'Giáo viên',
+            fixedGroup: null,
+            isTestRole: false
+        };
+        window.showToast("Đã chuyển vai trò: GIÁO VIÊN (Toàn quyền)");
+    } else if (testRole === 'class_leader') {
+        const sampleStu = (appData.students || []).find(s => s.accountRole === 'class_leader') || (appData.students && appData.students[0]);
+        window.authRole = {
+            role: 'class_leader',
+            email: sampleStu ? (sampleStu.accountEmail || 'lop_truong@lop.edu') : 'lop_truong@lop.edu',
+            studentId: sampleStu ? sampleStu.id : 99991,
+            studentName: sampleStu ? sampleStu.name : 'Lớp trưởng (Xem thử)',
+            fixedGroup: sampleStu ? sampleStu.fixedGroup : 1,
+            isTestRole: true
+        };
+        window.showToast("Đã chuyển vai trò: LỚP TRƯỞNG (Thao tác toàn lớp, không sửa hệ thống)");
+    } else if (testRole === 'class_vice') {
+        const sampleStu = (appData.students || []).find(s => s.accountRole === 'class_vice') || (appData.students && appData.students[1]);
+        window.authRole = {
+            role: 'class_vice',
+            email: sampleStu ? (sampleStu.accountEmail || 'lop_pho@lop.edu') : 'lop_pho@lop.edu',
+            studentId: sampleStu ? sampleStu.id : 99992,
+            studentName: sampleStu ? sampleStu.name : 'Lớp phó (Xem thử)',
+            fixedGroup: sampleStu ? sampleStu.fixedGroup : 1,
+            isTestRole: true
+        };
+        window.showToast("Đã chuyển vai trò: LỚP PHÓ (Thao tác toàn lớp, không sửa hệ thống)");
+    } else if (testRole === 'group_leader') {
+        const grpId = parseInt(targetGroup) || 1;
+        const sampleStu = (appData.students || []).find(s => s.fixedGroup == grpId && s.accountRole === 'group_leader') || 
+                          (appData.students || []).find(s => s.fixedGroup == grpId) || 
+                          (appData.students && appData.students[0]);
+        window.authRole = {
+            role: 'group_leader',
+            email: sampleStu ? (sampleStu.accountEmail || `to_truong_t${grpId}@lop.edu`) : `to_truong_t${grpId}@lop.edu`,
+            studentId: sampleStu ? sampleStu.id : 99993,
+            studentName: sampleStu ? sampleStu.name : `Tổ trưởng Tổ ${grpId}`,
+            fixedGroup: grpId,
+            isTestRole: true
+        };
+        window.showToast(`Đã chuyển vai trò: TỔ TRƯỞNG (Chỉ thao tác thành viên Tổ ${grpId})`);
+    } else if (testRole === 'none') {
+        window.authRole = {
+            role: 'none',
+            email: 'chua_cap_quyen@hocsinh.edu',
+            studentId: null,
+            studentName: 'Học sinh chưa cấp quyền',
+            fixedGroup: null,
+            isTestRole: true
+        };
+        window.showToast("Đã chuyển vai trò: CHƯA CẤP QUYỀN (Không có quyền thao tác)");
+    }
+    window.updateRoleUI();
+    window.renderStudents();
+    window.renderAttendance();
+    window.renderDisciplineStudents();
+};
+
 const loginScreen = document.getElementById('login-screen');
 const btnLogin = document.getElementById('btn-login');
 
@@ -85,7 +364,20 @@ onAuthStateChanged(auth, async (user) => {
 
         if (hasAccess) {
             try {
-                const docRef = doc(firestoreDb, "DuLieuGVCN", user.uid);
+                // Kiểm tra xem đây có phải tài khoản cán bộ lớp được giáo viên ủy quyền không
+                let targetTeacherUid = user.uid;
+                const cleanEmail = (user.email || '').toLowerCase().trim();
+                try {
+                    const officerSnap = await getDoc(doc(firestoreDb, "CanBoLop", cleanEmail));
+                    if (officerSnap.exists()) {
+                        const offData = officerSnap.data();
+                        if (offData.teacherUid) {
+                            targetTeacherUid = offData.teacherUid;
+                        }
+                    }
+                } catch(e) {}
+
+                const docRef = doc(firestoreDb, "DuLieuGVCN", targetTeacherUid);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const cloudData = docSnap.data();
@@ -109,12 +401,19 @@ onAuthStateChanged(auth, async (user) => {
             } catch(e) {
                 console.warn("Lỗi tải mây:", e);
             }
-            window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
+            window.resolveUserRole(user);
+            window.updateDashboardInfo(); 
+            window.renderStudents(); 
+            window.loadSettings(); 
+            window.renderKanban(); 
+            window.renderDocs(); 
+            window.renderSetupData();
         }
     } else {
         currentUser = null;
         const isGuest = localStorage.getItem('gvcn_guest_mode') === 'true';
         if(loginScreen) loginScreen.style.display = isGuest ? 'none' : 'flex';
+        window.resolveUserRole(null);
     }
 });
 
@@ -182,6 +481,14 @@ function initData() {
         }
         if (!v4Data.flexibleGroups) { v4Data.flexibleGroups = []; }
         if (!v4Data.classGradeMap) { v4Data.classGradeMap = {}; }
+        if (!v4Data.teacherEmail) { v4Data.teacherEmail = ""; }
+        if (!v4Data.teacherUid) { v4Data.teacherUid = ""; }
+        if (v4Data.students && Array.isArray(v4Data.students)) {
+            v4Data.students.forEach(s => {
+                if (s.accountRole === undefined) s.accountRole = 'none';
+                if (s.accountEmail === undefined) s.accountEmail = '';
+            });
+        }
         if (!v4Data.settings.grade) {
             const m = String(v4Data.settings.className || '').match(/\d+/);
             v4Data.settings.grade = m ? m[0] : "7";
@@ -201,7 +508,8 @@ window.saveData = function(immediateSync = false) {
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         const doSync = () => {
-            const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
+            const targetUid = appData.teacherUid || currentUser.uid;
+            const docRef = doc(firestoreDb, "DuLieuGVCN", targetUid);
             setDoc(docRef, appData).then(() => { 
                 console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); 
             }).catch(e => console.error("Lỗi đồng bộ mây:", e));
@@ -218,7 +526,8 @@ window.addEventListener('beforeunload', () => {
     if (currentUser && syncTimeout) {
         clearTimeout(syncTimeout);
         try {
-            const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
+            const targetUid = appData.teacherUid || currentUser.uid;
+            const docRef = doc(firestoreDb, "DuLieuGVCN", targetUid);
             setDoc(docRef, appData);
         } catch(e) {}
     }
@@ -237,6 +546,8 @@ window.onload = async () => {
     await initIndexedDB(); 
     document.getElementById('today-date').innerText = new Date().toLocaleDateString('vi-VN');
     document.getElementById('attendance-date').value = getTodayStr();
+    window.resolveUserRole(currentUser);
+    window.updateRoleUI();
     window.updateDashboardInfo(); window.renderStudents(); window.loadSettings(); window.renderKanban(); window.renderDocs(); window.renderSetupData();
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err)); }
 };
@@ -363,6 +674,17 @@ window.loadSettings = function() {
     if (setTeacher) setTeacher.value = s.teacherName || ''; 
     if (setClass) setClass.value = s.className || ''; 
     if (setYear) setYear.value = s.year || ''; 
+
+    // Kiểm tra quyền: Nếu không phải Giáo viên thì khóa các trường cài đặt
+    const isT = window.isTeacher();
+    if (setTeacher) setTeacher.disabled = !isT;
+    if (setClass) setClass.disabled = !isT;
+    if (setYear) setYear.disabled = !isT;
+
+    const btnSaveSettings = document.querySelector('#view-settings .btn-primary');
+    if (btnSaveSettings) {
+        btnSaveSettings.style.display = isT ? '' : 'none';
+    }
     
     if (document.getElementById('set-auto-absent')) document.getElementById('set-auto-absent').checked = s.autoAbsentDisc || false; 
     if (document.getElementById('set-auto-late')) document.getElementById('set-auto-late').checked = s.autoLateDisc || false; 
@@ -383,6 +705,11 @@ window.loadSettings = function() {
 };
 
 window.saveSettings = function() { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền lưu Cài đặt hệ thống!", "error");
+        return;
+    }
+
     if (!appData.settings) appData.settings = { ...defaultSettings };
     
     const setTeacher = document.getElementById('set-teacher');
@@ -415,6 +742,8 @@ window.saveSettings = function() {
 };
 
 window.autoSaveSettingsField = function(field, val) {
+    if (!window.isTeacher()) return;
+
     if (!appData.settings) appData.settings = { ...defaultSettings };
     appData.settings[field] = val ? val.trim() : '';
     if (field === 'className') {
@@ -426,7 +755,8 @@ window.autoSaveSettingsField = function(field, val) {
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
-            const docRef = doc(firestoreDb, "DuLieuGVCN", currentUser.uid);
+            const targetUid = appData.teacherUid || currentUser.uid;
+            const docRef = doc(firestoreDb, "DuLieuGVCN", targetUid);
             setDoc(docRef, appData).catch(e => console.error("Lỗi đồng bộ mây:", e));
         }, 1200);
     }
@@ -436,7 +766,13 @@ window.saveConfig = function() {
     window.saveSettings(); 
 };
 
-window.resetData = function() { if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); } }
+window.resetData = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền đặt lại dữ liệu!", "error");
+        return;
+    }
+    if(confirm("XÓA TOÀN BỘ CSDL CỤC BỘ? LƯU Ý: Thao tác này chỉ xóa bộ nhớ tạm, dữ liệu mây vẫn còn.")) { localStorage.removeItem('gvcnData_v4'); localStorage.removeItem('gvcnData_v3'); location.reload(); }
+}
 
 
 // ================= DASHBOARD =================
@@ -648,6 +984,10 @@ window.renderPPCTTable = function() {
 };
 
 window.clearAllPPCT = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền chỉnh sửa PPCT!", "error");
+        return;
+    }
     if(confirm("Bạn có chắc muốn xóa tất cả bài dạy trong Phân phối chương trình?")) {
         appData.scheduleSetup.ppct = [];
         window.saveData();
@@ -694,8 +1034,21 @@ window.renderSetupData = function() {
     stp.holidays.forEach((h, i) => { tbodyHol.innerHTML += `<tr><td>${h.start}</td><td>${h.end}</td><td>${h.name}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('holidays', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
 }
 
-window.delSetupData = function(type, index) { appData.scheduleSetup[type].splice(index, 1); window.saveData(); window.renderSetupData(); }
+window.delSetupData = function(type, index) {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa dữ liệu cấu hình TKB / PPCT!", "error");
+        return;
+    }
+    appData.scheduleSetup[type].splice(index, 1);
+    window.saveData();
+    window.renderSetupData();
+}
+
 window.addTKB = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền chỉnh sửa Thời khóa biểu!", "error");
+        return;
+    }
     let d = document.getElementById('add-tkb-day').value;
     let sess = document.getElementById('add-tkb-session') ? document.getElementById('add-tkb-session').value : 'morning';
     let p = parseInt(document.getElementById('add-tkb-period').value);
@@ -708,13 +1061,23 @@ window.addTKB = function() {
     appData.scheduleSetup.tkb.sort((a,b) => a.dayOfWeek - b.dayOfWeek || a.period - b.period);
     window.saveData(); window.renderSetupData(); window.showToast("Đã thêm TKB!");
 }
+
 window.clearAllTKB = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa Thời khóa biểu!", "error");
+        return;
+    }
     if(confirm("Bạn có chắc muốn xóa tất cả các tiết trong Thời khóa biểu?")) {
         appData.scheduleSetup.tkb = [];
         window.saveData(); window.renderSetupData(); window.showToast("Đã xóa sạch danh sách TKB!");
     }
 }
+
 window.addPPCT = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền thêm Phân phối chương trình!", "error");
+        return;
+    }
     let g = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : "7";
     let s = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value.trim() : "";
     let p = document.getElementById('add-ppct-period') ? document.getElementById('add-ppct-period').value : "";
@@ -1130,9 +1493,10 @@ window.renderStudents = function() {
     // Render bộ lọc theo Tổ cố định
     const filterContainer = document.getElementById('student-group-filters');
     if (filterContainer) {
-        let filterHtml = `
+        let filterHtml = '<div class="group-filter-grid">';
+        filterHtml += `
             <div class="group-filter-chip ${currentFixedGroupFilter === 'all' ? 'active' : ''}" onclick="window.filterStudentsByGroup('all')">
-                <i class="fas fa-layer-group"></i> Tất cả (${appData.students.length})
+                <i class="fas fa-layer-group"></i> <span>Tất cả (${appData.students.length})</span>
             </div>
         `;
         if (appData.fixedGroups && Array.isArray(appData.fixedGroups)) {
@@ -1151,18 +1515,21 @@ window.renderStudents = function() {
         }
         const unassignedCount = appData.students.filter(s => !s.fixedGroup || s.fixedGroup == 0).length;
         filterHtml += `
-            <div class="group-filter-chip ${currentFixedGroupFilter === 'unassigned' ? 'active' : ''}" onclick="window.filterStudentsByGroup('unassigned')">
-                <i class="fas fa-user-clock"></i> Chưa có tổ (${unassignedCount})
+            <div class="group-filter-chip chip-unassigned ${currentFixedGroupFilter === 'unassigned' ? 'active' : ''}" onclick="window.filterStudentsByGroup('unassigned')">
+                <i class="fas fa-user-clock"></i> <span>Chưa có tổ (${unassignedCount})</span>
             </div>
         `;
+        filterHtml += '</div>';
 
-        // Nút Thêm tổ và Xóa tổ nhanh ngay trên thanh lọc
+        // Nút Thêm tổ và Xóa tổ nhanh ngay trên thanh lọc (Hàng 3 riêng biệt)
         filterHtml += `
-            <div class="group-filter-chip" onclick="window.addNewFixedGroup()" title="Thêm tổ mới" style="background:#f0fdf4; color:#16a34a; border-color:#bbf7d0;">
-                <i class="fas fa-plus"></i> Thêm tổ
-            </div>
-            <div class="group-filter-chip" onclick="window.openDeleteFixedGroupModal()" title="Mở danh sách xóa các tổ tạo nhầm" style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;">
-                <i class="fas fa-trash-alt"></i> Xóa tổ...
+            <div class="group-filter-actions">
+                <div class="group-filter-chip chip-action-add" onclick="window.addNewFixedGroup()" title="Thêm tổ mới">
+                    <i class="fas fa-plus"></i> <span>Thêm tổ</span>
+                </div>
+                <div class="group-filter-chip chip-action-del" onclick="window.openDeleteFixedGroupModal()" title="Mở danh sách xóa các tổ tạo nhầm">
+                    <i class="fas fa-trash-alt"></i> <span>Xóa tổ...</span>
+                </div>
             </div>
         `;
 
@@ -1204,6 +1571,20 @@ window.renderStudents = function() {
             }
         }
 
+        // Nhãn tài khoản cán bộ lớp (RBAC App)
+        let accountBadge = '';
+        if (stu.accountRole && stu.accountRole !== 'none') {
+            if (stu.accountRole === 'class_leader') {
+                accountBadge = `<span class="group-tag" style="background:#dcfce7; color:#15803d; border-color:#bbf7d0;" title="${stu.accountEmail || 'Chưa gắn email'}"><i class="fas fa-user-shield"></i> App: Lớp trưởng</span>`;
+            } else if (stu.accountRole === 'class_vice') {
+                accountBadge = `<span class="group-tag" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd;" title="${stu.accountEmail || 'Chưa gắn email'}"><i class="fas fa-medal"></i> App: Lớp phó</span>`;
+            } else if (stu.accountRole === 'group_leader') {
+                const gNum = stu.fixedGroup || 1;
+                accountBadge = `<span class="group-tag" style="background:#fef3c7; color:#b45309; border-color:#fde68a;" title="${stu.accountEmail || 'Chưa gắn email'}"><i class="fas fa-users-cog"></i> App: Tổ trưởng T${gNum}</span>`;
+            }
+        }
+
+        const isTeacher = window.isTeacher();
         let groupSelectOptions = `<option value="0" ${(!stu.fixedGroup || stu.fixedGroup == 0) ? 'selected' : ''}>-- Chưa phân tổ --</option>`;
         if (appData.fixedGroups && Array.isArray(appData.fixedGroups)) {
             appData.fixedGroups.forEach(g => {
@@ -1211,39 +1592,52 @@ window.renderStudents = function() {
             });
         }
 
+        const transferDisabled = isTeacher ? '' : 'disabled style="background:#f1f5f9; cursor:not-allowed;"';
+        const teacherActionBtns = isTeacher ? `
+            <button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})" title="Chỉnh sửa hồ sơ"><i class="fas fa-pen"></i></button>
+            <button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})" title="Xóa học sinh"><i class="fas fa-trash"></i></button>
+        ` : '';
+
         list.innerHTML += `
             <div class="list-item">
                 <div class="list-item-info">
-                    <div>
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
                         <strong>${index + 1}. ${stu.name}</strong> 
                         ${groupBadge}
+                        ${accountBadge}
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px; margin: 4px 0;">
                         <span style="font-size: 0.78rem; font-weight: 700; color: #64748b;">Tổ:</span>
-                        <select onchange="window.transferStudentToGroup(${stu.id}, this.value, this)" style="font-size: 0.8rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: var(--text-main); outline: none;">
+                        <select onchange="window.transferStudentToGroup(${stu.id}, this.value, this)" ${transferDisabled} style="font-size: 0.8rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: var(--text-main); outline: none;">
                             ${groupSelectOptions}
                         </select>
                     </div>
-                    <small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Chưa có SĐT'}</small>
+                    <small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Chưa có SĐT'}${stu.accountEmail ? ' • <i class="fas fa-envelope"></i> ' + stu.accountEmail : ''}</small>
                 </div>
                 <div class="list-item-actions">
                     ${aiBtn}
                     ${zaloBtn}
                     <button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button>
-                    <button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button>
-                    <button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button>
+                    ${teacherActionBtns}
                 </div>
             </div>`; 
     });
 };
 
 window.openAddStudentModal = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền thêm học sinh mới!", "error");
+        return;
+    }
     document.getElementById('stu-id').value = ''; 
     document.getElementById('stu-name').value = ''; 
     document.getElementById('stu-gender').value = 'Nam'; 
     document.getElementById('stu-dob').value = ''; 
     document.getElementById('stu-phone').value = ''; 
     document.getElementById('stu-role').value = 'member';
+    if (document.getElementById('stu-account-email')) document.getElementById('stu-account-email').value = '';
+    if (document.getElementById('stu-account-role')) document.getElementById('stu-account-role').value = 'none';
+
     const grpSelect = document.getElementById('stu-group');
     if (grpSelect) {
         let opts = '<option value="0">-- Chưa phân tổ --</option>';
@@ -1259,12 +1653,22 @@ window.openAddStudentModal = function() {
 };
 
 window.saveStudent = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền lưu thông tin học sinh!", "error");
+        return;
+    }
+
     const id = document.getElementById('stu-id').value; 
     const name = document.getElementById('stu-name').value;
     if(!name) return window.showToast("Vui lòng nhập họ tên học sinh!", "error");
 
     const fixedGroup = parseInt(document.getElementById('stu-group').value) || 0;
     const fixedRole = document.getElementById('stu-role').value || 'member';
+
+    const accountEmailInput = document.getElementById('stu-account-email');
+    const accountRoleInput = document.getElementById('stu-account-role');
+    const accountEmail = accountEmailInput ? accountEmailInput.value.trim().toLowerCase() : '';
+    const accountRole = accountRoleInput ? accountRoleInput.value : 'none';
 
     if(id) { 
         const existingStu = appData.students.find(s => s.id == id);
@@ -1293,7 +1697,9 @@ window.saveStudent = function() {
         dob: document.getElementById('stu-dob').value, 
         phone: document.getElementById('stu-phone').value,
         fixedGroup: fixedGroup,
-        fixedRole: fixedGroup ? fixedRole : 'member'
+        fixedRole: fixedGroup ? fixedRole : 'member',
+        accountEmail: accountEmail,
+        accountRole: accountRole
     };
 
     if(id) { 
@@ -1334,6 +1740,19 @@ window.saveStudent = function() {
         }
     }
 
+    // Đồng bộ index ủy quyền Firestore cho cán bộ lớp nếu có tài khoản
+    if (accountEmail && currentUser) {
+        try {
+            setDoc(doc(firestoreDb, "CanBoLop", accountEmail), {
+                teacherUid: currentUser.uid,
+                role: accountRole,
+                studentId: obj.id,
+                studentName: obj.name,
+                fixedGroup: obj.fixedGroup || null
+            }).catch(e => console.warn("Lỗi sync CanBoLop:", e));
+        } catch(e) {}
+    }
+
     window.saveData(); 
     window.renderStudents(); 
     if (currentStudentTab === 'fixed') window.renderFixedGroups();
@@ -1341,6 +1760,10 @@ window.saveStudent = function() {
 };
 
 window.editStudent = function(id) { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền chỉnh sửa hồ sơ học sinh!", "error");
+        return;
+    }
     const stu = appData.students.find(s => s.id === id); 
     if(stu) { 
         document.getElementById('stu-id').value = stu.id; 
@@ -1353,6 +1776,13 @@ window.editStudent = function(id) {
         } 
         document.getElementById('stu-dob').value = fDob; 
         document.getElementById('stu-phone').value = stu.phone || ''; 
+
+        if (document.getElementById('stu-account-email')) {
+            document.getElementById('stu-account-email').value = stu.accountEmail || '';
+        }
+        if (document.getElementById('stu-account-role')) {
+            document.getElementById('stu-account-role').value = stu.accountRole || 'none';
+        }
 
         // Nạp danh sách tổ vào select
         const grpSelect = document.getElementById('stu-group');
@@ -1377,6 +1807,10 @@ window.editStudent = function(id) {
 };
 
 window.deleteStudent = function(id) { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa học sinh!", "error");
+        return;
+    }
     if(confirm("Xác nhận xóa học sinh này?")) { 
         appData.students = appData.students.filter(s => s.id !== id); 
         window.saveData(); 
@@ -1517,6 +1951,13 @@ window.renderFixedGroups = function() {
 
 // Chuyển một học sinh sang tổ khác (Áp dụng cho cả Chọn từ danh sách và Modal)
 window.transferStudentToGroup = function(studentId, targetGroupId, selectEl = null) {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền chuyển tổ cho học sinh!", "error");
+        const curStu = (appData.students || []).find(s => s.id == studentId);
+        if (selectEl && curStu) selectEl.value = String(curStu.fixedGroup || 0);
+        return false;
+    }
+
     const stu = appData.students.find(s => s.id == studentId);
     if (!stu) return false;
 
@@ -1564,6 +2005,10 @@ window.transferStudentToGroup = function(studentId, targetGroupId, selectEl = nu
 
 // Tạo tổ mới
 window.addNewFixedGroup = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền tạo tổ mới!", "error");
+        return;
+    }
     if (!appData.fixedGroups) appData.fixedGroups = [];
     const newId = appData.fixedGroups.length > 0 ? Math.max(...appData.fixedGroups.map(g => g.id)) + 1 : 1;
     const newName = `Tổ ${newId}`;
@@ -1581,6 +2026,10 @@ window.addNewFixedGroup = function() {
 
 // Xóa tổ (từ thẻ tổ)
 window.deleteFixedGroup = function(groupId) {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa tổ!", "error");
+        return;
+    }
     const grp = (appData.fixedGroups || []).find(g => g.id == groupId);
     const grpName = grp ? grp.name : `Tổ ${groupId}`;
     const members = (appData.students || []).filter(s => s.fixedGroup == groupId);
@@ -1616,6 +2065,10 @@ window.deleteFixedGroup = function(groupId) {
 
 // ================= MODAL XÓA TỔ CỐ ĐỊNH =================
 window.openDeleteFixedGroupModal = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền mở quản lý xóa tổ!", "error");
+        return;
+    }
     if (!appData.fixedGroups || appData.fixedGroups.length === 0) {
         window.showToast("Hiện tại lớp chưa có tổ nào để xóa!", "warning");
         return;
@@ -1625,6 +2078,10 @@ window.openDeleteFixedGroupModal = function() {
 };
 
 window.deleteEmptyFixedGroups = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa tổ trống!", "error");
+        return;
+    }
     if (!appData.fixedGroups || appData.fixedGroups.length === 0) return;
     const emptyGroups = appData.fixedGroups.filter(g => {
         const count = (appData.students || []).filter(s => s.fixedGroup == g.id).length;
@@ -2325,38 +2782,190 @@ window.processParsedData = function() {
     document.getElementById('btn-confirm-import').disabled = parsedStudents.length === 0; document.getElementById('import-warnings').innerHTML = dupCount > 0 ? `<div style="color:var(--warning); font-size:0.85rem; margin-bottom:10px;">⚠️ Có ${dupCount} HS trùng tên sẽ được cộng dồn.</div>` : '';
 }
 
-window.confirmImport = function() { let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "" }); c++; }); window.saveData(); window.renderStudents(); window.closeModal('modal-import-excel'); window.showToast(`Đã nhập ${c} HS!`); }
-window.exportExcel = function() { if(appData.students.length === 0) return window.showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); window.showToast("Đã xuất Excel!"); }
+window.confirmImport = function() { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền nhập dữ liệu từ Excel!", "error");
+        return;
+    }
+    let c = 0; parsedStudents.forEach(stu => { appData.students.push({ id: Date.now() + c, name: stu.name, gender: stu.gender, dob: stu.dob, phone: stu.phone, note: "", accountRole: 'none', accountEmail: '' }); c++; }); window.saveData(); window.renderStudents(); window.closeModal('modal-import-excel'); window.showToast(`Đã nhập ${c} HS!`); 
+}
+window.exportExcel = function() { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xuất dữ liệu Excel!", "error");
+        return;
+    }
+    if(appData.students.length === 0) return window.showToast("Lớp trống!", "error"); let ws_data = [["STT", "Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]; appData.students.forEach((stu, i) => { ws_data.push([i+1, stu.name, stu.dob||"", stu.gender||"", stu.phone||""]); }); XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet(ws_data), "DS"), `DS_Lop.xlsx`); window.showToast("Đã xuất Excel!"); 
+}
 window.downloadTemplate = function() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.aoa_to_sheet([["Họ và tên", "Ngày sinh", "Giới tính", "Số điện thoại"]]), "Mau"), `File_Mau.xlsx`); window.showToast("Đã tải!"); }
 
 window.renderAttendance = function() {
-    const date = document.getElementById('attendance-date').value; const list = document.getElementById('attendance-list'); list.innerHTML = '';
-    if(!appData.attendance[date]) { appData.attendance[date] = {}; appData.students.forEach(s => appData.attendance[date][s.id] = 'present'); }
-    let stats = { present: 0, excused: 0, unexcused: 0 }; const records = appData.attendance[date];
+    const date = document.getElementById('attendance-date').value; 
+    const list = document.getElementById('attendance-list'); 
+    list.innerHTML = '';
+    
+    if(!appData.attendance[date]) { 
+        appData.attendance[date] = {}; 
+        appData.students.forEach(s => appData.attendance[date][s.id] = 'present'); 
+    }
+    
+    let stats = { present: 0, excused: 0, unexcused: 0 }; 
+    const records = appData.attendance[date];
+
+    // Banner hướng dẫn nếu là Cán bộ lớp / Tổ trưởng
+    if (window.isGroupLeader()) {
+        const myG = window.authRole.fixedGroup || 1;
+        list.innerHTML += `
+            <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:0.83rem; color:#b45309; font-weight:700; display:flex; align-items:center; gap:8px;">
+                <i class="fas fa-shield-alt" style="font-size:1.1rem;"></i>
+                <span>Bạn đang đăng nhập vai trò: <b>Tổ trưởng Tổ ${myG}</b>. Bạn chỉ có quyền điểm danh học sinh thuộc Tổ ${myG}.</span>
+            </div>`;
+    } else if (window.isClassLeader() || window.isClassVice()) {
+        const titleRole = window.isClassLeader() ? "Lớp trưởng" : "Lớp phó";
+        list.innerHTML += `
+            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:0.83rem; color:#047857; font-weight:700; display:flex; align-items:center; gap:8px;">
+                <i class="fas fa-user-check" style="font-size:1.1rem;"></i>
+                <span>Bạn đang đăng nhập vai trò: <b>${titleRole}</b>. Bạn có quyền điểm danh toàn bộ học sinh trong lớp.</span>
+            </div>`;
+    }
+
     appData.students.forEach((stu, index) => {
-        const status = records[stu.id] || 'present'; stats[status]++;
-        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong></div><div class="attendance-opts"><button class="att-btn ${status === 'present' ? 'active' : ''}" data-status="present" onclick="setAtt(this, ${stu.id}, 'present')"><i class="fas fa-check"></i></button><button class="att-btn ${status === 'excused' ? 'active' : ''}" data-status="excused" onclick="setAtt(this, ${stu.id}, 'excused')"><i class="fas fa-exclamation"></i></button><button class="att-btn ${status === 'unexcused' ? 'active' : ''}" data-status="unexcused" onclick="setAtt(this, ${stu.id}, 'unexcused')"><i class="fas fa-times"></i></button></div></div>`;
+        const status = records[stu.id] || 'present'; 
+        stats[status]++;
+
+        const canMark = window.hasPermission('attendance:mark', stu);
+        const disabledStyle = canMark ? '' : 'opacity: 0.35; cursor: not-allowed;';
+        
+        let gInfo = '';
+        if (stu.fixedGroup && stu.fixedGroup != 0) {
+            const grp = (appData.fixedGroups || []).find(g => g.id == stu.fixedGroup);
+            gInfo = `<span style="font-size:0.75rem; color:#64748b; margin-left:6px;">(${grp ? grp.name : 'Tổ ' + stu.fixedGroup})</span>`;
+        }
+
+        const lockIcon = canMark ? '' : `<i class="fas fa-lock" style="font-size:0.75rem; color:#94a3b8; margin-left:6px;" title="Không thuộc phân quyền của bạn"></i>`;
+
+        list.innerHTML += `
+            <div class="list-item" style="align-items:center;">
+                <div class="list-item-info">
+                    <div style="display:flex; align-items:center;">
+                        <strong>${index + 1}. ${stu.name}</strong> 
+                        ${gInfo} 
+                        ${lockIcon}
+                    </div>
+                </div>
+                <div class="attendance-opts">
+                    <button class="att-btn ${status === 'present' ? 'active' : ''}" style="${disabledStyle}" data-status="present" onclick="setAtt(this, ${stu.id}, 'present')"><i class="fas fa-check"></i></button>
+                    <button class="att-btn ${status === 'excused' ? 'active' : ''}" style="${disabledStyle}" data-status="excused" onclick="setAtt(this, ${stu.id}, 'excused')"><i class="fas fa-exclamation"></i></button>
+                    <button class="att-btn ${status === 'unexcused' ? 'active' : ''}" style="${disabledStyle}" data-status="unexcused" onclick="setAtt(this, ${stu.id}, 'unexcused')"><i class="fas fa-times"></i></button>
+                </div>
+            </div>`;
     });
     document.getElementById('attendance-summary').innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Có mặt: ${stats.present}</span><span style="color:var(--warning)"><i class="fas fa-exclamation-circle"></i> Phép: ${stats.excused}</span><span style="color:var(--danger)"><i class="fas fa-times-circle"></i> K.Phép: ${stats.unexcused}</span>`;
 }
+
 window.setAtt = function(btn, stuId, status) {
-    const parent = btn.parentElement; parent.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
-    const date = document.getElementById('attendance-date').value; appData.attendance[date][stuId] = status;
-    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); if(tag) window.autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); }
+    const stu = (appData.students || []).find(s => s.id == stuId);
+    if (!window.hasPermission('attendance:mark', stu)) {
+        if (window.isGroupLeader()) {
+            window.showToast(`Từ chối: Bạn là Tổ trưởng Tổ ${window.authRole.fixedGroup}, không thể điểm danh học sinh Tổ khác!`, "error");
+        } else if (window.authRole.role === 'none') {
+            window.showToast("Từ chối: Tài khoản của bạn chưa được cấp quyền điểm danh!", "error");
+        } else {
+            window.showToast("Từ chối: Bạn không có quyền điểm danh học sinh này!", "error");
+        }
+        return;
+    }
+
+    const parent = btn.parentElement; 
+    parent.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active')); 
+    btn.classList.add('active');
+    
+    const date = document.getElementById('attendance-date').value; 
+    appData.attendance[date][stuId] = status;
+    
+    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { 
+        let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); 
+        if(tag) window.autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); 
+    }
     window.renderAttendance(); 
 }
-window.saveAttendance = function() { window.saveData(); window.showToast("✅ Đã lưu Điểm danh!"); window.switchView('view-home'); }
+
+window.saveAttendance = function() { 
+    if (!window.hasPermission('attendance:save')) {
+        window.showToast("Từ chối: Tài khoản của bạn không có quyền lưu điểm danh!", "error");
+        return;
+    }
+    window.saveData(); 
+    window.showToast("✅ Đã lưu Điểm danh!"); 
+    window.switchView('view-home'); 
+}
 
 let currentDiscStuId = null, currentBehaviorTab = 'negative';
 window.renderDisciplineStudents = function() {
-    const txt = document.getElementById('search-disc-student').value.toLowerCase(); const list = document.getElementById('discipline-student-list'); list.innerHTML = '';
-    let ptsMap = {}; appData.behaviorRecords.forEach(r => { ptsMap[r.studentId] = (ptsMap[r.studentId] || 0) + Number(r.snapshotPoints); });
+    const txt = document.getElementById('search-disc-student').value.toLowerCase(); 
+    const list = document.getElementById('discipline-student-list'); 
+    list.innerHTML = '';
+    
+    if (window.isGroupLeader()) {
+        const myG = window.authRole.fixedGroup || 1;
+        list.innerHTML += `
+            <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:0.83rem; color:#b45309; font-weight:700; display:flex; align-items:center; gap:8px;">
+                <i class="fas fa-shield-alt" style="font-size:1.1rem;"></i>
+                <span>Bạn đang đăng nhập: <b>Tổ trưởng Tổ ${myG}</b>. Bạn chỉ có quyền ghi nhận nề nếp cho thành viên Tổ ${myG}.</span>
+            </div>`;
+    }
+
+    let ptsMap = {}; 
+    appData.behaviorRecords.forEach(r => { ptsMap[r.studentId] = (ptsMap[r.studentId] || 0) + Number(r.snapshotPoints); });
+    
     appData.students.filter(s => s.name.toLowerCase().includes(txt)).forEach(stu => {
-        let pts = ptsMap[stu.id] || 0; let color = pts > 0 ? 'var(--success)' : (pts < 0 ? 'var(--danger)' : 'var(--text-muted)');
-        list.innerHTML += `<div class="list-item" style="cursor:pointer;" onclick="openRecordBehavior(${stu.id}, '${stu.name}')"><div class="list-item-info"><strong>${stu.name}</strong></div><div><span style="color:${color}; font-weight:800; font-size:1.1rem;">${pts > 0 ? '+'+pts : pts} đ</span> <i class="fas fa-chevron-right text-muted ml-2"></i></div></div>`;
+        let pts = ptsMap[stu.id] || 0; 
+        let color = pts > 0 ? 'var(--success)' : (pts < 0 ? 'var(--danger)' : 'var(--text-muted)');
+        const canRecord = window.hasPermission('behavior:record', stu);
+
+        let gInfo = '';
+        if (stu.fixedGroup && stu.fixedGroup != 0) {
+            const grp = (appData.fixedGroups || []).find(g => g.id == stu.fixedGroup);
+            gInfo = `<span style="font-size:0.75rem; color:#64748b; margin-left:6px;">(${grp ? grp.name : 'Tổ ' + stu.fixedGroup})</span>`;
+        }
+
+        const lockBadge = canRecord ? '' : `<span style="font-size:0.7rem; background:#f1f5f9; color:#94a3b8; padding:2px 6px; border-radius:4px; margin-left:6px;"><i class="fas fa-lock"></i> Khóa</span>`;
+        const rowOpacity = canRecord ? '1' : '0.55';
+
+        list.innerHTML += `
+            <div class="list-item" style="cursor:pointer; opacity:${rowOpacity};" onclick="openRecordBehavior(${stu.id}, '${stu.name.replace(/'/g, "\\'")}')">
+                <div class="list-item-info">
+                    <div style="display:flex; align-items:center;">
+                        <strong>${stu.name}</strong> 
+                        ${gInfo} 
+                        ${lockBadge}
+                    </div>
+                </div>
+                <div>
+                    <span style="color:${color}; font-weight:800; font-size:1.1rem;">${pts > 0 ? '+'+pts : pts} đ</span> 
+                    <i class="fas fa-chevron-right text-muted ml-2"></i>
+                </div>
+            </div>`;
     });
 }
-window.openRecordBehavior = function(stuId, stuName) { currentDiscStuId = stuId; document.getElementById('behavior-target-name').innerText = `Đang chọn: ${stuName}`; window.renderQuickTags(); window.openModal('modal-record-behavior'); }
+
+window.openRecordBehavior = function(stuId, stuName) { 
+    const stu = (appData.students || []).find(s => s.id == stuId);
+    if (!window.hasPermission('behavior:record', stu)) {
+        if (window.isGroupLeader()) {
+            window.showToast(`Từ chối: Bạn là Tổ trưởng Tổ ${window.authRole.fixedGroup}, không thể ghi nhận nề nếp cho học sinh Tổ khác!`, "error");
+        } else if (window.authRole.role === 'none') {
+            window.showToast("Từ chối: Tài khoản của bạn chưa được cấp quyền ghi nhận nề nếp!", "error");
+        } else {
+            window.showToast("Từ chối thao tác: Không đủ quyền hạn!", "error");
+        }
+        return;
+    }
+    currentDiscStuId = stuId; 
+    document.getElementById('behavior-target-name').innerText = `Đang chọn: ${stuName}`; 
+    window.renderQuickTags(); 
+    window.openModal('modal-record-behavior'); 
+}
+
 window.switchBehaviorTab = function(type, element) { currentBehaviorTab = type; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); element.classList.add('active'); window.renderQuickTags(); }
 window.renderQuickTags = function() {
     const grid = document.getElementById('quick-tag-list'); grid.innerHTML = '';
@@ -2364,11 +2973,18 @@ window.renderQuickTags = function() {
 }
 window.confirmTagRecord = function(tagId) { const tag = appData.behaviorTags.find(t => t.id === tagId); if(!tag) return; document.getElementById('conf-tag-id').value = tag.id; document.getElementById('conf-stu-id').value = currentDiscStuId; document.getElementById('conf-tag-display').innerHTML = `<strong>Hành vi:</strong> ${tag.name} (Gốc: ${tag.currentPoints})`; document.getElementById('conf-points').value = tag.currentPoints; document.getElementById('conf-note').value = ''; window.openModal('modal-confirm-tag'); }
 window.submitBehaviorRecord = function() {
+    const stuId = parseInt(document.getElementById('conf-stu-id').value);
+    const stu = (appData.students || []).find(s => s.id == stuId);
+    if (!window.hasPermission('behavior:record', stu)) {
+        window.showToast("Từ chối: Bạn không có quyền ghi nhận nề nếp cho học sinh này!", "error");
+        return;
+    }
     const tag = appData.behaviorTags.find(t => t.id === document.getElementById('conf-tag-id').value);
-    appData.behaviorRecords.push({ id: Date.now(), studentId: parseInt(document.getElementById('conf-stu-id').value), tagId: tag.id, snapshotName: tag.name, snapshotPoints: parseInt(document.getElementById('conf-points').value), type: tag.type, date: getTodayStr(), time: formatDateTime(), note: document.getElementById('conf-note').value });
+    appData.behaviorRecords.push({ id: Date.now(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: parseInt(document.getElementById('conf-points').value), type: tag.type, date: getTodayStr(), time: formatDateTime(), note: document.getElementById('conf-note').value });
     window.saveData(); window.closeModal('modal-confirm-tag'); window.closeModal('modal-record-behavior'); window.showToast(`✅ Đã ghi nhận: ${tag.name}`); window.renderDisciplineStudents(); 
 }
 window.autoCreateBehavior = function(stuId, tag, date, note) { if(!appData.behaviorRecords.find(r => r.studentId === stuId && r.date === date && r.tagId === tag.id && r.note.includes("Hệ thống"))) { appData.behaviorRecords.push({ id: Date.now() + Math.random(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: tag.currentPoints, type: tag.type, date: date, time: formatDateTime(), note: note }); window.saveData(); } }
+
 window.renderManageTags = function() {
     const list = document.getElementById('manage-tag-list'); list.innerHTML = '';
     appData.behaviorTags.forEach(t => {
@@ -2376,9 +2992,263 @@ window.renderManageTags = function() {
         list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${t.name}</strong><small>Điểm: <b>${t.currentPoints}</b> | ${t.type==='negative'?'Trừ':'Cộng'}</small></div><div class="list-item-actions"><button class="btn-outline-action" style="color:${toggleClr}" onclick="toggleTag('${t.id}')"><i class="fas ${t.enabled ? 'fa-eye' : 'fa-eye-slash'}"></i></button>${actionBtn}</div></div>`;
     });
 }
-window.toggleTag = function(id) { const t = appData.behaviorTags.find(x => x.id === id); if(t) { t.enabled = !t.enabled; window.saveData(); window.renderManageTags(); } }
-window.deleteTag = function(id) { if(confirm("Xóa hành vi này?")) { appData.behaviorTags = appData.behaviorTags.filter(x => x.id !== id); window.saveData(); window.renderManageTags(); } }
-window.saveTag = function() { const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return window.showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); window.saveData(); window.renderManageTags(); window.closeModal('modal-add-tag'); window.showToast("Đã thêm!"); }
+window.toggleTag = function(id) { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền bật/tắt hành vi nề nếp!", "error");
+        return;
+    }
+    const t = appData.behaviorTags.find(x => x.id === id); if(t) { t.enabled = !t.enabled; window.saveData(); window.renderManageTags(); } 
+}
+window.deleteTag = function(id) { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền xóa hành vi nề nếp!", "error");
+        return;
+    }
+    if(confirm("Xóa hành vi này?")) { appData.behaviorTags = appData.behaviorTags.filter(x => x.id !== id); window.saveData(); window.renderManageTags(); } 
+}
+window.saveTag = function() { 
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền tạo hành vi nề nếp!", "error");
+        return;
+    }
+    const name = document.getElementById('tag-name').value; const type = document.getElementById('tag-type').value; const pts = parseInt(document.getElementById('tag-points').value) || (type==='negative'? -1:1); if(!name) return window.showToast("Nhập tên!", "error"); appData.behaviorTags.push({ id: "cus_" + Date.now(), name: name, type: type, defaultPoints: pts, currentPoints: pts, isSystem: false, enabled: true, icon: type==='negative' ? 'fa-exclamation' : 'fa-star', color: type==='negative' ? 'qt-negative' : 'qt-positive' }); window.saveData(); window.renderManageTags(); window.closeModal('modal-add-tag'); window.showToast("Đã thêm!"); 
+}
+
+// ================= GIAO DIỆN QUẢN LÝ PHÂN QUYỀN TÀI KHOẢN (RBAC) =================
+window.openAccountPermissionsModal = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền mở quản lý phân quyền tài khoản!", "error");
+        return;
+    }
+
+    const selectEl = document.getElementById('perm-student-select');
+    if (!selectEl) return;
+
+    if (!appData.students || appData.students.length === 0) {
+        window.showToast("Lớp chưa có học sinh nào. Hãy thêm học sinh trước khi phân quyền!", "warning");
+        return;
+    }
+
+    let opts = '';
+    appData.students.forEach(s => {
+        let gName = '';
+        if (s.fixedGroup && s.fixedGroup != 0) {
+            const gObj = (appData.fixedGroups || []).find(g => g.id == s.fixedGroup);
+            gName = gObj ? ` (${gObj.name})` : ` (Tổ ${s.fixedGroup})`;
+        }
+        let roleBadge = '';
+        if (s.accountRole === 'class_leader') roleBadge = ' [Lớp trưởng]';
+        else if (s.accountRole === 'class_vice') roleBadge = ' [Lớp phó]';
+        else if (s.accountRole === 'group_leader') roleBadge = ' [Tổ trưởng]';
+
+        opts += `<option value="${s.id}">${s.name}${gName}${roleBadge}</option>`;
+    });
+
+    selectEl.innerHTML = opts;
+    
+    // Nạp học sinh đầu tiên
+    const firstStuId = appData.students[0].id;
+    selectEl.value = firstStuId;
+    window.onSelectPermStudent(firstStuId);
+    window.renderAssignedAccountsList();
+    window.openModal('modal-account-permissions');
+};
+
+window.onSelectPermStudent = function(studentId) {
+    const stu = (appData.students || []).find(s => s.id == studentId);
+    if (!stu) return;
+
+    const emailEl = document.getElementById('perm-account-email');
+    const roleEl = document.getElementById('perm-role-select');
+    
+    if (emailEl) emailEl.value = stu.accountEmail || '';
+    if (roleEl) roleEl.value = stu.accountRole || 'none';
+
+    window.onPermRoleChanged();
+};
+
+window.onPermRoleChanged = function() {
+    const roleEl = document.getElementById('perm-role-select');
+    const stuSelectEl = document.getElementById('perm-student-select');
+    const descEl = document.getElementById('perm-role-desc');
+    if (!roleEl || !descEl) return;
+
+    const role = roleEl.value;
+    const stuId = stuSelectEl ? stuSelectEl.value : null;
+    const stu = stuId ? (appData.students || []).find(s => s.id == stuId) : null;
+
+    let descText = "";
+    if (role === 'teacher') {
+        descText = "👑 <b>Giáo viên chủ nhiệm:</b> Toàn quyền quản trị, sửa Cài đặt, PPCT, TKB, thêm xóa học sinh và phân quyền cán bộ lớp.";
+    } else if (role === 'class_leader') {
+        descText = "⭐ <b>Lớp trưởng:</b> Được điểm danh và ghi nhận nề nếp cho <b>toàn bộ học sinh trong lớp</b>. KHÔNG được sửa Cài đặt, PPCT, TKB, chia tổ hay xóa học sinh.";
+    } else if (role === 'class_vice') {
+        descText = "🎖️ <b>Lớp phó:</b> Được điểm danh và ghi nhận nề nếp cho <b>toàn bộ học sinh trong lớp</b>. KHÔNG được sửa Cài đặt, PPCT, TKB hay xóa học sinh.";
+    } else if (role === 'group_leader') {
+        const grpId = (stu && stu.fixedGroup) ? stu.fixedGroup : 0;
+        const grpObj = (appData.fixedGroups || []).find(g => g.id == grpId);
+        const grpName = grpObj ? grpObj.name : (grpId ? `Tổ ${grpId}` : 'Chưa phân tổ');
+        
+        if (grpId === 0) {
+            descText = `⚠️ <b>Tổ trưởng:</b> Em <b>${stu ? stu.name : 'này'}</b> hiện <b>chưa được phân vào tổ cố định nào</b>. Vui lòng xếp tổ cho em trước để em có thể điểm danh các bạn trong tổ!`;
+        } else {
+            descText = `👥 <b>Tổ trưởng:</b> Chỉ có quyền điểm danh và ghi nhận nề nếp cho thành viên trong <b>${grpName}</b>. Không thao tác được học sinh tổ khác.`;
+        }
+    } else {
+        descText = "ℹ️ <b>Chưa cấp quyền:</b> Tài khoản học sinh bình thường, không có quyền ghi điểm danh hay nề nếp trên hệ thống.";
+    }
+
+    descEl.innerHTML = descText;
+};
+
+window.saveStudentPermission = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền lưu phân quyền!", "error");
+        return;
+    }
+
+    const stuSelectEl = document.getElementById('perm-student-select');
+    const emailEl = document.getElementById('perm-account-email');
+    const roleEl = document.getElementById('perm-role-select');
+
+    if (!stuSelectEl || !emailEl || !roleEl) return;
+
+    const stuId = stuSelectEl.value;
+    const stu = (appData.students || []).find(s => s.id == stuId);
+    if (!stu) return window.showToast("Chưa chọn học sinh!", "error");
+
+    const email = emailEl.value.trim().toLowerCase();
+    const role = roleEl.value;
+
+    if (role !== 'none' && !email) {
+        window.showToast("Vui lòng nhập Email Google đăng nhập của học sinh để cấp quyền!", "error");
+        emailEl.focus();
+        return;
+    }
+
+    stu.accountEmail = email;
+    stu.accountRole = role;
+
+    // Đồng bộ Firestore
+    if (currentUser) {
+        if (email) {
+            try {
+                setDoc(doc(firestoreDb, "CanBoLop", email), {
+                    teacherUid: currentUser.uid,
+                    role: role,
+                    studentId: stu.id,
+                    studentName: stu.name,
+                    fixedGroup: stu.fixedGroup || null
+                }).catch(e => console.warn("Lỗi đồng bộ CanBoLop:", e));
+            } catch(e) {}
+        }
+    }
+
+    window.saveData(true);
+    window.renderStudents();
+    window.renderAssignedAccountsList();
+    
+    let roleText = "Học sinh";
+    if (role === 'class_leader') roleText = "Lớp trưởng";
+    else if (role === 'class_vice') roleText = "Lớp phó";
+    else if (role === 'group_leader') roleText = `Tổ trưởng Tổ ${stu.fixedGroup || 1}`;
+
+    window.showToast(`✅ Đã phân quyền cho em ${stu.name}: [${roleText}]!`);
+};
+
+window.revokeStudentPermission = function() {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền gỡ phân quyền!", "error");
+        return;
+    }
+
+    const stuSelectEl = document.getElementById('perm-student-select');
+    if (!stuSelectEl) return;
+    const stuId = stuSelectEl.value;
+    window.revokeStudentPermissionById(stuId);
+};
+
+window.revokeStudentPermissionById = function(stuId) {
+    if (!window.isTeacher()) {
+        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền gỡ phân quyền!", "error");
+        return;
+    }
+
+    const stu = (appData.students || []).find(s => s.id == stuId);
+    if (!stu) return;
+
+    if (confirm(`Bạn có chắc chắn muốn gỡ quyền cán bộ lớp của học sinh ${stu.name}?`)) {
+        const oldEmail = stu.accountEmail;
+        stu.accountRole = 'none';
+        
+        if (oldEmail && currentUser) {
+            try {
+                deleteDoc(doc(firestoreDb, "CanBoLop", oldEmail.toLowerCase().trim())).catch(e => {});
+            } catch(e) {}
+        }
+
+        const emailEl = document.getElementById('perm-account-email');
+        const roleEl = document.getElementById('perm-role-select');
+        const selectEl = document.getElementById('perm-student-select');
+
+        if (selectEl && selectEl.value == stuId) {
+            if (roleEl) roleEl.value = 'none';
+            window.onPermRoleChanged();
+        }
+
+        window.saveData(true);
+        window.renderStudents();
+        window.renderAssignedAccountsList();
+        window.showToast(`Đã gỡ quyền cán bộ lớp của em ${stu.name}!`);
+    }
+};
+
+window.renderAssignedAccountsList = function() {
+    const container = document.getElementById('perm-assigned-list');
+    if (!container) return;
+
+    const assigned = (appData.students || []).filter(s => s.accountRole && s.accountRole !== 'none');
+    if (assigned.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:18px; color:#94a3b8; font-size:0.88rem; font-style:italic;">Chưa có cán bộ lớp nào được cấp quyền tài khoản.</div>`;
+        return;
+    }
+
+    let html = '';
+    assigned.forEach(stu => {
+        let badgeBg = '#f1f5f9';
+        let badgeColor = '#475569';
+        let roleName = 'Học sinh';
+
+        if (stu.accountRole === 'class_leader') {
+            badgeBg = '#dcfce7'; badgeColor = '#15803d'; roleName = 'Lớp trưởng';
+        } else if (stu.accountRole === 'class_vice') {
+            badgeBg = '#e0f2fe'; badgeColor = '#0369a1'; roleName = 'Lớp phó';
+        } else if (stu.accountRole === 'group_leader') {
+            badgeBg = '#fef3c7'; badgeColor = '#b45309'; roleName = `Tổ trưởng Tổ ${stu.fixedGroup || 1}`;
+        }
+
+        let gInfo = stu.fixedGroup ? ` (Tổ ${stu.fixedGroup})` : '';
+
+        html += `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                <div>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.92rem;">
+                        ${stu.name}${gInfo}
+                        <span style="font-size:0.75rem; font-weight:700; background:${badgeBg}; color:${badgeColor}; padding:2px 8px; border-radius:6px; margin-left:6px;">${roleName}</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                        <i class="fas fa-envelope"></i> ${stu.accountEmail || 'Chưa gắn email'}
+                    </div>
+                </div>
+                <button class="btn-outline-action text-danger" onclick="window.revokeStudentPermissionById(${stu.id})" title="Gỡ phân quyền" style="font-size:0.8rem; padding:4px 8px; border-radius:6px; border-color:#fee2e2;">
+                    <i class="fas fa-user-times"></i> Gỡ
+                </button>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+};
 
 window.applyNotifyTemplate = function() { const val = document.getElementById('notify-template').value; const t = document.getElementById('notify-title'); const c = document.getElementById('notify-content'); if(val === 'T1') { t.value = "Thông báo khoản thu"; c.value = "Kính gửi quý PH,\nGVCN thông báo các khoản phí tháng này gồm: ..."; } else if(val === 'T2') { t.value = "Mời họp phụ huynh"; c.value = "Kính mời quý PH dự họp đầu năm lúc 8h00 Chủ nhật tại lớp."; } else if(val === 'T3') { t.value = "Nhắc nhở nề nếp"; c.value = "Xin quý PH nhắc các con mặc đúng đồng phục khi đến trường.\nXin cảm ơn!"; } else { t.value = ""; c.value = ""; } }
 
