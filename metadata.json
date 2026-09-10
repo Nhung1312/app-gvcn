@@ -1,0 +1,8 @@
+{
+  "name": "App GVCN - Trợ Lý Giáo Viên Chủ Nhiệm",
+  "description": "Ứng dụng trợ lý đắc lực cho Giáo viên Chủ nhiệm: quản lý học sinh, điểm danh, nề nếp thi đua, sổ báo giảng và soạn thông báo thông minh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

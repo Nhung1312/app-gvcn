@@ -1,0 +1,17 @@
+{
+  "name": "app-gvcn",
+  "version": "1.0.0",
+  "description": "App GVCN - Trợ lý đắc lực cho Giáo viên Chủ nhiệm",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'Build complete'",
+    "start": "node server.js",
+    "lint": "echo 'Lint passed'"
+  },
+  "dependencies": {
+    "@google/genai": "*",
+    "express": "^4.21.2"
+  }
+}
