@@ -219,10 +219,114 @@
 
             <!-- QUẢN LÝ HỌC SINH -->
             <section id="view-students" class="view">
-                <div class="top-bar"><div class="top-bar-title"><h2>👥 Lớp học</h2></div><button class="btn-primary" onclick="openModal('modal-add-student')"><i class="fas fa-plus"></i></button></div>
-                <div class="excel-actions"><button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button><button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button><button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button></div>
-                <div class="search-bar mt-15"><i class="fas fa-search"></i><input type="text" id="search-student" placeholder="Tìm tên..." onkeyup="renderStudents()"></div>
-                <div id="student-list" class="list-container"></div>
+                <div class="top-bar">
+                    <div class="top-bar-title"><h2>👥 Lớp học</h2></div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-primary" onclick="openAddStudentModal()" title="Thêm học sinh"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <!-- SUB-TABS: DANH SÁCH / TỔ CỐ ĐỊNH / NHÓM HOẠT ĐỘNG -->
+                <div class="sub-nav-tabs">
+                    <div class="sub-tab-item active" id="tab-btn-students-all" onclick="switchStudentTab('all')"><i class="fas fa-user-graduate"></i> Danh sách</div>
+                    <div class="sub-tab-item" id="tab-btn-students-fixed" onclick="switchStudentTab('fixed')"><i class="fas fa-sitemap"></i> Tổ cố định</div>
+                    <div class="sub-tab-item" id="tab-btn-students-activity" onclick="switchStudentTab('activity')"><i class="fas fa-bolt"></i> Nhóm hoạt động</div>
+                </div>
+
+                <!-- TAB 1: TẤT CẢ HỌC SINH -->
+                <div id="subtab-content-all">
+                    <div class="excel-actions">
+                        <button class="btn-action-chip" onclick="openImportModal()"><i class="fas fa-file-import text-blue"></i> Nhập file</button>
+                        <button class="btn-action-chip" onclick="exportExcel()"><i class="fas fa-file-export text-green"></i> Xuất file</button>
+                        <button class="btn-action-chip" onclick="downloadTemplate()"><i class="fas fa-file-excel text-orange"></i> Mẫu</button>
+                    </div>
+
+                    <!-- BỘ LỌC THEO TỔ CỐ ĐỊNH -->
+                    <div class="group-filter-bar mt-15" id="student-group-filters">
+                        <button class="group-filter-chip active" onclick="filterStudentsByGroup('all', this)">Tất cả</button>
+                        <button class="group-filter-chip" onclick="filterStudentsByGroup(1, this)">Tổ 1</button>
+                        <button class="group-filter-chip" onclick="filterStudentsByGroup(2, this)">Tổ 2</button>
+                        <button class="group-filter-chip" onclick="filterStudentsByGroup(3, this)">Tổ 3</button>
+                        <button class="group-filter-chip" onclick="filterStudentsByGroup(4, this)">Tổ 4</button>
+                    </div>
+
+                    <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="search-student" placeholder="Tìm tên..." onkeyup="renderStudents()"></div>
+                    <div id="student-list" class="list-container"></div>
+                </div>
+
+                <!-- TAB 2: QUẢN LÝ TỔ CỐ ĐỊNH -->
+                <div id="subtab-content-fixed" style="display: none;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <button class="btn-primary" style="padding: 10px 16px; font-size: 0.88rem; font-weight: 700;" onclick="addNewFixedGroup()"><i class="fas fa-plus"></i> + Thêm tổ</button>
+                        <button class="btn-outline text-danger" style="padding: 10px 16px; font-size: 0.88rem; font-weight: 700; border-color: #fecaca; background: #fff5f5;" onclick="openDeleteFixedGroupModal()"><i class="fas fa-trash-alt"></i> Xóa tổ</button>
+                        <button class="btn-outline text-blue" style="flex: 1; min-width: 140px; font-size: 0.85rem;" onclick="openAutoGroupModal()"><i class="fas fa-magic"></i> Tự động chia tổ (Hỗ trợ)</button>
+                    </div>
+
+                    <div class="alert-item" style="background:#eff6ff; border-left-color:#0d6efd; margin-bottom: 15px;">
+                        <div class="alert-icon" style="background:#dbeafe; color:#0d6efd;"><i class="fas fa-info-circle"></i></div>
+                        <div class="alert-info">
+                            <strong>Tổ cố định của lớp</strong>
+                            <p>Phân bổ nề nếp lâu dài, bầu Tổ trưởng/Tổ phó và xếp hạng thi đua tuần/tháng.</p>
+                        </div>
+                    </div>
+
+                    <div id="fixed-groups-list"></div>
+                </div>
+
+                <!-- TAB 3: NHÓM HOẠT ĐỘNG LINH HOẠT TRONG GIỜ HỌC -->
+                <div id="subtab-content-activity" style="display: none;">
+                    <div style="background: white; border-radius: 18px; padding: 16px; border: 1px solid #f1f5f9; box-shadow: var(--shadow-sm); margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span style="font-weight: 800; font-size: 0.95rem; color: var(--primary);"><i class="fas fa-sliders-h"></i> Thiết lập chia nhóm</span>
+                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);" id="activity-student-count">0 HS</span>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label style="font-size: 0.8rem;">Cách chia</label>
+                                <select id="act-split-mode" onchange="updateActivitySplitLabel()" style="padding: 10px; font-size: 0.85rem;">
+                                    <option value="by_group_count" selected>Chia thành N nhóm</option>
+                                    <option value="by_member_count">Mỗi nhóm N học sinh</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label style="font-size: 0.8rem;" id="act-split-number-label">Số lượng nhóm</label>
+                                <input type="number" id="act-split-number" value="4" min="2" max="20" style="padding: 10px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label style="font-size: 0.8rem;">Tiêu chí phân chia</label>
+                                <select id="act-split-criteria" style="padding: 10px; font-size: 0.85rem;">
+                                    <option value="random" selected>🎲 Ngẫu nhiên tuyệt đối</option>
+                                    <option value="gender">⚖️ Cân bằng Nam - Nữ</option>
+                                    <option value="points">🌟 Phân bổ đều điểm nề nếp</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label style="font-size: 0.8rem;">Tên nhóm</label>
+                                <select id="act-group-naming" style="padding: 10px; font-size: 0.85rem;">
+                                    <option value="numbers" selected>Nhóm 1, 2, 3...</option>
+                                    <option value="cool">Phong cách (Tia chớp, Đại bàng...)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 5px;">
+                            <button class="btn-primary w-full" style="padding: 12px; font-size: 0.95rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark));" onclick="generateFlexibleGroups()"><i class="fas fa-dice"></i> 🎲 Chia nhóm ngay</button>
+                        </div>
+                    </div>
+
+                    <!-- BỘ CÔNG CỤ TƯƠNG TÁC LỚP HỌC -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
+                        <button class="btn-outline text-blue" style="font-size: 0.82rem; padding: 10px 14px; white-space: nowrap; border-radius: 12px;" onclick="pickRandomGroup()"><i class="fas fa-bullhorn text-orange"></i> 🎯 Bốc thăm Nhóm</button>
+                        <button class="btn-outline text-green" style="font-size: 0.82rem; padding: 10px 14px; white-space: nowrap; border-radius: 12px;" onclick="pickRandomStudentAnywhere()"><i class="fas fa-user-check text-green"></i> 👤 Bốc thăm 1 HS</button>
+                        <button class="btn-outline text-muted" style="font-size: 0.82rem; padding: 10px 14px; white-space: nowrap; border-radius: 12px;" onclick="reshuffleFlexibleGroups()"><i class="fas fa-random"></i> Xáo trộn lại</button>
+                    </div>
+
+                    <div id="activity-groups-list" class="act-group-grid"></div>
+                </div>
             </section>
             
             <!-- ĐIỂM DANH -->
@@ -274,9 +378,40 @@
                 
                 <div class="settings-card mb-20">
                     <div class="input-group"><label>Tên Giáo Viên</label><input type="text" id="set-teacher" placeholder="VD: Nguyễn Thu Hà" oninput="autoSaveSettingsField('teacherName', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()"></div>
-                    <div class="input-group"><label>Tên Lớp</label><input type="text" id="set-class" placeholder="VD: 8A1" oninput="autoSaveSettingsField('className', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()"></div>
+                    
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>Tên Lớp (Chủ nhiệm)</label>
+                            <input type="text" id="set-class" placeholder="VD: 7/1, 7A, 8A3" oninput="autoSaveSettingsField('className', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()">
+                        </div>
+                        <div class="input-group">
+                            <label>Khối (Độc lập)</label>
+                            <select id="set-grade" onchange="autoSaveSettingsField('grade', this.value); saveSettings();">
+                                <option value="1">Khối 1</option>
+                                <option value="2">Khối 2</option>
+                                <option value="3">Khối 3</option>
+                                <option value="4">Khối 4</option>
+                                <option value="5">Khối 5</option>
+                                <option value="6">Khối 6</option>
+                                <option value="7" selected>Khối 7</option>
+                                <option value="8">Khối 8</option>
+                                <option value="9">Khối 9</option>
+                                <option value="10">Khối 10</option>
+                                <option value="11">Khối 11</option>
+                                <option value="12">Khối 12</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="input-group"><label>Năm học</label><input type="text" id="set-year" placeholder="VD: 2026 - 2027" oninput="autoSaveSettingsField('year', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()"></div>
                     <button class="btn-primary w-full mt-10" onclick="saveSettings()">Lưu cài đặt</button>
+                </div>
+
+                <!-- QUẢN LÝ KHỐI CHO CÁC LỚP GIẢNG DẠY (DÙNG CHUNG PPCT) -->
+                <div class="section-title"><h3>🏫 Khối của các lớp giảng dạy</h3></div>
+                <div class="settings-card mb-20">
+                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Hệ thống cho phép Tên lớp (như 7/1, 7A, 7A1) và Khối hoàn toàn độc lập. Các lớp cùng khối sẽ tự động dùng chung PPCT của Khối đó.</p>
+                    <div id="class-grade-management-list"></div>
                 </div>
                 
                 <div class="section-title"><h3>Tự động & Cảnh báo</h3></div>
@@ -454,7 +589,77 @@
         <div class="table-responsive"><table class="preview-table"><thead><tr><th>Thứ</th><th>Buổi & Tiết</th><th>Lớp</th><th>Môn</th><th>Xóa</th></tr></thead><tbody id="tkb-tbody"></tbody></table></div>
     </div></div></div>
     
-    <div id="modal-setup-ppct" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>📚 Phân phối chương trình</h3><div class="close" onclick="closeModal('modal-setup-ppct')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button class="btn-outline text-orange w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="downloadTemplatePPCT()"><i class="fas fa-download"></i> Tải File Mẫu</button><button class="btn-outline text-green w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="triggerImport('ppct')"><i class="fas fa-file-excel"></i> Import PPCT</button></div><div class="form-row"><div class="input-group"><label>Lớp</label><input type="text" id="add-ppct-class"></div><div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject"></div></div><div class="form-row"><div class="input-group"><label>Tiết PPCT</label><input type="number" id="add-ppct-period"></div></div><div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content"></div><button class="btn-primary w-full mb-20" onclick="addPPCT()">Thêm Bài</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Lớp</th><th>Môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div></div></div></div>
+    <div id="modal-setup-ppct" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>📚 Phân phối chương trình</h3><div class="close" onclick="closeModal('modal-setup-ppct')"><i class="fas fa-times"></i></div></div><div class="modal-body">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button class="btn-outline text-orange w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="downloadTemplatePPCT()"><i class="fas fa-download"></i> Tải File Mẫu</button>
+            <button class="btn-outline text-green w-full" style="padding: 10px; font-weight: bold; border-radius: 12px;" onclick="triggerImport('ppct')"><i class="fas fa-file-excel"></i> Import PPCT</button>
+        </div>
+
+        <div style="background:#eff6ff; border: 1px solid #bfdbfe; border-radius:12px; padding:10px 14px; margin-bottom:14px; font-size:0.85rem; color:#1e40af;">
+            <i class="fas fa-check-circle"></i> <b>PPCT dùng chung:</b> Khi nhập theo Khối (ví dụ Khối 7), tất cả các lớp cùng Khối (như 7A, 7/1, 7A1) sẽ cùng dùng chung PPCT với tiến độ độc lập từng lớp!
+        </div>
+
+        <div class="form-row">
+            <div class="input-group">
+                <label>Phạm vi áp dụng</label>
+                <select id="add-ppct-scope" onchange="togglePpctScopeUI()">
+                    <option value="grade" selected>Dùng chung cả Khối</option>
+                    <option value="class">Chỉ riêng 1 lớp cụ thể</option>
+                </select>
+            </div>
+            <div class="input-group" id="ppct-grade-wrapper">
+                <label>Khối</label>
+                <select id="add-ppct-grade">
+                    <option value="1">Khối 1</option>
+                    <option value="2">Khối 2</option>
+                    <option value="3">Khối 3</option>
+                    <option value="4">Khối 4</option>
+                    <option value="5">Khối 5</option>
+                    <option value="6">Khối 6</option>
+                    <option value="7" selected>Khối 7</option>
+                    <option value="8">Khối 8</option>
+                    <option value="9">Khối 9</option>
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                </select>
+            </div>
+            <div class="input-group" id="ppct-class-wrapper" style="display:none;">
+                <label>Tên Lớp cụ thể</label>
+                <input type="text" id="add-ppct-class" placeholder="VD: 7A1, 7/1">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject" placeholder="VD: Toán, GDĐP"></div>
+            <div class="input-group"><label>Tiết PPCT</label><input type="number" id="add-ppct-period" placeholder="VD: 1"></div>
+        </div>
+        <div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content" placeholder="VD: Bài 1: Tập hợp các số hữu tỉ"></div>
+        <button class="btn-primary w-full mb-20" onclick="addPPCT()"><i class="fas fa-plus"></i> Thêm Bài</button>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <b style="font-size:0.85rem; color:var(--text-muted);">Danh sách PPCT:</b>
+            <div style="display:flex; gap:6px; align-items: center;">
+                <select id="filter-ppct-grade" onchange="renderPPCTTable()" style="padding:4px 8px; font-size:0.75rem; border-radius:8px;">
+                    <option value="all">Tất cả Khối</option>
+                    <option value="1">Khối 1</option>
+                    <option value="2">Khối 2</option>
+                    <option value="3">Khối 3</option>
+                    <option value="4">Khối 4</option>
+                    <option value="5">Khối 5</option>
+                    <option value="6">Khối 6</option>
+                    <option value="7">Khối 7</option>
+                    <option value="8">Khối 8</option>
+                    <option value="9">Khối 9</option>
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                </select>
+                <button class="btn-outline-action text-red" style="font-size:0.75rem; padding:2px 8px; height:auto; width:auto;" onclick="clearAllPPCT()"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+        <div class="table-responsive"><table class="preview-table"><thead><tr><th>Áp dụng</th><th>Môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div>
+    </div></div></div>
     
     <div id="modal-setup-holidays" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🏖️ Ngày nghỉ & Sự kiện</h3><div class="close" onclick="closeModal('modal-setup-holidays')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-red w-full mb-15" onclick="triggerImport('holidays')"><i class="fas fa-file-excel"></i> Import Lịch từ Excel</button><div class="form-row"><div class="input-group"><label>Ngày bắt đầu</label><input type="date" id="add-hol-start"></div><div class="input-group"><label>Ngày kết thúc</label><input type="date" id="add-hol-end"></div></div><div class="input-group"><label>Tên sự kiện / Lễ</label><input type="text" id="add-hol-name" placeholder="VD: Nghỉ Tết Nguyên Đán"></div><button class="btn-primary w-full mb-20" onclick="addHoliday()">Thêm Ngày Nghỉ</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Từ ngày</th><th>Đến ngày</th><th>Tên sự kiện</th><th>Xóa</th></tr></thead><tbody id="hol-tbody"></tbody></table></div></div></div></div>
     
@@ -464,7 +669,115 @@
     <div id="modal-adjust-schedule" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>🔄 Đổi lịch / Dạy bù</h3><div class="close" onclick="closeModal('modal-adjust-schedule')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="adj-sched-id"><div class="alert-item yellow mb-15"><div class="alert-info" id="adj-sched-info"></div></div><div class="form-row"><div class="input-group"><label>Ngày thực dạy</label><input type="date" id="adj-sched-date"></div><div class="input-group"><label>Tiết (1-10)</label><input type="number" id="adj-sched-period"></div></div><div class="input-group mb-0"><label>Lý do</label><input type="text" id="adj-sched-note"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveAdjustedSchedule()">Lưu thay đổi</button></div></div></div>
     <div id="modal-edit-theme" class="modal" style="z-index: 300;"><div class="modal-content"><div class="modal-header"><h3>Đổi Chủ điểm tháng</h3><div class="close" onclick="closeModal('modal-edit-theme')"><i class="fas fa-times"></i></div></div><div class="modal-body"><div class="input-group"><label>Tháng</label><input type="number" id="edit-theme-month" min="1" max="12"></div><div class="input-group mb-0"><label>Tên Chủ điểm</label><input type="text" id="edit-theme-name" placeholder="VD: VĂN MINH - XANH - AN TOÀN"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveMonthlyTheme()">Lưu thay đổi</button></div></div></div>
     
-    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
+    <div id="modal-add-student" class="modal"><div class="modal-content"><div class="modal-header"><h3>Hồ sơ HS</h3><div class="close" onclick="closeModal('modal-add-student')"><i class="fas fa-times"></i></div></div><div class="modal-body"><input type="hidden" id="stu-id"><div class="input-group"><label>Họ tên *</label><input type="text" id="stu-name"></div><div class="form-row"><div class="input-group"><label>Giới tính</label><select id="stu-gender"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div><div class="input-group"><label>Ngày sinh</label><input type="date" id="stu-dob"></div></div><div class="form-row"><div class="input-group"><label>Tổ cố định</label><select id="stu-group"><option value="0">-- Chưa phân tổ --</option></select></div><div class="input-group"><label>Vai trò trong tổ</label><select id="stu-role"><option value="member">Thành viên</option><option value="leader">⭐ Tổ trưởng</option><option value="vice">🎖️ Tổ phó</option></select></div></div><div class="input-group"><label>SĐT</label><input type="tel" id="stu-phone"></div></div><div class="modal-footer"><button class="btn-primary w-full" onclick="saveStudent()">Lưu</button></div></div></div>
+
+    <!-- MODAL TỰ ĐỘNG CHIA TỔ CỐ ĐỊNH -->
+    <div id="modal-auto-fixed-groups" class="modal" style="z-index: 300;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚡ Tự động chia Tổ cố định</h3>
+                <div class="close" onclick="closeModal('modal-auto-fixed-groups')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body">
+                <div class="alert-item yellow mb-15">
+                    <div class="alert-icon"><i class="fas fa-lightbulb"></i></div>
+                    <div class="alert-info">
+                        <strong>Chia tổ cố định cho lớp</strong>
+                        <p>Học sinh sẽ được phân bổ vào các Tổ cố định một cách công bằng và tự động.</p>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Số lượng tổ</label>
+                    <select id="auto-group-count">
+                        <option value="2">2 Tổ</option>
+                        <option value="3">3 Tổ</option>
+                        <option value="4" selected>4 Tổ (Chuẩn)</option>
+                        <option value="5">5 Tổ</option>
+                        <option value="6">6 Tổ</option>
+                    </select>
+                </div>
+                <div class="input-group mb-0">
+                    <label>Phương thức phân chia</label>
+                    <select id="auto-group-method">
+                        <option value="balanced_gender" selected>⚖️ Cân bằng Nam - Nữ (Khuyên dùng)</option>
+                        <option value="random">🎲 Ngẫu nhiên hoàn toàn</option>
+                        <option value="sequential">📋 Theo danh sách thứ tự (1..N)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary w-full" onclick="executeAutoFixedGroups()">Thực hiện chia tổ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL THÊM HỌC SINH VÀO TỔ CỐ ĐỊNH -->
+    <div id="modal-add-students-to-group" class="modal" style="z-index: 310;">
+        <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 id="add-students-group-title">➕ Thêm học sinh vào tổ</h3>
+                <div class="close" onclick="closeModal('modal-add-students-to-group')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="padding: 15px; overflow-y: auto; flex: 1;">
+                <input type="hidden" id="add-students-target-group-id">
+                <div class="search-bar" style="margin-bottom: 12px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-student-for-group" placeholder="Tìm tên học sinh..." onkeyup="renderStudentsForGroupModal()">
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-muted);">
+                    <span id="add-students-count-info">Danh sách học sinh chưa thuộc tổ:</span>
+                    <button class="btn-outline-action" style="font-size: 0.75rem; padding: 2px 8px; height: auto; width: auto;" onclick="toggleSelectAllStudentsForGroup()">Chọn tất cả</button>
+                </div>
+                <div id="add-students-group-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px;">
+                <button class="btn-outline w-full" onclick="closeModal('modal-add-students-to-group')">Đóng</button>
+                <button class="btn-primary w-full" id="btn-batch-add-students" onclick="confirmBatchAddStudentsToGroup()">Xác nhận thêm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XÓA TỔ CỐ ĐỊNH -->
+    <div id="modal-delete-fixed-group" class="modal" style="z-index: 310;">
+        <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 style="color: var(--danger);"><i class="fas fa-trash-alt"></i> Xóa tổ cố định</h3>
+                <div class="close" onclick="closeModal('modal-delete-fixed-group')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body" style="padding: 15px; overflow-y: auto; flex: 1;">
+                <div class="alert-item red mb-15">
+                    <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="alert-info">
+                        <strong>Lưu ý an toàn</strong>
+                        <p>Khi xóa tổ, toàn bộ học sinh trong tổ đó sẽ được chuyển về <b>"Chưa phân tổ"</b> (không bị xóa khỏi danh sách lớp).</p>
+                    </div>
+                </div>
+                <div id="delete-fixed-groups-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline w-full" onclick="closeModal('modal-delete-fixed-group')">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL BỐC THĂM / QUAY SỐ TRONG GIỜ HỌC -->
+    <div id="modal-random-picker" class="modal" style="z-index: 350;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="random-picker-title">🎯 Vòng quay lớp học</h3>
+                <div class="close" onclick="closeModal('modal-random-picker')"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="modal-body text-center" style="padding: 25px 15px;">
+                <div style="font-size: 3.5rem; margin-bottom: 8px;" id="lottery-icon">🎲</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;" id="lottery-subtext">Đang bốc thăm...</div>
+                <div style="font-size: 1.6rem; font-weight: 900; color: var(--primary); min-height: 42px;" id="lottery-winner">---</div>
+                <div id="lottery-extra" style="font-size: 0.85rem; color: #475569; font-weight: 600; margin-top: 5px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-primary w-full" id="btn-spin-again" onclick="retriggerPicker()"><i class="fas fa-redo"></i> Quay tiếp</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div id="modal-import-excel" class="modal"><div class="modal-content" style="max-height: 95vh;"><div class="modal-header"><h3>📥 Nhập danh sách</h3><div class="close" onclick="closeModal('modal-import-excel')"><i class="fas fa-times"></i></div></div><div class="modal-body" style="padding: 15px;"><div id="import-step-1"><div class="drop-zone" id="drop-zone" onclick="document.getElementById('excel-file').click()"><div class="drop-icon"><i class="fas fa-cloud-upload-alt"></i></div><h4>Kéo thả hoặc Nhấn chọn</h4><input type="file" id="excel-file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelUpload(event)"></div></div><div id="import-step-2" style="display: none;"><div class="mapping-section"><h4>Xác nhận cột:</h4><div class="mapping-grid"><div class="map-group"><label>Họ tên</label><select id="map-name" onchange="processParsedData()"></select></div><div class="map-group"><label>Giới tính</label><select id="map-gender" onchange="processParsedData()"></select></div><div class="map-group"><label>Ngày sinh</label><select id="map-dob" onchange="processParsedData()"></select></div><div class="map-group"><label>SĐT</label><select id="map-phone" onchange="processParsedData()"></select></div></div></div><div id="import-warnings"></div><div class="table-responsive"><table class="preview-table"><thead><tr><th>STT</th><th>Họ tên</th><th>SĐT</th></tr></thead><tbody id="preview-tbody"></tbody></table></div></div></div><div class="modal-footer" id="import-step-2-footer" style="display: none; gap:10px;"><button class="btn-outline w-full" onclick="resetImport()">Quay lại</button><button class="btn-primary w-full" id="btn-confirm-import" onclick="confirmImport()">✅ Xác nhận</button></div></div></div>
     

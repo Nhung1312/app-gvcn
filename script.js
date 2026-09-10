@@ -138,7 +138,13 @@ const defaultTags = [
     { id: "t6", name: "Làm việc tốt", type: "positive", defaultPoints: 2, currentPoints: 2, isSystem: true, enabled: true, icon: "fa-heart", color: "qt-positive" },
     { id: "t7", name: "Đạt thành tích", type: "positive", defaultPoints: 3, currentPoints: 3, isSystem: true, enabled: true, icon: "fa-medal", color: "qt-positive" }
 ];
-const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "8A1", year: "2026-2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default", apiKey: "" };
+const defaultFixedGroups = [
+    { id: 1, name: "Tổ 1", leaderId: null, viceLeaderId: null },
+    { id: 2, name: "Tổ 2", leaderId: null, viceLeaderId: null },
+    { id: 3, name: "Tổ 3", leaderId: null, viceLeaderId: null },
+    { id: 4, name: "Tổ 4", leaderId: null, viceLeaderId: null }
+];
+const defaultSettings = { teacherName: "Nguyễn Thu Hà", className: "7/1", grade: "7", year: "2026 - 2027", autoAbsentDisc: false, autoLateDisc: false, warnAbsent: 3, warnBehavior: -5, theme: "default", apiKey: "" };
 
 function initData() {
     let v4Data = null;
@@ -160,6 +166,9 @@ function initData() {
             scheduleSetup: v3Data && v3Data.scheduleSetup ? v3Data.scheduleSetup : { week1Start: "", ppct: [], tkb: [], holidays: [] },
             scheduleRecords: v3Data && v3Data.scheduleRecords ? v3Data.scheduleRecords : [],
             monthlyThemes: v3Data && v3Data.settings && v3Data.settings.monthlyThemes ? v3Data.settings.monthlyThemes : { "8": "VĂN MINH - XANH - AN TOÀN" },
+            fixedGroups: JSON.parse(JSON.stringify(defaultFixedGroups)),
+            flexibleGroups: [],
+            classGradeMap: {},
             lastUpdated: v3Data ? Date.now() : 0
         };
         localStorage.setItem('gvcnData_v4', JSON.stringify(v4Data));
@@ -168,6 +177,15 @@ function initData() {
         v4Data.settings = { ...defaultSettings, ...v4Data.settings };
         if (!v4Data.settings.monthlyThemes) { v4Data.settings.monthlyThemes = { "8": "VĂN MINH - XANH - AN TOÀN" }; }
         if (!v4Data.settings.theme) { v4Data.settings.theme = "default"; }
+        if (!v4Data.fixedGroups || !Array.isArray(v4Data.fixedGroups) || v4Data.fixedGroups.length === 0) {
+            v4Data.fixedGroups = JSON.parse(JSON.stringify(defaultFixedGroups));
+        }
+        if (!v4Data.flexibleGroups) { v4Data.flexibleGroups = []; }
+        if (!v4Data.classGradeMap) { v4Data.classGradeMap = {}; }
+        if (!v4Data.settings.grade) {
+            const m = String(v4Data.settings.className || '').match(/\d+/);
+            v4Data.settings.grade = m ? m[0] : "7";
+        }
         if (typeof v4Data.lastUpdated !== 'number') { v4Data.lastUpdated = 0; }
     }
     return v4Data;
@@ -269,6 +287,20 @@ window.openModal = function(id) {
                 ppctClass.value = appData.settings.className;
             }
         }
+        if (id === 'modal-add-student') {
+            const grpSelect = document.getElementById('stu-group');
+            if (grpSelect) {
+                let currentVal = grpSelect.value || '0';
+                let opts = '<option value="0">-- Chưa phân tổ --</option>';
+                if (appData.fixedGroups) {
+                    appData.fixedGroups.forEach(g => {
+                        opts += `<option value="${g.id}">${g.name}</option>`;
+                    });
+                }
+                grpSelect.innerHTML = opts;
+                grpSelect.value = currentVal;
+            }
+        }
     }
 };
 window.closeModal = function(id) { 
@@ -286,16 +318,92 @@ window.changeTheme = function(themeName, element) {
     window.showToast("Đã đổi màu giao diện!", "success");
 }
 
+window.inferGrade = function(className) {
+    if (!className) return "7";
+    const m = String(className).match(/\d+/);
+    return m ? m[0] : "7";
+};
+
+window.getGradeOfClass = function(className) {
+    if (!className) return appData.settings.grade || "7";
+    const clean = String(className).trim();
+    if (appData.classGradeMap && appData.classGradeMap[clean]) {
+        return String(appData.classGradeMap[clean]);
+    }
+    if (appData.settings && appData.settings.className && clean.toLowerCase() === appData.settings.className.trim().toLowerCase()) {
+        return String(appData.settings.grade || window.inferGrade(appData.settings.className));
+    }
+    return window.inferGrade(clean);
+};
+
+window.renderClassGradeList = function() {
+    const container = document.getElementById('class-grade-management-list');
+    if (!container) return;
+    
+    const classSet = new Set();
+    if (appData.settings && appData.settings.className) classSet.add(appData.settings.className.trim());
+    if (appData.scheduleSetup && appData.scheduleSetup.tkb) {
+        appData.scheduleSetup.tkb.forEach(t => {
+            if (t.className) classSet.add(t.className.trim());
+        });
+    }
+    if (appData.classGradeMap) {
+        Object.keys(appData.classGradeMap).forEach(c => classSet.add(c.trim()));
+    }
+
+    const classList = Array.from(classSet).filter(Boolean);
+    if (classList.length === 0) {
+        container.innerHTML = '<div class="text-sm text-muted">Chưa có lớp học nào trong Thời khóa biểu hoặc Cài đặt.</div>';
+        return;
+    }
+
+    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+    classList.forEach(cls => {
+        const currentGrade = window.getGradeOfClass(cls);
+        const isHomeroom = appData.settings && appData.settings.className && cls.toLowerCase() === appData.settings.className.trim().toLowerCase();
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:12px; border:1px solid #e2e8f0;">
+                <div>
+                    <strong>${cls}</strong> ${isHomeroom ? '<span style="background:#e0f2fe; color:#0369a1; font-size:0.75rem; padding:2px 8px; border-radius:10px; font-weight:700; margin-left:6px;">Lớp CN</span>' : ''}
+                    <div style="font-size:0.75rem; color:#64748b;">Dùng chung PPCT của Khối ${currentGrade}</div>
+                </div>
+                <div>
+                    <select onchange="window.setClassGrade('${cls}', this.value)" style="padding:6px 12px; font-size:0.85rem; border-radius:8px; border:1px solid #cbd5e1; font-weight:700;">
+                        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(g => `<option value="${g}" ${String(g) === String(currentGrade) ? 'selected' : ''}>Khối ${g}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+};
+
+window.setClassGrade = function(className, grade) {
+    if (!appData.classGradeMap) appData.classGradeMap = {};
+    appData.classGradeMap[className] = String(grade);
+    if (appData.settings && appData.settings.className && className.trim().toLowerCase() === appData.settings.className.trim().toLowerCase()) {
+        appData.settings.grade = String(grade);
+        const setGradeEl = document.getElementById('set-grade');
+        if (setGradeEl) setGradeEl.value = String(grade);
+    }
+    window.saveData();
+    window.renderClassGradeList();
+    window.showToast(`Đã gán lớp ${className} thuộc Khối ${grade}!`);
+};
+
 window.loadSettings = function() { 
     if (!appData.settings) appData.settings = { ...defaultSettings };
     const s = appData.settings; 
     
     const setTeacher = document.getElementById('set-teacher');
     const setClass = document.getElementById('set-class');
+    const setGrade = document.getElementById('set-grade');
     const setYear = document.getElementById('set-year');
     
     if (setTeacher) setTeacher.value = s.teacherName || ''; 
     if (setClass) setClass.value = s.className || ''; 
+    if (setGrade) setGrade.value = s.grade || window.inferGrade(s.className) || '7';
     if (setYear) setYear.value = s.year || ''; 
     
     if (document.getElementById('set-auto-absent')) document.getElementById('set-auto-absent').checked = s.autoAbsentDisc || false; 
@@ -314,6 +422,8 @@ window.loadSettings = function() {
         const onclickAttr = btn.getAttribute('onclick');
         if (onclickAttr && onclickAttr.includes(currentTheme)) btn.classList.add('active');
     });
+
+    window.renderClassGradeList();
 };
 
 window.saveSettings = function() { 
@@ -321,10 +431,12 @@ window.saveSettings = function() {
     
     const setTeacher = document.getElementById('set-teacher');
     const setClass = document.getElementById('set-class');
+    const setGrade = document.getElementById('set-grade');
     const setYear = document.getElementById('set-year');
     
     if (setTeacher) appData.settings.teacherName = setTeacher.value.trim(); 
     if (setClass) appData.settings.className = setClass.value.trim(); 
+    if (setGrade) appData.settings.grade = setGrade.value;
     if (setYear) appData.settings.year = setYear.value.trim(); 
     
     if (document.getElementById('set-auto-absent')) appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; 
@@ -341,16 +453,24 @@ window.saveSettings = function() {
     
     const displayTeacher = appData.settings.teacherName || 'GV';
     const displayClass = appData.settings.className || '';
+    const displayGrade = appData.settings.grade ? ` (Khối ${appData.settings.grade})` : '';
     const displayYear = appData.settings.year || '';
-    window.showToast(`✅ Đã lưu: ${displayTeacher}${displayClass ? ' - Lớp ' + displayClass : ''}${displayYear ? ' (' + displayYear + ')' : ''}`); 
+    window.showToast(`✅ Đã lưu: ${displayTeacher}${displayClass ? ' - Lớp ' + displayClass + displayGrade : ''}${displayYear ? ' (' + displayYear + ')' : ''}`); 
+    window.renderClassGradeList();
 };
 
 window.autoSaveSettingsField = function(field, val) {
     if (!appData.settings) appData.settings = { ...defaultSettings };
     appData.settings[field] = val ? val.trim() : '';
+    if (field === 'className' && (!appData.settings.grade || appData.settings.grade === '')) {
+        appData.settings.grade = window.inferGrade(val);
+        const setGrade = document.getElementById('set-grade');
+        if (setGrade) setGrade.value = appData.settings.grade;
+    }
     appData.lastUpdated = Date.now();
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData));
     window.updateDashboardInfo();
+    window.renderClassGradeList();
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
@@ -569,6 +689,33 @@ window.exportScheduleExcel = function() {
     window.showToast("Đã xuất Excel Sổ Báo Giảng!");
 }
 
+window.togglePpctScopeUI = function() {
+    const scopeEl = document.getElementById('add-ppct-scope');
+    const scope = scopeEl ? scopeEl.value : 'grade';
+    const gradeWrapper = document.getElementById('ppct-grade-wrapper');
+    const classWrapper = document.getElementById('ppct-class-wrapper');
+    if (scope === 'grade') {
+        if (gradeWrapper) gradeWrapper.style.display = 'block';
+        if (classWrapper) classWrapper.style.display = 'none';
+    } else {
+        if (gradeWrapper) gradeWrapper.style.display = 'none';
+        if (classWrapper) classWrapper.style.display = 'block';
+    }
+};
+
+window.renderPPCTTable = function() {
+    window.renderSetupData();
+};
+
+window.clearAllPPCT = function() {
+    if(confirm("Bạn có chắc muốn xóa tất cả bài dạy trong Phân phối chương trình?")) {
+        appData.scheduleSetup.ppct = [];
+        window.saveData();
+        window.renderSetupData();
+        window.showToast("Đã xóa sạch danh sách PPCT!");
+    }
+};
+
 window.renderSetupData = function() {
     let stp = appData.scheduleSetup;
     document.getElementById('setup-week1-date').value = stp.week1Start;
@@ -585,7 +732,23 @@ window.renderSetupData = function() {
     });
     
     const tbodyPPCT = document.getElementById('ppct-tbody'); tbodyPPCT.innerHTML = '';
-    stp.ppct.forEach((p, i) => { tbodyPPCT.innerHTML += `<tr><td>${p.className}</td><td>${p.subject}</td><td>${p.ppct}</td><td>${p.content.substring(0,20)}...</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
+    const filterGradeEl = document.getElementById('filter-ppct-grade');
+    const currentGradeFilter = filterGradeEl ? filterGradeEl.value : 'all';
+
+    stp.ppct.forEach((p, i) => { 
+        let isShared = !p.className || p.className.toLowerCase().includes('khối') || p.className.toLowerCase() === 'chung';
+        let gradeStr = p.grade || window.inferGrade(p.className) || (appData.settings ? appData.settings.grade : '7') || '7';
+        
+        if (currentGradeFilter !== 'all' && String(gradeStr) !== String(currentGradeFilter)) {
+            return;
+        }
+
+        let scopeBadge = isShared 
+            ? `<span class="badge-grade">Khối ${gradeStr} (Chung)</span>` 
+            : `<span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">Lớp ${p.className}</span>`;
+
+        tbodyPPCT.innerHTML += `<tr><td>${scopeBadge}</td><td><b>${p.subject}</b></td><td>${p.ppct}</td><td>${(p.content||'').substring(0,30)}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; 
+    });
 
     const tbodyHol = document.getElementById('hol-tbody'); tbodyHol.innerHTML = '';
     stp.holidays.forEach((h, i) => { tbodyHol.innerHTML += `<tr><td>${h.start}</td><td>${h.end}</td><td>${h.name}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('holidays', ${i})"><i class="fas fa-times"></i></button></td></tr>`; });
@@ -612,10 +775,32 @@ window.clearAllTKB = function() {
     }
 }
 window.addPPCT = function() {
-    let c = document.getElementById('add-ppct-class').value, s = document.getElementById('add-ppct-subject').value, p = document.getElementById('add-ppct-period').value, n = document.getElementById('add-ppct-content').value;
-    if(!c || !s || !p || !n) return window.showToast("Nhập đủ thông tin!", "error");
-    appData.scheduleSetup.ppct.push({ className: c.trim(), subject: s.trim(), ppct: parseInt(p), content: n.trim() });
-    window.saveData(); window.renderSetupData(); window.showToast("Đã thêm PPCT!");
+    const scopeEl = document.getElementById('add-ppct-scope');
+    const scope = scopeEl ? scopeEl.value : 'grade';
+    let s = document.getElementById('add-ppct-subject').value;
+    let p = document.getElementById('add-ppct-period').value;
+    let n = document.getElementById('add-ppct-content').value;
+    if(!s || !p || !n) return window.showToast("Nhập đủ môn, tiết và nội dung!", "error");
+
+    let gradeVal = "7";
+    let classVal = "";
+    if (scope === 'grade') {
+        gradeVal = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : (appData.settings.grade || "7");
+        classVal = "";
+    } else {
+        classVal = document.getElementById('add-ppct-class') ? document.getElementById('add-ppct-class').value.trim() : "";
+        if (!classVal) return window.showToast("Vui lòng nhập tên lớp!", "error");
+        gradeVal = window.getGradeOfClass(classVal);
+    }
+
+    appData.scheduleSetup.ppct.push({
+        grade: String(gradeVal),
+        className: classVal,
+        subject: s.trim(),
+        ppct: parseInt(p),
+        content: n.trim()
+    });
+    window.saveData(); window.renderSetupData(); window.showToast(`Đã thêm PPCT: Tiết ${p} (${scope === 'grade' ? 'Khối ' + gradeVal : 'Lớp ' + classVal})!`);
 }
 window.addHoliday = function() {
     let s = document.getElementById('add-hol-start').value, e = document.getElementById('add-hol-end').value, n = document.getElementById('add-hol-name').value;
@@ -726,10 +911,33 @@ window.handleGeneralImport = function(event) {
                             }
                         }
                     }
-                    else if(currentImportType === 'ppct' && (r['Tiết'] || r['Tiet'] || r['Tiết PPCT'])) {
-                        let p = parseInt(String(r['Tiết'] || r['Tiet'] || r['Tiết PPCT']).replace(/\D/g, '')); 
-                        let n = String(r['Nội dung'] || r['Noi dung'] || r['Tên bài'] || r['Ten bai'] || r['Tên bài học / Chuyên đề'] || r['Chủ đề'] || '');
-                        if(!isNaN(p) && n) { appData.scheduleSetup.ppct.push({ className: String(r['Lớp']||r['Lop']||targetClass), subject: String(r['Môn']||r['Mon']||targetSubject), ppct: p, content: n }); count++; }
+                    else if(currentImportType === 'ppct') {
+                        let targetScope = document.getElementById('add-ppct-scope') ? document.getElementById('add-ppct-scope').value : 'grade';
+                        let targetGrade = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : (appData.settings.grade || "7");
+                        let targetClass = document.getElementById('add-ppct-class') ? document.getElementById('add-ppct-class').value : "";
+                        let targetSubject = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value : "Chung";
+
+                        let pVal = r['Tiết'] || r['Tiet'] || r['Tiết PPCT'] || r['Tiết học'] || r['Period'];
+                        if (pVal !== undefined) {
+                            let p = parseInt(String(pVal).replace(/\D/g, '')); 
+                            let n = String(r['Nội dung'] || r['Noi dung'] || r['Tên bài'] || r['Ten bai'] || r['Tên bài học / Chuyên đề'] || r['Chủ đề'] || r['Bài học'] || '');
+                            if(!isNaN(p) && n) {
+                                let rowGrade = r['Khối'] || r['Khoi'] || r['Grade'] || (targetScope === 'grade' ? targetGrade : '');
+                                let rowClass = r['Lớp'] || r['Lop'] || r['Class'] || (targetScope === 'class' ? targetClass : '');
+                                if (!rowGrade && rowClass) rowGrade = window.getGradeOfClass(rowClass);
+                                if (!rowGrade && !rowClass) rowGrade = targetGrade;
+                                let rowSubj = r['Môn'] || r['Mon'] || r['Môn học'] || r['Subject'] || targetSubject;
+
+                                appData.scheduleSetup.ppct.push({
+                                    grade: String(rowGrade).replace(/\D/g, '') || "7",
+                                    className: String(rowClass).trim(),
+                                    subject: String(rowSubj).trim(),
+                                    ppct: p,
+                                    content: n
+                                });
+                                count++;
+                            }
+                        }
                     }
                     else if(currentImportType === 'holidays' && r['Từ ngày'] && r['Đến ngày'] && r['Sự kiện']) {
                         let sd = new Date(r['Từ ngày']); let ed = new Date(r['Đến ngày']);
@@ -757,34 +965,90 @@ window.generateAutoSchedule = function() {
     if(!startDate) return window.showToast("Vui lòng thiết lập Ngày bắt đầu Tuần 1!", "error");
     if(appData.scheduleRecords.length > 0) { if(!confirm("CẢNH BÁO: Thao tác này sẽ TẠO LẠI TOÀN BỘ SỔ BÁO GIẢNG và ghi đè các tiết chưa hoàn thành. Các tiết Đã Dạy sẽ được bảo lưu. Bạn chắc chắn chứ?")) return; }
 
-    appData.scheduleSetup.week1Start = startDate; let records = []; let ppctQueues = {}; 
-    appData.scheduleSetup.ppct.sort((a,b) => a.ppct - b.ppct).forEach(p => { let key = `${p.subject.toLowerCase()}-${p.className.toLowerCase()}`; if(!ppctQueues[key]) ppctQueues[key] = []; ppctQueues[key].push({...p}); });
+    appData.scheduleSetup.week1Start = startDate; 
+    let records = []; 
+    let ppctQueues = {}; 
+
+    const getQueueKey = (cls, sbj) => `${sbj.trim().toLowerCase()}__${cls.trim().toLowerCase()}`;
+
+    // Tạo hàng đợi bài dạy độc lập cho từng lớp (classId + ppctId + tietHienTai)
+    // Hệ thống tự động phân giải: ưu tiên PPCT riêng của lớp -> nếu không có thì dùng PPCT chung của Khối (Year + Grade + Subject)
+    appData.scheduleSetup.tkb.forEach(tItem => {
+        let qKey = getQueueKey(tItem.className, tItem.subject);
+        if (!ppctQueues[qKey]) {
+            let classGrade = window.getGradeOfClass(tItem.className);
+            
+            // 1. Tìm PPCT được gán đích danh cho lớp này
+            let matched = appData.scheduleSetup.ppct.filter(p => {
+                let pClass = (p.className || '').trim().toLowerCase();
+                let pSubj = (p.subject || '').trim().toLowerCase();
+                return pSubj === tItem.subject.trim().toLowerCase() && pClass === tItem.className.trim().toLowerCase();
+            });
+
+            // 2. Nếu không có PPCT riêng, tìm PPCT dùng chung của Khối tương ứng
+            if (matched.length === 0) {
+                matched = appData.scheduleSetup.ppct.filter(p => {
+                    let pSubj = (p.subject || '').trim().toLowerCase();
+                    if (pSubj !== tItem.subject.trim().toLowerCase()) return false;
+                    let pGrade = p.grade || window.inferGrade(p.className) || '';
+                    let isShared = !p.className || p.className.toLowerCase().includes('khối') || p.className.toLowerCase() === 'chung';
+                    return isShared && String(pGrade) === String(classGrade);
+                });
+            }
+
+            // 3. Dự phòng tìm kiếm theo môn nếu chưa gán khối
+            if (matched.length === 0) {
+                matched = appData.scheduleSetup.ppct.filter(p => {
+                    let pSubj = (p.subject || '').trim().toLowerCase();
+                    return pSubj === tItem.subject.trim().toLowerCase();
+                });
+            }
+
+            // Sắp xếp bài dạy tăng dần theo số tiết PPCT
+            matched.sort((a, b) => parseInt(a.ppct) - parseInt(b.ppct));
+            ppctQueues[qKey] = matched.map(x => ({ ...x }));
+        }
+    });
 
     let currentDate = new Date(startDate);
     for(let w = 1; w <= 35; w++) {
         for(let d = 2; d <= 7; d++) {
-            let dateStr = currentDate.toISOString().split('T')[0]; let holiday = window.checkIsHoliday(dateStr);
-            let dayTKB = appData.scheduleSetup.tkb.filter(t => t.dayOfWeek == d); dayTKB.sort((a,b) => a.period - b.period);
+            let dateStr = currentDate.toISOString().split('T')[0]; 
+            let holiday = window.checkIsHoliday(dateStr);
+            let dayTKB = appData.scheduleSetup.tkb.filter(t => t.dayOfWeek == d); 
+            dayTKB.sort((a,b) => a.period - b.period);
 
             dayTKB.forEach(tItem => {
-                let qKey = `${tItem.subject.toLowerCase()}-${tItem.className.toLowerCase()}`;
+                let qKey = getQueueKey(tItem.className, tItem.subject);
                 let oldR = appData.scheduleRecords.find(x => x.date === dateStr && x.period === tItem.period && x.className === tItem.className);
                 if(oldR && (oldR.status === 'completed' || oldR.note)) {
                     records.push(oldR);
-                    if(oldR.status === 'completed' && ppctQueues[qKey] && ppctQueues[qKey].length>0 && ppctQueues[qKey][0].ppct == oldR.ppct) { ppctQueues[qKey].shift(); } return; 
+                    if(oldR.status === 'completed' && ppctQueues[qKey] && ppctQueues[qKey].length > 0 && ppctQueues[qKey][0].ppct == oldR.ppct) { 
+                        ppctQueues[qKey].shift(); 
+                    } 
+                    return; 
                 }
-                if (holiday) { records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "NGHỈ LỄ - " + holiday.name, status: "off" }); } 
-                else {
-                    if (ppctQueues[qKey] && ppctQueues[qKey].length > 0) { let lesson = ppctQueues[qKey].shift(); records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: lesson.ppct, content: lesson.content, status: "scheduled" }); } 
-                    else { records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "Ôn tập / Tự chọn (Hết PPCT)", status: "scheduled" }); }
+                if (holiday) { 
+                    records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "NGHỈ LỄ - " + holiday.name, status: "off" }); 
+                } else {
+                    if (ppctQueues[qKey] && ppctQueues[qKey].length > 0) { 
+                        let lesson = ppctQueues[qKey].shift(); 
+                        records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: lesson.ppct, content: lesson.content, status: "scheduled" }); 
+                    } else { 
+                        records.push({ id: Date.now() + Math.random(), week: w, date: dateStr, dayOfWeek: d, period: tItem.period, className: tItem.className, subject: tItem.subject, ppct: "-", content: "Ôn tập / Tự chọn (Hết PPCT)", status: "scheduled" }); 
+                    }
                 }
             });
             currentDate.setDate(currentDate.getDate() + 1); 
         }
         currentDate.setDate(currentDate.getDate() + 1); 
     }
-    appData.scheduleRecords = records; window.saveData(); window.closeModal('modal-setup-lesson-log'); window.initLessonLogView(); window.showToast("🎉 Đã tự động sinh Sổ Báo Giảng cho cả năm học!");
-}
+    appData.scheduleRecords = records; 
+    window.saveData(); 
+    window.closeModal('modal-setup-lesson-log'); 
+    window.initLessonLogView(); 
+    window.showToast("🎉 Đã sinh Sổ Báo Giảng: PPCT dùng chung theo Khối & tiến độ độc lập từng lớp!");
+};
 
 window.generateReportCard = async function(stuId) {
     window.showToast("Đang tạo ảnh Phiếu liên lạc...", "success");
@@ -820,31 +1084,1233 @@ window.openAIForStudent = function(studentName) {
     window.openModal('modal-compose-notify');
 }
 
+// ================= QUẢN LÝ HỌC SINH, TỔ CỐ ĐỊNH & NHÓM HOẠT ĐỘNG =================
+let currentStudentTab = 'all';
+let currentFixedGroupFilter = 'all';
+let lastPickerMode = 'group'; // 'group' | 'student' | 'member'
+let lastPickerGroupId = null;
+
+// Âm thanh chúc mừng & quay số bằng Web Audio API
+function playChime(type) {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (type === 'tick') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        } else if (type === 'win') {
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.1);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime + idx * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.1 + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + idx * 0.1);
+                osc.stop(audioCtx.currentTime + idx * 0.1 + 0.25);
+            });
+        }
+    } catch(e) {}
+}
+
+window.switchStudentTab = function(tab) {
+    currentStudentTab = tab;
+    document.querySelectorAll('.sub-tab-item').forEach(el => el.classList.remove('active'));
+
+    const tabAll = document.getElementById('subtab-content-all');
+    const tabFixed = document.getElementById('subtab-content-fixed');
+    const tabAct = document.getElementById('subtab-content-activity');
+
+    if (tabAll) tabAll.style.display = 'none';
+    if (tabFixed) tabFixed.style.display = 'none';
+    if (tabAct) tabAct.style.display = 'none';
+
+    if (tab === 'all') {
+        const btn = document.getElementById('tab-btn-students-all');
+        if (btn) btn.classList.add('active');
+        if (tabAll) tabAll.style.display = 'block';
+        window.renderStudents();
+    } else if (tab === 'fixed') {
+        const btn = document.getElementById('tab-btn-students-fixed');
+        if (btn) btn.classList.add('active');
+        if (tabFixed) tabFixed.style.display = 'block';
+        window.renderFixedGroups();
+    } else if (tab === 'activity') {
+        const btn = document.getElementById('tab-btn-students-activity');
+        if (btn) btn.classList.add('active');
+        if (tabAct) tabAct.style.display = 'block';
+        window.renderActivityGroups();
+    }
+};
+
+window.filterStudentsByGroup = function(groupId) {
+    currentFixedGroupFilter = groupId;
+    window.renderStudents();
+};
+
 window.renderStudents = function() {
-    const list = document.getElementById('student-list'); list.innerHTML = ''; 
+    const list = document.getElementById('student-list'); 
+    if (!list) return;
+    list.innerHTML = ''; 
+
+    // Render bộ lọc theo Tổ cố định
+    const filterContainer = document.getElementById('student-group-filters');
+    if (filterContainer) {
+        let filterHtml = `
+            <div class="group-filter-chip ${currentFixedGroupFilter === 'all' ? 'active' : ''}" onclick="window.filterStudentsByGroup('all')">
+                <i class="fas fa-layer-group"></i> Tất cả (${appData.students.length})
+            </div>
+        `;
+        if (appData.fixedGroups && Array.isArray(appData.fixedGroups)) {
+            appData.fixedGroups.forEach(g => {
+                const count = appData.students.filter(s => s.fixedGroup == g.id).length;
+                const isActive = String(currentFixedGroupFilter) === String(g.id);
+                filterHtml += `
+                    <div class="group-filter-chip ${isActive ? 'active' : ''}" onclick="window.filterStudentsByGroup('${g.id}')">
+                        <span>${g.name} (${count})</span>
+                        <span class="chip-delete-btn" onclick="event.stopPropagation(); window.deleteFixedGroup(${g.id})" title="Xóa ${g.name} (nếu lỡ tạo nhầm)">
+                            <i class="fas fa-times"></i>
+                        </span>
+                    </div>
+                `;
+            });
+        }
+        const unassignedCount = appData.students.filter(s => !s.fixedGroup || s.fixedGroup == 0).length;
+        filterHtml += `
+            <div class="group-filter-chip ${currentFixedGroupFilter === 'unassigned' ? 'active' : ''}" onclick="window.filterStudentsByGroup('unassigned')">
+                <i class="fas fa-user-clock"></i> Chưa có tổ (${unassignedCount})
+            </div>
+        `;
+
+        // Nút Thêm tổ và Xóa tổ nhanh ngay trên thanh lọc
+        filterHtml += `
+            <div class="group-filter-chip" onclick="window.addNewFixedGroup()" title="Thêm tổ mới" style="background:#f0fdf4; color:#16a34a; border-color:#bbf7d0;">
+                <i class="fas fa-plus"></i> Thêm tổ
+            </div>
+            <div class="group-filter-chip" onclick="window.openDeleteFixedGroupModal()" title="Mở danh sách xóa các tổ tạo nhầm" style="background:#fff1f2; color:#e11d48; border-color:#fecdd3;">
+                <i class="fas fa-trash-alt"></i> Xóa tổ...
+            </div>
+        `;
+
+        filterContainer.innerHTML = filterHtml;
+    }
+
     const searchInput = document.getElementById('search-student');
     const filterText = searchInput ? searchInput.value.toLowerCase() : "";
-    let filtered = appData.students.filter(s => s.name.toLowerCase().includes(filterText));
-    if(filtered.length === 0) { list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy!</h4></div>'; return; }
+
+    let filtered = appData.students.filter(s => {
+        const matchName = s.name.toLowerCase().includes(filterText);
+        if (!matchName) return false;
+        if (currentFixedGroupFilter === 'all') return true;
+        if (currentFixedGroupFilter === 'unassigned') return !s.fixedGroup || s.fixedGroup == 0;
+        return String(s.fixedGroup) === String(currentFixedGroupFilter);
+    });
+
+    if(filtered.length === 0) { 
+        list.innerHTML = '<div class="empty-state"><h4>Không tìm thấy học sinh phù hợp!</h4></div>'; 
+        return; 
+    }
+
     filtered.forEach((stu, index) => { 
         let cleanPhone = stu.phone ? String(stu.phone).replace(/[^0-9]/g, '') : '';
         let zaloBtn = cleanPhone ? `<button class="btn-outline-action" style="color:white; background:#0068ff; border-color:#0068ff; box-shadow: 0 4px 10px rgba(0,104,255,0.3);" onclick="window.open('https://zalo.me/${cleanPhone}', '_blank')" title="Nhắn Zalo cho Phụ huynh"><i class="fas fa-comment-dots"></i></button>` : '';
-        
         let aiBtn = `<button class="btn-ai-magic" onclick="openAIForStudent('${stu.name}')" title="Nhờ AI nhận xét"><i class="fas fa-magic"></i></button>`;
         
-        list.innerHTML += `<div class="list-item"><div class="list-item-info"><strong>${index + 1}. ${stu.name}</strong><small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Trống'}</small></div><div class="list-item-actions">${aiBtn}${zaloBtn}<button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button><button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button><button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button></div></div>`; 
+        // Nhãn Tổ cố định & Vai trò
+        let groupBadge = '';
+        if (stu.fixedGroup && stu.fixedGroup != 0) {
+            const gObj = (appData.fixedGroups || []).find(g => g.id == stu.fixedGroup);
+            const gName = gObj ? gObj.name : `Tổ ${stu.fixedGroup}`;
+            if (stu.fixedRole === 'leader') {
+                groupBadge = `<span class="group-tag" style="background:#fef3c7; color:#b45309; border-color:#fde68a;"><i class="fas fa-star text-orange"></i> ${gName} (Tổ trưởng)</span>`;
+            } else if (stu.fixedRole === 'vice') {
+                groupBadge = `<span class="group-tag" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd;"><i class="fas fa-medal"></i> ${gName} (Tổ phó)</span>`;
+            } else {
+                groupBadge = `<span class="group-tag"><i class="fas fa-users"></i> ${gName}</span>`;
+            }
+        }
+
+        let groupSelectOptions = `<option value="0" ${(!stu.fixedGroup || stu.fixedGroup == 0) ? 'selected' : ''}>-- Chưa phân tổ --</option>`;
+        if (appData.fixedGroups && Array.isArray(appData.fixedGroups)) {
+            appData.fixedGroups.forEach(g => {
+                groupSelectOptions += `<option value="${g.id}" ${stu.fixedGroup == g.id ? 'selected' : ''}>${g.name}</option>`;
+            });
+        }
+
+        list.innerHTML += `
+            <div class="list-item">
+                <div class="list-item-info">
+                    <div>
+                        <strong>${index + 1}. ${stu.name}</strong> 
+                        ${groupBadge}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; margin: 4px 0;">
+                        <span style="font-size: 0.78rem; font-weight: 700; color: #64748b;">Tổ:</span>
+                        <select onchange="window.transferStudentToGroup(${stu.id}, this.value, this)" style="font-size: 0.8rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: var(--text-main); outline: none;">
+                            ${groupSelectOptions}
+                        </select>
+                    </div>
+                    <small><i class="fas fa-venus-mars"></i> ${stu.gender} • <i class="fas fa-phone"></i> ${stu.phone || 'Chưa có SĐT'}</small>
+                </div>
+                <div class="list-item-actions">
+                    ${aiBtn}
+                    ${zaloBtn}
+                    <button class="btn-outline-action" style="color:white; background:var(--primary);" onclick="generateReportCard(${stu.id})" title="Tạo phiếu liên lạc ảnh"><i class="fas fa-camera-retro"></i></button>
+                    <button class="btn-outline-action" style="color:var(--text-main);" onclick="editStudent(${stu.id})"><i class="fas fa-pen"></i></button>
+                    <button class="btn-outline-action" style="color:var(--danger);" onclick="deleteStudent(${stu.id})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`; 
     });
-}
+};
+
+window.openAddStudentModal = function() {
+    document.getElementById('stu-id').value = ''; 
+    document.getElementById('stu-name').value = ''; 
+    document.getElementById('stu-gender').value = 'Nam'; 
+    document.getElementById('stu-dob').value = ''; 
+    document.getElementById('stu-phone').value = ''; 
+    document.getElementById('stu-role').value = 'member';
+    const grpSelect = document.getElementById('stu-group');
+    if (grpSelect) {
+        let opts = '<option value="0">-- Chưa phân tổ --</option>';
+        if (appData.fixedGroups) {
+            appData.fixedGroups.forEach(g => {
+                opts += `<option value="${g.id}">${g.name}</option>`;
+            });
+        }
+        grpSelect.innerHTML = opts;
+        grpSelect.value = '0';
+    }
+    window.openModal('modal-add-student');
+};
 
 window.saveStudent = function() {
-    const id = document.getElementById('stu-id').value; const name = document.getElementById('stu-name').value;
-    if(!name) return window.showToast("Nhập tên!", "error");
-    const obj = { id: id ? parseInt(id) : Date.now(), name: name, gender: document.getElementById('stu-gender').value, dob: document.getElementById('stu-dob').value, phone: document.getElementById('stu-phone').value };
-    if(id) { appData.students[appData.students.findIndex(s => s.id == id)] = obj; window.showToast("Đã cập nhật!"); } else { appData.students.push(obj); window.showToast("Đã thêm!"); }
-    window.saveData(); window.renderStudents(); window.closeModal('modal-add-student');
-}
-window.editStudent = function(id) { const stu = appData.students.find(s => s.id === id); if(stu) { document.getElementById('stu-id').value = stu.id; document.getElementById('stu-name').value = stu.name; document.getElementById('stu-gender').value = stu.gender || 'Nam'; let fDob = stu.dob || ''; if(fDob.includes('/')) { const p = fDob.split('/'); if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; } document.getElementById('stu-dob').value = fDob; document.getElementById('stu-phone').value = stu.phone || ''; window.openModal('modal-add-student'); } }
-window.deleteStudent = function(id) { if(confirm("Xác nhận xóa?")) { appData.students = appData.students.filter(s => s.id !== id); window.saveData(); window.renderStudents(); window.showToast("Đã xóa"); } }
+    const id = document.getElementById('stu-id').value; 
+    const name = document.getElementById('stu-name').value;
+    if(!name) return window.showToast("Vui lòng nhập họ tên học sinh!", "error");
+
+    const fixedGroup = parseInt(document.getElementById('stu-group').value) || 0;
+    const fixedRole = document.getElementById('stu-role').value || 'member';
+
+    if(id) { 
+        const existingStu = appData.students.find(s => s.id == id);
+        if (existingStu) {
+            const oldFixedGroup = existingStu.fixedGroup || 0;
+            // Nếu chuyển sang tổ khác và đang giữ vai trò Tổ trưởng/Tổ phó
+            if (oldFixedGroup && oldFixedGroup !== fixedGroup && (existingStu.fixedRole === 'leader' || existingStu.fixedRole === 'vice')) {
+                const confirmMsg = "Học sinh này đang giữ vai trò Tổ trưởng/Tổ phó. Nếu chuyển tổ, vai trò hiện tại sẽ được gỡ bỏ. Bạn có chắc chắn muốn chuyển không?";
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
+                // Gỡ vai trò ở tổ cũ
+                const oldG = (appData.fixedGroups || []).find(g => g.id == oldFixedGroup);
+                if (oldG) {
+                    if (oldG.leaderId == existingStu.id) oldG.leaderId = null;
+                    if (oldG.viceLeaderId == existingStu.id) oldG.viceLeaderId = null;
+                }
+            }
+        }
+    }
+
+    const obj = { 
+        id: id ? parseInt(id) : Date.now(), 
+        name: name.trim(), 
+        gender: document.getElementById('stu-gender').value, 
+        dob: document.getElementById('stu-dob').value, 
+        phone: document.getElementById('stu-phone').value,
+        fixedGroup: fixedGroup,
+        fixedRole: fixedGroup ? fixedRole : 'member'
+    };
+
+    if(id) { 
+        const existingIdx = appData.students.findIndex(s => s.id == id);
+        if (existingIdx !== -1) {
+            appData.students[existingIdx] = { ...appData.students[existingIdx], ...obj };
+        }
+        window.showToast("Đã cập nhật thông tin học sinh!"); 
+    } else { 
+        appData.students.push(obj); 
+        window.showToast("Đã thêm học sinh mới!"); 
+    }
+
+    // Đồng bộ vai trò Tổ trưởng / Tổ phó trong tổ
+    if (fixedGroup && appData.fixedGroups) {
+        const grp = appData.fixedGroups.find(g => g.id == fixedGroup);
+        if (grp) {
+            if (obj.fixedRole === 'leader') {
+                if (grp.viceLeaderId == obj.id) grp.viceLeaderId = null;
+                appData.students.forEach(s => {
+                    if (s.fixedGroup == fixedGroup && s.id != obj.id && s.fixedRole === 'leader') {
+                        s.fixedRole = 'member';
+                    }
+                });
+                grp.leaderId = obj.id;
+            } else if (obj.fixedRole === 'vice') {
+                if (grp.leaderId == obj.id) grp.leaderId = null;
+                appData.students.forEach(s => {
+                    if (s.fixedGroup == fixedGroup && s.id != obj.id && s.fixedRole === 'vice') {
+                        s.fixedRole = 'member';
+                    }
+                });
+                grp.viceLeaderId = obj.id;
+            } else {
+                if (grp.leaderId == obj.id) grp.leaderId = null;
+                if (grp.viceLeaderId == obj.id) grp.viceLeaderId = null;
+            }
+        }
+    }
+
+    window.saveData(); 
+    window.renderStudents(); 
+    if (currentStudentTab === 'fixed') window.renderFixedGroups();
+    window.closeModal('modal-add-student');
+};
+
+window.editStudent = function(id) { 
+    const stu = appData.students.find(s => s.id === id); 
+    if(stu) { 
+        document.getElementById('stu-id').value = stu.id; 
+        document.getElementById('stu-name').value = stu.name; 
+        document.getElementById('stu-gender').value = stu.gender || 'Nam'; 
+        let fDob = stu.dob || ''; 
+        if(fDob.includes('/')) { 
+            const p = fDob.split('/'); 
+            if(p.length===3) fDob = `${p[2]}-${p[1]}-${p[0]}`; 
+        } 
+        document.getElementById('stu-dob').value = fDob; 
+        document.getElementById('stu-phone').value = stu.phone || ''; 
+
+        // Nạp danh sách tổ vào select
+        const grpSelect = document.getElementById('stu-group');
+        if (grpSelect) {
+            let opts = '<option value="0">-- Chưa phân tổ --</option>';
+            if (appData.fixedGroups) {
+                appData.fixedGroups.forEach(g => {
+                    opts += `<option value="${g.id}">${g.name}</option>`;
+                });
+            }
+            grpSelect.innerHTML = opts;
+            grpSelect.value = stu.fixedGroup || 0;
+        }
+
+        const roleSelect = document.getElementById('stu-role');
+        if (roleSelect) {
+            roleSelect.value = stu.fixedRole || 'member';
+        }
+
+        window.openModal('modal-add-student'); 
+    } 
+};
+
+window.deleteStudent = function(id) { 
+    if(confirm("Xác nhận xóa học sinh này?")) { 
+        appData.students = appData.students.filter(s => s.id !== id); 
+        window.saveData(); 
+        window.renderStudents(); 
+        if (currentStudentTab === 'fixed') window.renderFixedGroups();
+        window.showToast("Đã xóa học sinh"); 
+    } 
+};
+
+// ================= HỆ THỐNG TỔ CỐ ĐỊNH =================
+window.renderFixedGroups = function() {
+    const container = document.getElementById('fixed-groups-list') || document.getElementById('fixed-groups-container');
+    if (!container) return;
+
+    if (!appData.fixedGroups || !Array.isArray(appData.fixedGroups)) {
+        appData.fixedGroups = JSON.parse(JSON.stringify(defaultFixedGroups));
+    }
+
+    if (appData.fixedGroups.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 35px 20px; background: white; border-radius: 16px; border: 2px dashed #cbd5e1;">
+                <i class="fas fa-users-slash" style="font-size: 2.2rem; color: #94a3b8; margin-bottom: 10px;"></i>
+                <h4 style="color: var(--text-main); margin-bottom: 6px;">Chưa có tổ nào</h4>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">Tạo các tổ cố định để quản lý nề nếp lớp học lâu dài.</p>
+                <button class="btn-primary" onclick="addNewFixedGroup()"><i class="fas fa-plus"></i> + Thêm tổ mới</button>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    appData.fixedGroups.forEach(g => {
+        const members = appData.students.filter(s => s.fixedGroup == g.id);
+        const leader = members.find(s => s.id == g.leaderId || s.fixedRole === 'leader');
+        const vice = members.find(s => s.id == g.viceLeaderId || s.fixedRole === 'vice');
+
+        // Tính tổng điểm thi đua của cả tổ trong tháng hiện tại
+        let totalPoints = 0;
+        const currentMonth = new Date().getMonth() + 1;
+        members.forEach(m => {
+            (appData.behaviorRecords || []).forEach(r => {
+                const rMonth = new Date(r.date).getMonth() + 1;
+                if (rMonth === currentMonth && r.studentId == m.id) {
+                    totalPoints += Number(r.snapshotPoints || 0);
+                }
+            });
+        });
+
+        const pointsBadgeClass = totalPoints >= 0 ? 'bg-green-soft text-green' : 'bg-red-soft text-danger';
+        const pointsSign = totalPoints > 0 ? `+${totalPoints}` : totalPoints;
+
+        html += `
+            <div class="fixed-group-card" id="fixed-group-card-${g.id}" style="margin-bottom: 16px;">
+                <div class="fixed-group-header">
+                    <div class="fixed-group-title">
+                        <i class="fas fa-shield-alt text-primary"></i>
+                        <span>${g.name.toUpperCase()}</span>
+                        <span class="group-badge" style="background:#eff6ff; color:#1d4ed8; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px;">
+                            ${members.length} học sinh
+                        </span>
+                        <span class="group-badge ${pointsBadgeClass}" style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px;" title="Điểm thi đua tháng này">
+                            ${pointsSign} điểm TĐ
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button class="btn-outline-action" onclick="window.quickRewardFixedGroup(${g.id})" title="Cộng/Trừ điểm thi đua cả tổ" style="color:var(--primary); width:34px; height:34px;"><i class="fas fa-award"></i></button>
+                        <button class="btn-outline-action" onclick="window.renameFixedGroup(${g.id})" title="Sửa tên tổ" style="width:34px; height:34px;"><i class="fas fa-pen"></i></button>
+                        <button class="btn-outline text-danger" onclick="window.deleteFixedGroup(${g.id})" title="Xóa tổ này" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 700; border-color: #fecaca; background: #fff5f5; border-radius: 8px;">
+                            <i class="fas fa-trash-alt"></i> Xóa tổ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KHU VỰC CÁN SỰ TỔ: TỔ TRƯỞNG & TỔ PHÓ -->
+                <div class="fixed-group-meta" style="margin-bottom: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px;">
+                    <div class="fixed-group-meta-item">
+                        <span class="fixed-group-meta-label" style="display:flex; align-items:center; gap:4px; color:#d97706; font-weight:700;">
+                            <i class="fas fa-star text-orange"></i> Tổ trưởng:
+                        </span>
+                        <select onchange="window.setFixedGroupRole(${g.id}, this.value, 'leader')" style="width:100%; margin-top:3px; font-weight:700; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:var(--text-main); font-size:0.82rem; padding:4px 6px; cursor:pointer;">
+                            <option value="">-- Chưa chọn Tổ trưởng --</option>
+                            ${members.map(m => `<option value="${m.id}" ${(leader && leader.id === m.id) ? 'selected' : ''}>${m.name} (${m.gender})</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="fixed-group-meta-item">
+                        <span class="fixed-group-meta-label" style="display:flex; align-items:center; gap:4px; color:#0284c7; font-weight:700;">
+                            <i class="fas fa-medal text-primary"></i> Tổ phó:
+                        </span>
+                        <select onchange="window.setFixedGroupRole(${g.id}, this.value, 'vice')" style="width:100%; margin-top:3px; font-weight:700; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:var(--text-main); font-size:0.82rem; padding:4px 6px; cursor:pointer;">
+                            <option value="">-- Chưa chọn Tổ phó --</option>
+                            ${members.map(m => `<option value="${m.id}" ${(vice && vice.id === m.id) ? 'selected' : ''}>${m.name} (${m.gender})</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- NÚT THAO TÁC THÊM HỌC SINH -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #475569;">Danh sách thành viên:</span>
+                    <button class="btn-outline text-blue" style="padding: 4px 10px; font-size: 0.8rem; font-weight: 700; border-radius: 8px;" onclick="window.openAddStudentsToGroupModal(${g.id})">
+                        <i class="fas fa-user-plus"></i> + Thêm học sinh
+                    </button>
+                </div>
+
+                <!-- DANH SÁCH HỌC SINH ĐƯỢC ĐÁNH SỐ THỨ TỰ -->
+                <div class="fixed-group-members" style="display: flex; flex-direction: column; gap: 6px;">
+                    ${members.length === 0 ? `
+                        <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; color: #64748b; font-size: 0.82rem;">
+                            Chưa có học sinh trong tổ. Bấm <b>"+ Thêm học sinh"</b> ở trên để chọn học sinh vào tổ.
+                        </div>
+                    ` : members.map((m, idx) => {
+                        let roleTag = '';
+                        if (leader && leader.id === m.id) {
+                            roleTag = `<span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:0.75rem; padding:2px 6px; border-radius:6px; font-weight:700;"><i class="fas fa-star"></i> Tổ trưởng</span>`;
+                        } else if (vice && vice.id === m.id) {
+                            roleTag = `<span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.75rem; padding:2px 6px; border-radius:6px; font-weight:700;"><i class="fas fa-medal"></i> Tổ phó</span>`;
+                        }
+
+                        return `
+                            <div class="fixed-group-member-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #ffffff; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 0.85rem;">
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-weight: 700; color: #64748b; min-width: 22px;">${idx + 1}.</span>
+                                    <strong style="color: var(--text-main);">${m.name}</strong>
+                                    ${roleTag}
+                                    <small style="color: #64748b;">(${m.gender})</small>
+                                </div>
+                                <button class="btn-outline-action text-danger" onclick="window.removeStudentFromGroup(${m.id})" title="Rút học sinh khỏi tổ" style="width:26px; height:26px; font-size:0.75rem; border-color:#fee2e2;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+};
+
+// Chuyển một học sinh sang tổ khác (Áp dụng cho cả Chọn từ danh sách và Modal)
+window.transferStudentToGroup = function(studentId, targetGroupId, selectEl = null) {
+    const stu = appData.students.find(s => s.id == studentId);
+    if (!stu) return false;
+
+    const oldGroupId = stu.fixedGroup || 0;
+    const newGroupId = parseInt(targetGroupId) || 0;
+
+    if (oldGroupId === newGroupId) return false;
+
+    // Cảnh báo nếu học sinh đang giữ vai trò Tổ trưởng hoặc Tổ phó
+    if (oldGroupId !== 0 && (stu.fixedRole === 'leader' || stu.fixedRole === 'vice')) {
+        const confirmMsg = "Học sinh này đang giữ vai trò Tổ trưởng/Tổ phó. Nếu chuyển tổ, vai trò hiện tại sẽ được gỡ bỏ. Bạn có chắc chắn muốn chuyển không?";
+        if (!confirm(confirmMsg)) {
+            if (selectEl) selectEl.value = String(oldGroupId);
+            return false;
+        }
+        // Xóa vai trò ở tổ cũ
+        const oldGrp = (appData.fixedGroups || []).find(g => g.id == oldGroupId);
+        if (oldGrp) {
+            if (oldGrp.leaderId == stu.id) oldGrp.leaderId = null;
+            if (oldGrp.viceLeaderId == stu.id) oldGrp.viceLeaderId = null;
+        }
+    }
+
+    // Đặt tổ mới và chuyển vai trò về học sinh bình thường
+    stu.fixedGroup = newGroupId;
+    stu.fixedRole = 'member';
+
+    // Đảm bảo không bị trùng vai trò ở tổ mới
+    if (newGroupId) {
+        const newGrp = (appData.fixedGroups || []).find(g => g.id == newGroupId);
+        if (newGrp) {
+            if (newGrp.leaderId == stu.id) newGrp.leaderId = null;
+            if (newGrp.viceLeaderId == stu.id) newGrp.viceLeaderId = null;
+        }
+    }
+
+    window.saveData();
+    window.renderStudents();
+    window.renderFixedGroups();
+
+    const targetName = newGroupId ? ((appData.fixedGroups || []).find(g => g.id == newGroupId)?.name || `Tổ ${newGroupId}`) : 'Chưa phân tổ';
+    window.showToast(`Đã chuyển em ${stu.name} sang ${targetName}!`);
+    return true;
+};
+
+// Tạo tổ mới
+window.addNewFixedGroup = function() {
+    if (!appData.fixedGroups) appData.fixedGroups = [];
+    const newId = appData.fixedGroups.length > 0 ? Math.max(...appData.fixedGroups.map(g => g.id)) + 1 : 1;
+    const newName = `Tổ ${newId}`;
+    appData.fixedGroups.push({
+        id: newId,
+        name: newName,
+        leaderId: null,
+        viceLeaderId: null
+    });
+    window.saveData();
+    window.renderFixedGroups();
+    window.renderStudents();
+    window.showToast(`Đã thêm ${newName}!`);
+};
+
+// Xóa tổ (từ thẻ tổ)
+window.deleteFixedGroup = function(groupId) {
+    const grp = (appData.fixedGroups || []).find(g => g.id == groupId);
+    const grpName = grp ? grp.name : `Tổ ${groupId}`;
+    const members = (appData.students || []).filter(s => s.fixedGroup == groupId);
+
+    let confirmMsg = `Xác nhận xóa ${grpName}?`;
+    if (members.length > 0) {
+        confirmMsg += `\nLưu ý: Có ${members.length} học sinh đang thuộc tổ này. Khi xóa, các em sẽ tự động chuyển về trạng thái "Chưa phân tổ".`;
+    }
+
+    if (confirm(confirmMsg)) {
+        appData.fixedGroups = appData.fixedGroups.filter(g => g.id != groupId);
+        appData.students.forEach(s => {
+            if (s.fixedGroup == groupId) {
+                s.fixedGroup = 0;
+                s.fixedRole = 'member';
+            }
+        });
+        window.saveData();
+        window.renderFixedGroups();
+        window.renderStudents();
+        window.showToast(`Đã xóa ${grpName}!`);
+
+        const deleteModal = document.getElementById('modal-delete-fixed-group');
+        if (deleteModal && deleteModal.style.display === 'flex') {
+            if (appData.fixedGroups.length === 0) {
+                window.closeModal('modal-delete-fixed-group');
+            } else {
+                window.renderDeleteFixedGroupsModal();
+            }
+        }
+    }
+};
+
+// ================= MODAL XÓA TỔ CỐ ĐỊNH =================
+window.openDeleteFixedGroupModal = function() {
+    if (!appData.fixedGroups || appData.fixedGroups.length === 0) {
+        window.showToast("Hiện tại lớp chưa có tổ nào để xóa!", "warning");
+        return;
+    }
+    window.renderDeleteFixedGroupsModal();
+    window.openModal('modal-delete-fixed-group');
+};
+
+window.deleteEmptyFixedGroups = function() {
+    if (!appData.fixedGroups || appData.fixedGroups.length === 0) return;
+    const emptyGroups = appData.fixedGroups.filter(g => {
+        const count = (appData.students || []).filter(s => s.fixedGroup == g.id).length;
+        return count === 0;
+    });
+
+    if (emptyGroups.length === 0) {
+        window.showToast("Không có tổ trống nào (tất cả các tổ đều đang có học sinh)!", "info");
+        return;
+    }
+
+    const groupNames = emptyGroups.map(g => g.name).join(', ');
+    if (confirm(`Bạn có chắc chắn muốn xóa ${emptyGroups.length} tổ trống (${groupNames}) tạo nhầm không?`)) {
+        appData.fixedGroups = appData.fixedGroups.filter(g => !emptyGroups.some(eg => eg.id === g.id));
+        window.saveData();
+        window.renderFixedGroups();
+        window.renderStudents();
+        window.showToast(`Đã xóa sạch ${emptyGroups.length} tổ trống tạo nhầm!`);
+
+        const deleteModal = document.getElementById('modal-delete-fixed-group');
+        if (deleteModal && deleteModal.style.display === 'flex') {
+            if (appData.fixedGroups.length === 0) {
+                window.closeModal('modal-delete-fixed-group');
+            } else {
+                window.renderDeleteFixedGroupsModal();
+            }
+        }
+    }
+};
+
+window.renderDeleteFixedGroupsModal = function() {
+    const container = document.getElementById('delete-fixed-groups-list');
+    if (!container) return;
+
+    if (!appData.fixedGroups || appData.fixedGroups.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 25px 15px; color: #64748b;">
+                <i class="fas fa-check-circle" style="font-size: 2rem; color: var(--success); margin-bottom: 8px;"></i>
+                <p style="font-weight: 600;">Không còn tổ nào trong danh sách.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const emptyCount = appData.fixedGroups.filter(g => (appData.students || []).filter(s => s.fixedGroup == g.id).length === 0).length;
+
+    let html = '';
+    if (emptyCount > 0) {
+        html += `
+            <button class="btn-outline text-danger mb-15 w-full" style="padding: 10px; font-size: 0.85rem; font-weight: 700; border-color: #fecaca; background: #fff1f2;" onclick="window.deleteEmptyFixedGroups()">
+                <i class="fas fa-broom"></i> Xóa nhanh ${emptyCount} tổ trống (0 học sinh) tạo nhầm
+            </button>
+        `;
+    }
+
+    appData.fixedGroups.forEach(g => {
+        const memberCount = (appData.students || []).filter(s => s.fixedGroup == g.id).length;
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: var(--shadow-sm);">
+                <div>
+                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-shield-alt text-primary"></i> ${g.name}
+                    </div>
+                    <div style="font-size: 0.8rem; color: #64748b; margin-top: 3px;">
+                        ${memberCount > 0 ? `<b style="color:var(--primary);">${memberCount}</b> học sinh trong tổ` : `<span style="color:#ef4444; font-weight:600;">Tổ trống (0 học sinh)</span>`}
+                    </div>
+                </div>
+                <button class="btn-outline text-danger" style="padding: 7px 12px; font-size: 0.82rem; font-weight: 700; border-color: #fecaca; background: #fff5f5; border-radius: 8px;" onclick="window.deleteFixedGroup(${g.id})">
+                    <i class="fas fa-trash-alt"></i> Xóa tổ
+                </button>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+};
+
+// Sửa tên tổ
+window.renameFixedGroup = function(groupId) {
+    const grp = appData.fixedGroups.find(g => g.id == groupId);
+    if (!grp) return;
+    const newName = prompt("Nhập tên mới cho tổ:", grp.name);
+    if (newName && newName.trim()) {
+        grp.name = newName.trim();
+        window.saveData();
+        window.renderFixedGroups();
+        window.renderStudents();
+        window.showToast("Đã đổi tên tổ!");
+    }
+};
+
+// Phân công Tổ trưởng và Tổ phó với đầy đủ quy tắc kiểm tra ràng buộc
+window.setFixedGroupRole = function(groupId, studentId, role) {
+    const grp = appData.fixedGroups.find(g => g.id == groupId);
+    if (!grp) return;
+
+    const sId = studentId ? parseInt(studentId) : null;
+    const members = appData.students.filter(s => s.fixedGroup == groupId);
+
+    if (sId) {
+        const candidate = members.find(s => s.id == sId);
+        if (!candidate) {
+            window.showToast("Học sinh này không thuộc tổ!", "error");
+            return;
+        }
+
+        if (role === 'leader') {
+            // Quy tắc: 1 học sinh không được đồng thời là Tổ trưởng và Tổ phó
+            if (grp.viceLeaderId == sId) {
+                grp.viceLeaderId = null;
+            }
+            grp.leaderId = sId;
+        } else if (role === 'vice') {
+            // Quy tắc: 1 học sinh không được đồng thời là Tổ trưởng và Tổ phó
+            if (grp.leaderId == sId) {
+                grp.leaderId = null;
+            }
+            grp.viceLeaderId = sId;
+        }
+    } else {
+        // Gỡ bỏ vai trò
+        if (role === 'leader') grp.leaderId = null;
+        if (role === 'vice') grp.viceLeaderId = null;
+    }
+
+    // Đồng bộ vai trò fixedRole cho từng học sinh trong tổ
+    members.forEach(s => {
+        if (s.id == grp.leaderId) {
+            s.fixedRole = 'leader';
+        } else if (s.id == grp.viceLeaderId) {
+            s.fixedRole = 'vice';
+        } else {
+            s.fixedRole = 'member';
+        }
+    });
+
+    window.saveData();
+    window.renderFixedGroups();
+    window.renderStudents();
+    window.showToast("Đã cập nhật cán sự tổ!");
+};
+
+// Rút một học sinh khỏi tổ
+window.removeStudentFromGroup = function(studentId) {
+    const stu = appData.students.find(s => s.id == studentId);
+    if (!stu) return;
+
+    if (stu.fixedRole === 'leader' || stu.fixedRole === 'vice') {
+        const confirmMsg = "Học sinh này đang giữ vai trò Tổ trưởng/Tổ phó. Bạn có chắc chắn muốn rút em khỏi tổ không?";
+        if (!confirm(confirmMsg)) return;
+    }
+
+    const oldGrp = (appData.fixedGroups || []).find(g => g.id == stu.fixedGroup);
+    if (oldGrp) {
+        if (oldGrp.leaderId == stu.id) oldGrp.leaderId = null;
+        if (oldGrp.viceLeaderId == stu.id) oldGrp.viceLeaderId = null;
+    }
+
+    stu.fixedGroup = 0;
+    stu.fixedRole = 'member';
+
+    window.saveData();
+    window.renderFixedGroups();
+    window.renderStudents();
+    window.showToast(`Đã rút em ${stu.name} khỏi tổ!`);
+};
+
+// ================= MODAL THÊM HỌC SINH VÀO TỔ =================
+window.currentAddGroupTargetId = null;
+
+window.openAddStudentsToGroupModal = function(groupId) {
+    const grp = (appData.fixedGroups || []).find(g => g.id == groupId);
+    if (!grp) return;
+
+    window.currentAddGroupTargetId = groupId;
+    const targetInput = document.getElementById('add-students-target-group-id');
+    if (targetInput) targetInput.value = groupId;
+
+    const titleEl = document.getElementById('add-students-group-title');
+    if (titleEl) titleEl.innerHTML = `<i class="fas fa-user-plus text-primary"></i> Thêm học sinh vào ${grp.name}`;
+
+    const searchInput = document.getElementById('search-student-for-group');
+    if (searchInput) searchInput.value = '';
+
+    window.renderStudentsForGroupModal();
+    window.openModal('modal-add-students-to-group');
+};
+
+window.renderStudentsForGroupModal = function() {
+    const listContainer = document.getElementById('add-students-group-list');
+    if (!listContainer) return;
+
+    const targetGroupId = window.currentAddGroupTargetId;
+    const query = (document.getElementById('search-student-for-group')?.value || '').toLowerCase().trim();
+
+    // Lấy tất cả học sinh KHÔNG thuộc tổ hiện tại
+    let eligibleStudents = appData.students.filter(s => s.fixedGroup != targetGroupId);
+
+    if (query) {
+        eligibleStudents = eligibleStudents.filter(s => s.name.toLowerCase().includes(query));
+    }
+
+    const infoEl = document.getElementById('add-students-count-info');
+    if (infoEl) {
+        infoEl.innerText = `Có ${eligibleStudents.length} học sinh có thể thêm vào:`;
+    }
+
+    if (eligibleStudents.length === 0) {
+        listContainer.innerHTML = `
+            <div style="text-align:center; padding:20px; color:#64748b; font-size:0.85rem;">
+                Không tìm thấy học sinh phù hợp.
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    eligibleStudents.forEach(stu => {
+        let statusBadge = '';
+        if (!stu.fixedGroup || stu.fixedGroup == 0) {
+            statusBadge = `<span class="badge" style="background:#f1f5f9; color:#475569; font-size:0.72rem; padding:2px 6px; border-radius:4px;">Chưa phân tổ</span>`;
+        } else {
+            const currentG = (appData.fixedGroups || []).find(g => g.id == stu.fixedGroup);
+            const gName = currentG ? currentG.name : `Tổ ${stu.fixedGroup}`;
+            let roleNote = '';
+            if (stu.fixedRole === 'leader') roleNote = ' (⭐ Tổ trưởng)';
+            else if (stu.fixedRole === 'vice') roleNote = ' (🎖️ Tổ phó)';
+            statusBadge = `<span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.72rem; padding:2px 6px; border-radius:4px;">Đang ở ${gName}${roleNote}</span>`;
+        }
+
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; margin-bottom: 0;">
+                    <input type="checkbox" class="chk-add-student-to-grp" value="${stu.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                    <div>
+                        <strong>${stu.name}</strong> <small style="color:#64748b;">(${stu.gender})</small>
+                        <div style="margin-top: 2px;">${statusBadge}</div>
+                    </div>
+                </label>
+                <button class="btn-outline text-blue" style="font-size: 0.75rem; padding: 4px 8px; font-weight: 700;" onclick="window.quickAddSingleStudentToGroup(${stu.id})">
+                    + Thêm ngay
+                </button>
+            </div>
+        `;
+    });
+
+    listContainer.innerHTML = html;
+};
+
+window.toggleSelectAllStudentsForGroup = function() {
+    const checkboxes = document.querySelectorAll('.chk-add-student-to-grp');
+    if (checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(c => c.checked);
+    checkboxes.forEach(c => c.checked = !allChecked);
+};
+
+window.quickAddSingleStudentToGroup = function(studentId) {
+    if (!window.currentAddGroupTargetId) return;
+    const ok = window.transferStudentToGroup(studentId, window.currentAddGroupTargetId);
+    if (ok) {
+        window.renderStudentsForGroupModal();
+    }
+};
+
+window.confirmBatchAddStudentsToGroup = function() {
+    const targetGroupId = window.currentAddGroupTargetId;
+    if (!targetGroupId) return;
+
+    const checkboxes = document.querySelectorAll('.chk-add-student-to-grp:checked');
+    if (checkboxes.length === 0) {
+        return window.showToast("Vui lòng chọn ít nhất một học sinh!", "error");
+    }
+
+    let addedCount = 0;
+    for (const chk of checkboxes) {
+        const stuId = parseInt(chk.value);
+        const ok = window.transferStudentToGroup(stuId, targetGroupId);
+        if (ok) addedCount++;
+    }
+
+    if (addedCount > 0) {
+        window.closeModal('modal-add-students-to-group');
+        window.showToast(`🎉 Đã thêm ${addedCount} học sinh vào tổ thành công!`);
+    }
+};
+
+window.quickRewardFixedGroup = function(groupId) {
+    const grp = appData.fixedGroups.find(g => g.id == groupId);
+    if (!grp) return;
+    const members = appData.students.filter(s => s.fixedGroup == groupId);
+    if (members.length === 0) return window.showToast("Tổ này chưa có thành viên!", "error");
+
+    const ptsStr = prompt(`Cộng/Trừ điểm thi đua cho TẤT CẢ ${members.length} học sinh ${grp.name}:\n(Nhập số dương VD: 2 để cộng điểm, số âm VD: -1 để trừ điểm)`, "1");
+    if (ptsStr === null) return;
+    const pts = parseInt(ptsStr);
+    if (isNaN(pts) || pts === 0) return window.showToast("Số điểm không hợp lệ!", "error");
+
+    const note = prompt("Lý do ghi nhận thi đua:", pts > 0 ? "Khen ngợi nề nếp tổ" : "Vi phạm nề nếp tổ") || "Thi đua tổ";
+
+    members.forEach(stu => {
+        appData.behaviorRecords.push({
+            id: Date.now() + Math.random(),
+            studentId: stu.id,
+            tagId: "custom_group",
+            tagName: `[${grp.name}] ${note}`,
+            type: pts > 0 ? 'positive' : 'negative',
+            snapshotPoints: pts,
+            note: note,
+            date: getTodayStr()
+        });
+    });
+
+    window.saveData();
+    window.renderFixedGroups();
+    window.showToast(`🎉 Đã ${pts > 0 ? 'cộng' : 'trừ'} ${Math.abs(pts)} điểm cho toàn bộ ${grp.name}!`);
+};
+
+window.openAutoGroupModal = function() {
+    window.openModal('modal-auto-fixed-groups');
+};
+
+window.executeAutoFixedGroups = function() {
+    if (appData.students.length === 0) {
+        return window.showToast("Chưa có học sinh nào trong danh sách lớp!", "error");
+    }
+
+    const count = parseInt(document.getElementById('auto-group-count').value) || 4;
+    const method = document.getElementById('auto-group-method').value;
+
+    if (!appData.fixedGroups) appData.fixedGroups = [];
+    while (appData.fixedGroups.length < count) {
+        const nextId = appData.fixedGroups.length + 1;
+        appData.fixedGroups.push({ id: nextId, name: `Tổ ${nextId}`, leaderId: null, viceLeaderId: null });
+    }
+    const activeGroups = appData.fixedGroups.slice(0, count);
+
+    let sortedStudents = [...appData.students];
+
+    if (method === 'balanced_gender') {
+        const males = sortedStudents.filter(s => (s.gender || 'Nam').toLowerCase() === 'nam').sort(() => Math.random() - 0.5);
+        const females = sortedStudents.filter(s => (s.gender || 'Nam').toLowerCase() !== 'nam').sort(() => Math.random() - 0.5);
+        
+        males.forEach((stu, idx) => {
+            const targetGroup = activeGroups[idx % count];
+            stu.fixedGroup = targetGroup.id;
+            stu.fixedRole = 'member';
+        });
+        females.forEach((stu, idx) => {
+            const targetGroup = activeGroups[(count - 1 - (idx % count)) % count];
+            stu.fixedGroup = targetGroup.id;
+            stu.fixedRole = 'member';
+        });
+    } else if (method === 'random') {
+        sortedStudents.sort(() => Math.random() - 0.5).forEach((stu, idx) => {
+            const targetGroup = activeGroups[idx % count];
+            stu.fixedGroup = targetGroup.id;
+            stu.fixedRole = 'member';
+        });
+    } else {
+        // sequential
+        sortedStudents.forEach((stu, idx) => {
+            const targetGroup = activeGroups[idx % count];
+            stu.fixedGroup = targetGroup.id;
+            stu.fixedRole = 'member';
+        });
+    }
+
+    window.saveData();
+    window.closeModal('modal-auto-fixed-groups');
+    window.renderFixedGroups();
+    window.renderStudents();
+    window.showToast(`🎉 Đã tự động chia ${appData.students.length} học sinh thành ${count} tổ!`);
+};
+
+// ================= HỆ THỐNG NHÓM HOẠT ĐỘNG LINH HOẠT TRONG GIỜ HỌC =================
+window.updateActivitySplitLabel = function() {
+    const mode = document.getElementById('act-split-mode').value;
+    const label = document.getElementById('act-split-label');
+    const input = document.getElementById('act-split-num');
+    if (mode === 'by_group_count') {
+        label.innerText = 'Số lượng nhóm cần tạo';
+        input.value = 4;
+        input.min = 2;
+        input.max = 12;
+    } else {
+        label.innerText = 'Số học sinh mỗi nhóm';
+        input.value = 5;
+        input.min = 2;
+        input.max = 20;
+    }
+};
+
+const coolGroupNames = [
+    "Đại Bàng Vàng", "Rồng Thần Tốc", "Sư Tử Trẻ", "Phượng Hoàng Lửa", 
+    "Chiến Binh Ánh Sáng", "Đoàn Kết Vững Vàng", "Tia Chớp Xanh", "Bứt Phá Vươn Xa",
+    "Khám Phá Tri Thức", "Sáng Tạo Đỉnh Cao", "Vô Địch", "Ngôi Sao Hy Vọng"
+];
+
+window.generateFlexibleGroups = function() {
+    if (appData.students.length === 0) {
+        return window.showToast("Chưa có học sinh nào trong lớp!", "error");
+    }
+
+    const mode = document.getElementById('act-split-mode').value;
+    const num = parseInt(document.getElementById('act-split-num').value) || 4;
+    const criteria = document.getElementById('act-split-criteria').value;
+    const naming = document.getElementById('act-naming-style').value;
+
+    let totalStudents = appData.students.length;
+    let groupCount = 4;
+
+    if (mode === 'by_group_count') {
+        groupCount = Math.max(1, Math.min(num, totalStudents));
+    } else {
+        groupCount = Math.max(1, Math.ceil(totalStudents / Math.max(1, num)));
+    }
+
+    let studentsToDistribute = [...appData.students];
+
+    if (criteria === 'random') {
+        studentsToDistribute.sort(() => Math.random() - 0.5);
+    } else if (criteria === 'balanced_gender') {
+        const males = studentsToDistribute.filter(s => (s.gender || 'Nam').toLowerCase() === 'nam').sort(() => Math.random() - 0.5);
+        const females = studentsToDistribute.filter(s => (s.gender || 'Nam').toLowerCase() !== 'nam').sort(() => Math.random() - 0.5);
+        studentsToDistribute = [];
+        let maxLen = Math.max(males.length, females.length);
+        for(let i = 0; i < maxLen; i++) {
+            if (i < males.length) studentsToDistribute.push(males[i]);
+            if (i < females.length) studentsToDistribute.push(females[i]);
+        }
+    } else if (criteria === 'balanced_points') {
+        // Cân bằng theo điểm thi đua
+        const currentMonth = new Date().getMonth() + 1;
+        studentsToDistribute.forEach(s => {
+            let pts = 0;
+            (appData.behaviorRecords || []).forEach(r => {
+                if (new Date(r.date).getMonth() + 1 === currentMonth && r.studentId == s.id) {
+                    pts += Number(r.snapshotPoints || 0);
+                }
+            });
+            s._tmpPoints = pts;
+        });
+        studentsToDistribute.sort((a, b) => b._tmpPoints - a._tmpPoints);
+    }
+
+    const newGroups = [];
+    for(let i = 0; i < groupCount; i++) {
+        let gName = `Nhóm ${i + 1}`;
+        if (naming === 'letters') {
+            gName = `Nhóm ${String.fromCharCode(65 + i)}`;
+        } else if (naming === 'cool_names') {
+            gName = coolGroupNames[i % coolGroupNames.length];
+        }
+        newGroups.push({
+            id: i + 1,
+            name: gName,
+            members: []
+        });
+    }
+
+    studentsToDistribute.forEach((stu, idx) => {
+        let targetGroupIdx = idx % groupCount;
+        newGroups[targetGroupIdx].members.push(stu.id);
+    });
+
+    appData.flexibleGroups = newGroups;
+    window.saveData();
+    window.renderActivityGroups();
+    playChime('win');
+    window.showToast(`🎉 Đã chia ${totalStudents} học sinh thành ${newGroups.length} nhóm hoạt động!`);
+};
+
+window.reshuffleFlexibleGroups = function() {
+    if (!appData.flexibleGroups || appData.flexibleGroups.length === 0) {
+        return window.generateFlexibleGroups();
+    }
+    const groupCount = appData.flexibleGroups.length;
+    const shuffledStudents = [...appData.students].sort(() => Math.random() - 0.5);
+
+    appData.flexibleGroups.forEach(g => g.members = []);
+    shuffledStudents.forEach((stu, idx) => {
+        appData.flexibleGroups[idx % groupCount].members.push(stu.id);
+    });
+
+    window.saveData();
+    window.renderActivityGroups();
+    playChime('win');
+    window.showToast("🎲 Đã xáo trộn ngẫu nhiên thành viên các nhóm!");
+};
+
+window.renderActivityGroups = function() {
+    const container = document.getElementById('activity-groups-container');
+    if (!container) return;
+
+    if (!appData.flexibleGroups || appData.flexibleGroups.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 30px; background:white; border-radius:16px; border:2px dashed #cbd5e1; text-align:center;">
+                <div style="font-size:3rem; margin-bottom:10px;">🎲</div>
+                <h4>Chưa tạo nhóm hoạt động</h4>
+                <p class="text-sm text-muted">Chọn tiêu chí ở bảng trên rồi bấm <b>"Tạo nhóm hoạt động"</b> để chia nhóm tức thì trong giờ học!</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    appData.flexibleGroups.forEach(g => {
+        const memberList = appData.students.filter(s => (g.members || []).includes(s.id));
+        html += `
+            <div class="act-group-card">
+                <div class="act-group-header">
+                    <div class="act-group-title">
+                        <i class="fas fa-users-cog"></i> ${g.name}
+                        <span class="group-badge" style="background:white; color:var(--text-main); font-weight:700;">${memberList.length} bạn</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-outline-action" style="color:white; border-color:rgba(255,255,255,0.4);" onclick="window.pickRandomMemberOfGroup(${g.id})" title="Bốc thăm 1 bạn đại diện nhóm"><i class="fas fa-dice"></i></button>
+                        <button class="btn-outline-action" style="color:white; border-color:rgba(255,255,255,0.4);" onclick="window.rewardFlexibleGroup(${g.id}, 1)" title="Thưởng +1 điểm cả nhóm"><i class="fas fa-plus"></i>1</button>
+                        <button class="btn-outline-action" style="color:white; border-color:rgba(255,255,255,0.4);" onclick="window.rewardFlexibleGroup(${g.id}, 2)" title="Thưởng +2 điểm cả nhóm"><i class="fas fa-plus"></i>2</button>
+                    </div>
+                </div>
+                <div class="act-members-box">
+                    ${memberList.length === 0 ? '<div class="text-sm text-muted">Trống</div>' : ''}
+                    ${memberList.map(m => `
+                        <div class="member-pill">
+                            <span><b>${m.name}</b> <small style="color:#64748b;">(${m.gender})</small></span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+};
+
+window.rewardFlexibleGroup = function(groupId, points = 1) {
+    const grp = (appData.flexibleGroups || []).find(g => g.id == groupId);
+    if (!grp) return;
+    const memberList = appData.students.filter(s => (grp.members || []).includes(s.id));
+    if (memberList.length === 0) return window.showToast("Nhóm không có học sinh nào!", "error");
+
+    memberList.forEach(stu => {
+        appData.behaviorRecords.push({
+            id: Date.now() + Math.random(),
+            studentId: stu.id,
+            tagId: "act_group_reward",
+            tagName: `[${grp.name}] Hoạt động nhóm tích cực`,
+            type: 'positive',
+            snapshotPoints: points,
+            note: `Thưởng hoạt động nhóm: ${grp.name}`,
+            date: getTodayStr()
+        });
+    });
+
+    window.saveData();
+    playChime('win');
+    window.showToast(`🎉 Đã thưởng +${points} điểm cho ${memberList.length} thành viên ${grp.name}!`);
+};
+
+// VÒNG QUAY BỐC THĂM / QUAY SỐ TRONG GIỜ HỌC
+window.pickRandomGroup = function() {
+    if (!appData.flexibleGroups || appData.flexibleGroups.length === 0) {
+        return window.showToast("Chưa có nhóm hoạt động nào! Hãy bấm Tạo nhóm trước.", "error");
+    }
+    lastPickerMode = 'group';
+    window.startLotteryAnimation(
+        '🎯 Bốc thăm Nhóm lên bảng',
+        'Đang chọn nhóm ngẫu nhiên...',
+        appData.flexibleGroups.map(g => ({ title: g.name, extra: `${(g.members||[]).length} thành viên`, obj: g }))
+    );
+};
+
+window.pickRandomStudentAnywhere = function() {
+    if (appData.students.length === 0) {
+        return window.showToast("Chưa có học sinh trong danh sách!", "error");
+    }
+    lastPickerMode = 'student';
+    window.startLotteryAnimation(
+        '🌟 Vòng quay may mắn gọi học sinh',
+        'Đang chọn bạn ngẫu nhiên...',
+        appData.students.map(s => {
+            const gObj = (appData.fixedGroups || []).find(g => g.id == s.fixedGroup);
+            return {
+                title: s.name,
+                extra: `${s.gender} • ${gObj ? gObj.name : 'Chưa phân tổ'}`,
+                obj: s
+            };
+        })
+    );
+};
+
+window.pickRandomMemberOfGroup = function(groupId) {
+    const grp = (appData.flexibleGroups || []).find(g => g.id == groupId);
+    if (!grp) return;
+    const memberList = appData.students.filter(s => (grp.members || []).includes(s.id));
+    if (memberList.length === 0) return window.showToast("Nhóm này trống!", "error");
+
+    lastPickerMode = 'member';
+    lastPickerGroupId = groupId;
+    window.startLotteryAnimation(
+        `🎯 Đại diện ${grp.name}`,
+        `Đang chọn đại diện của ${grp.name}...`,
+        memberList.map(s => ({
+            title: s.name,
+            extra: `Đại diện phát biểu cho ${grp.name}`,
+            obj: s
+        }))
+    );
+};
+
+window.retriggerPicker = function() {
+    if (lastPickerMode === 'group') window.pickRandomGroup();
+    else if (lastPickerMode === 'member') window.pickRandomMemberOfGroup(lastPickerGroupId);
+    else window.pickRandomStudentAnywhere();
+};
+
+window.startLotteryAnimation = function(title, subtext, items) {
+    document.getElementById('random-picker-title').innerText = title;
+    document.getElementById('lottery-subtext').innerText = subtext;
+    const winnerEl = document.getElementById('lottery-winner');
+    const extraEl = document.getElementById('lottery-extra');
+    const iconEl = document.getElementById('lottery-icon');
+    const spinBtn = document.getElementById('btn-spin-again');
+
+    winnerEl.innerText = 'Đang quay...';
+    extraEl.innerText = '';
+    iconEl.innerText = '🎲';
+    spinBtn.disabled = true;
+
+    window.openModal('modal-random-picker');
+
+    let rollCount = 0;
+    const totalRolls = 18;
+    const interval = setInterval(() => {
+        rollCount++;
+        playChime('tick');
+        const randItem = items[Math.floor(Math.random() * items.length)];
+        winnerEl.innerText = randItem.title;
+        extraEl.innerText = randItem.extra || '';
+
+        if (rollCount >= totalRolls) {
+            clearInterval(interval);
+            const finalPick = items[Math.floor(Math.random() * items.length)];
+            winnerEl.innerText = `✨ ${finalPick.title} ✨`;
+            extraEl.innerText = finalPick.extra || '';
+            iconEl.innerText = '🎉';
+            spinBtn.disabled = false;
+            playChime('win');
+        }
+    }, 85);
+};
 
 let rawExcelData = [], parsedStudents = [], excelHeaders = []; let currentHeaderRowIndex = 0; 
 window.openImportModal = function() { document.getElementById('import-step-1').style.display = 'block'; document.getElementById('import-step-2').style.display = 'none'; document.getElementById('import-step-2-footer').style.display = 'none'; document.getElementById('excel-file').value = ""; rawExcelData = []; parsedStudents = []; currentHeaderRowIndex = 0; window.openModal('modal-import-excel'); }
