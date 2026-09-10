@@ -282,9 +282,9 @@ window.openModal = function(id) {
             }
         }
         if (id === 'modal-setup-ppct') {
-            const ppctClass = document.getElementById('add-ppct-class');
-            if (ppctClass && !ppctClass.value && appData.settings && appData.settings.className) {
-                ppctClass.value = appData.settings.className;
+            const ppctGrade = document.getElementById('add-ppct-grade');
+            if (ppctGrade && appData.settings && appData.settings.className) {
+                ppctGrade.value = window.inferGrade(appData.settings.className);
             }
         }
         if (id === 'modal-add-student') {
@@ -320,77 +320,37 @@ window.changeTheme = function(themeName, element) {
 
 window.inferGrade = function(className) {
     if (!className) return "7";
-    const m = String(className).match(/\d+/);
+    const clean = String(className).trim();
+    const m = clean.match(/\d+/);
     return m ? m[0] : "7";
 };
 
 window.getGradeOfClass = function(className) {
-    if (!className) return appData.settings.grade || "7";
-    const clean = String(className).trim();
-    if (appData.classGradeMap && appData.classGradeMap[clean]) {
-        return String(appData.classGradeMap[clean]);
-    }
-    if (appData.settings && appData.settings.className && clean.toLowerCase() === appData.settings.className.trim().toLowerCase()) {
-        return String(appData.settings.grade || window.inferGrade(appData.settings.className));
-    }
-    return window.inferGrade(clean);
+    return window.inferGrade(className);
 };
 
-window.renderClassGradeList = function() {
-    const container = document.getElementById('class-grade-management-list');
-    if (!container) return;
-    
-    const classSet = new Set();
-    if (appData.settings && appData.settings.className) classSet.add(appData.settings.className.trim());
-    if (appData.scheduleSetup && appData.scheduleSetup.tkb) {
-        appData.scheduleSetup.tkb.forEach(t => {
-            if (t.className) classSet.add(t.className.trim());
-        });
-    }
-    if (appData.classGradeMap) {
-        Object.keys(appData.classGradeMap).forEach(c => classSet.add(c.trim()));
-    }
+window.getPpct = function(subject, grade) {
+    if (!appData.scheduleSetup || !Array.isArray(appData.scheduleSetup.ppct)) return [];
+    const cleanSubj = String(subject || '').trim().toLowerCase();
+    const targetGrade = String(grade || '').trim();
 
-    const classList = Array.from(classSet).filter(Boolean);
-    if (classList.length === 0) {
-        container.innerHTML = '<div class="text-sm text-muted">Chưa có lớp học nào trong Thời khóa biểu hoặc Cài đặt.</div>';
-        return;
-    }
+    const matched = appData.scheduleSetup.ppct.filter(p => {
+        const pSubj = String(p.subject || '').trim().toLowerCase();
+        if (pSubj !== cleanSubj) return false;
+        
+        let pGrade = (p.grade !== undefined && p.grade !== null && String(p.grade).trim() !== '')
+            ? String(p.grade).trim()
+            : window.inferGrade(p.className);
 
-    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
-    classList.forEach(cls => {
-        const currentGrade = window.getGradeOfClass(cls);
-        const isHomeroom = appData.settings && appData.settings.className && cls.toLowerCase() === appData.settings.className.trim().toLowerCase();
-        html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:12px; border:1px solid #e2e8f0;">
-                <div>
-                    <strong>${cls}</strong> ${isHomeroom ? '<span style="background:#e0f2fe; color:#0369a1; font-size:0.75rem; padding:2px 8px; border-radius:10px; font-weight:700; margin-left:6px;">Lớp CN</span>' : ''}
-                    <div style="font-size:0.75rem; color:#64748b;">Dùng chung PPCT của Khối ${currentGrade}</div>
-                </div>
-                <div>
-                    <select onchange="window.setClassGrade('${cls}', this.value)" style="padding:6px 12px; font-size:0.85rem; border-radius:8px; border:1px solid #cbd5e1; font-weight:700;">
-                        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(g => `<option value="${g}" ${String(g) === String(currentGrade) ? 'selected' : ''}>Khối ${g}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-        `;
+        return String(pGrade) === targetGrade;
     });
-    html += '</div>';
-    container.innerHTML = html;
+
+    matched.sort((a, b) => parseInt(a.ppct) - parseInt(b.ppct));
+    return matched;
 };
 
-window.setClassGrade = function(className, grade) {
-    if (!appData.classGradeMap) appData.classGradeMap = {};
-    appData.classGradeMap[className] = String(grade);
-    if (appData.settings && appData.settings.className && className.trim().toLowerCase() === appData.settings.className.trim().toLowerCase()) {
-        appData.settings.grade = String(grade);
-        const setGradeEl = document.getElementById('set-grade');
-        if (setGradeEl) setGradeEl.value = String(grade);
-    }
-    window.saveData();
-    window.renderClassGradeList();
-    window.showToast(`Đã gán lớp ${className} thuộc Khối ${grade}!`);
-};
+window.renderClassGradeList = function() {};
+window.setClassGrade = function() {};
 
 window.loadSettings = function() { 
     if (!appData.settings) appData.settings = { ...defaultSettings };
@@ -398,12 +358,10 @@ window.loadSettings = function() {
     
     const setTeacher = document.getElementById('set-teacher');
     const setClass = document.getElementById('set-class');
-    const setGrade = document.getElementById('set-grade');
     const setYear = document.getElementById('set-year');
     
     if (setTeacher) setTeacher.value = s.teacherName || ''; 
     if (setClass) setClass.value = s.className || ''; 
-    if (setGrade) setGrade.value = s.grade || window.inferGrade(s.className) || '7';
     if (setYear) setYear.value = s.year || ''; 
     
     if (document.getElementById('set-auto-absent')) document.getElementById('set-auto-absent').checked = s.autoAbsentDisc || false; 
@@ -422,8 +380,6 @@ window.loadSettings = function() {
         const onclickAttr = btn.getAttribute('onclick');
         if (onclickAttr && onclickAttr.includes(currentTheme)) btn.classList.add('active');
     });
-
-    window.renderClassGradeList();
 };
 
 window.saveSettings = function() { 
@@ -431,12 +387,13 @@ window.saveSettings = function() {
     
     const setTeacher = document.getElementById('set-teacher');
     const setClass = document.getElementById('set-class');
-    const setGrade = document.getElementById('set-grade');
     const setYear = document.getElementById('set-year');
     
     if (setTeacher) appData.settings.teacherName = setTeacher.value.trim(); 
-    if (setClass) appData.settings.className = setClass.value.trim(); 
-    if (setGrade) appData.settings.grade = setGrade.value;
+    if (setClass) {
+        appData.settings.className = setClass.value.trim(); 
+        appData.settings.grade = window.inferGrade(appData.settings.className);
+    }
     if (setYear) appData.settings.year = setYear.value.trim(); 
     
     if (document.getElementById('set-auto-absent')) appData.settings.autoAbsentDisc = document.getElementById('set-auto-absent').checked; 
@@ -453,24 +410,19 @@ window.saveSettings = function() {
     
     const displayTeacher = appData.settings.teacherName || 'GV';
     const displayClass = appData.settings.className || '';
-    const displayGrade = appData.settings.grade ? ` (Khối ${appData.settings.grade})` : '';
     const displayYear = appData.settings.year || '';
-    window.showToast(`✅ Đã lưu: ${displayTeacher}${displayClass ? ' - Lớp ' + displayClass + displayGrade : ''}${displayYear ? ' (' + displayYear + ')' : ''}`); 
-    window.renderClassGradeList();
+    window.showToast(`✅ Đã lưu: ${displayTeacher}${displayClass ? ' - Lớp ' + displayClass : ''}${displayYear ? ' (' + displayYear + ')' : ''}`); 
 };
 
 window.autoSaveSettingsField = function(field, val) {
     if (!appData.settings) appData.settings = { ...defaultSettings };
     appData.settings[field] = val ? val.trim() : '';
-    if (field === 'className' && (!appData.settings.grade || appData.settings.grade === '')) {
+    if (field === 'className') {
         appData.settings.grade = window.inferGrade(val);
-        const setGrade = document.getElementById('set-grade');
-        if (setGrade) setGrade.value = appData.settings.grade;
     }
     appData.lastUpdated = Date.now();
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData));
     window.updateDashboardInfo();
-    window.renderClassGradeList();
     if (currentUser) {
         if (syncTimeout) clearTimeout(syncTimeout);
         syncTimeout = setTimeout(() => {
@@ -689,19 +641,7 @@ window.exportScheduleExcel = function() {
     window.showToast("Đã xuất Excel Sổ Báo Giảng!");
 }
 
-window.togglePpctScopeUI = function() {
-    const scopeEl = document.getElementById('add-ppct-scope');
-    const scope = scopeEl ? scopeEl.value : 'grade';
-    const gradeWrapper = document.getElementById('ppct-grade-wrapper');
-    const classWrapper = document.getElementById('ppct-class-wrapper');
-    if (scope === 'grade') {
-        if (gradeWrapper) gradeWrapper.style.display = 'block';
-        if (classWrapper) classWrapper.style.display = 'none';
-    } else {
-        if (gradeWrapper) gradeWrapper.style.display = 'none';
-        if (classWrapper) classWrapper.style.display = 'block';
-    }
-};
+window.togglePpctScopeUI = function() {};
 
 window.renderPPCTTable = function() {
     window.renderSetupData();
@@ -736,18 +676,18 @@ window.renderSetupData = function() {
     const currentGradeFilter = filterGradeEl ? filterGradeEl.value : 'all';
 
     stp.ppct.forEach((p, i) => { 
-        let isShared = !p.className || p.className.toLowerCase().includes('khối') || p.className.toLowerCase() === 'chung';
-        let gradeStr = p.grade || window.inferGrade(p.className) || (appData.settings ? appData.settings.grade : '7') || '7';
+        let gradeStr = (p.grade !== undefined && p.grade !== null && String(p.grade).trim() !== '')
+            ? String(p.grade).trim()
+            : window.inferGrade(p.className);
+        if (!gradeStr) gradeStr = "7";
         
         if (currentGradeFilter !== 'all' && String(gradeStr) !== String(currentGradeFilter)) {
             return;
         }
 
-        let scopeBadge = isShared 
-            ? `<span class="badge-grade">Khối ${gradeStr} (Chung)</span>` 
-            : `<span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">Lớp ${p.className}</span>`;
+        let scopeBadge = `<span class="badge-grade" style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:6px; font-weight:700; font-size:0.75rem;">Khối ${gradeStr}</span>`;
 
-        tbodyPPCT.innerHTML += `<tr><td>${scopeBadge}</td><td><b>${p.subject}</b></td><td>${p.ppct}</td><td>${(p.content||'').substring(0,30)}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; 
+        tbodyPPCT.innerHTML += `<tr><td>${scopeBadge}</td><td><b>${p.subject}</b></td><td>${p.ppct}</td><td>${(p.content||'').substring(0,35)}</td><td><button class="btn-outline-action text-red" style="width:25px;height:25px;" onclick="delSetupData('ppct', ${i})"><i class="fas fa-times"></i></button></td></tr>`; 
     });
 
     const tbodyHol = document.getElementById('hol-tbody'); tbodyHol.innerHTML = '';
@@ -775,32 +715,43 @@ window.clearAllTKB = function() {
     }
 }
 window.addPPCT = function() {
-    const scopeEl = document.getElementById('add-ppct-scope');
-    const scope = scopeEl ? scopeEl.value : 'grade';
-    let s = document.getElementById('add-ppct-subject').value;
-    let p = document.getElementById('add-ppct-period').value;
-    let n = document.getElementById('add-ppct-content').value;
+    let g = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : "7";
+    let s = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value.trim() : "";
+    let p = document.getElementById('add-ppct-period') ? document.getElementById('add-ppct-period').value : "";
+    let n = document.getElementById('add-ppct-content') ? document.getElementById('add-ppct-content').value.trim() : "";
     if(!s || !p || !n) return window.showToast("Nhập đủ môn, tiết và nội dung!", "error");
 
-    let gradeVal = "7";
-    let classVal = "";
-    if (scope === 'grade') {
-        gradeVal = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : (appData.settings.grade || "7");
-        classVal = "";
+    const gradeVal = String(g).trim() || "7";
+    const periodNum = parseInt(p);
+
+    let existing = appData.scheduleSetup.ppct.find(item => {
+        let ig = (item.grade !== undefined && item.grade !== null && String(item.grade).trim() !== '')
+            ? String(item.grade).trim()
+            : window.inferGrade(item.className);
+        let is = String(item.subject || '').trim().toLowerCase();
+        return is === s.toLowerCase() && String(ig) === gradeVal && parseInt(item.ppct) === periodNum;
+    });
+
+    if (existing) {
+        existing.content = n;
+        existing.grade = gradeVal;
+        existing.subject = s;
+        existing.ppct = periodNum;
     } else {
-        classVal = document.getElementById('add-ppct-class') ? document.getElementById('add-ppct-class').value.trim() : "";
-        if (!classVal) return window.showToast("Vui lòng nhập tên lớp!", "error");
-        gradeVal = window.getGradeOfClass(classVal);
+        appData.scheduleSetup.ppct.push({
+            grade: gradeVal,
+            subject: s,
+            ppct: periodNum,
+            content: n
+        });
     }
 
-    appData.scheduleSetup.ppct.push({
-        grade: String(gradeVal),
-        className: classVal,
-        subject: s.trim(),
-        ppct: parseInt(p),
-        content: n.trim()
-    });
-    window.saveData(); window.renderSetupData(); window.showToast(`Đã thêm PPCT: Tiết ${p} (${scope === 'grade' ? 'Khối ' + gradeVal : 'Lớp ' + classVal})!`);
+    window.saveData(); 
+    window.renderSetupData(); 
+    window.showToast(`Đã thêm PPCT: ${s} Khối ${gradeVal} - Tiết ${periodNum}!`);
+
+    if (document.getElementById('add-ppct-period')) document.getElementById('add-ppct-period').value = periodNum + 1;
+    if (document.getElementById('add-ppct-content')) document.getElementById('add-ppct-content').value = "";
 }
 window.addHoliday = function() {
     let s = document.getElementById('add-hol-start').value, e = document.getElementById('add-hol-end').value, n = document.getElementById('add-hol-name').value;
@@ -820,7 +771,8 @@ window.handleGeneralImport = function(event) {
         reader.onload = (ev) => {
             mammoth.convertToHtml({arrayBuffer: ev.target.result}).then(function(result) {
                 let html = result.value; let parser = new DOMParser(); let doc = parser.parseFromString(html, 'text/html'); let tables = doc.querySelectorAll('table'); let count = 0;
-                let targetClass = document.getElementById('add-ppct-class').value || "Chung"; let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+                let targetGrade = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : "7";
+                let targetSubject = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value.trim() : "Toán";
                 
                 tables.forEach(table => {
                     let rows = table.querySelectorAll('tr'); let tietIdx = -1, ndIdx = -1;
@@ -832,7 +784,21 @@ window.handleGeneralImport = function(event) {
                         } else {
                             if (cells.length > Math.max(tietIdx, ndIdx) && ndIdx !== -1) {
                                 let tiet = parseInt(cells[tietIdx]); let nd = cells[ndIdx];
-                                if(!isNaN(tiet) && nd) { appData.scheduleSetup.ppct.push({ className: targetClass, subject: targetSubject, ppct: tiet, content: nd }); count++; }
+                                if(!isNaN(tiet) && nd) {
+                                    let existing = appData.scheduleSetup.ppct.find(item => {
+                                        let ig = (item.grade !== undefined && item.grade !== null && String(item.grade).trim() !== '')
+                                            ? String(item.grade).trim()
+                                            : window.inferGrade(item.className);
+                                        let is = String(item.subject || '').trim().toLowerCase();
+                                        return is === targetSubject.toLowerCase() && String(ig) === String(targetGrade) && parseInt(item.ppct) === tiet;
+                                    });
+                                    if (existing) {
+                                        existing.content = nd;
+                                    } else {
+                                        appData.scheduleSetup.ppct.push({ grade: String(targetGrade), subject: targetSubject, ppct: tiet, content: nd });
+                                        count++;
+                                    }
+                                }
                             }
                         }
                     });
@@ -846,7 +812,8 @@ window.handleGeneralImport = function(event) {
         reader.onload = (ev) => {
             try {
                 const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' }); let rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]); let count = 0;
-                let targetClass = document.getElementById('add-ppct-class').value || "Chung"; let targetSubject = document.getElementById('add-ppct-subject').value || "Chung";
+                let formGrade = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : "7";
+                let formSubject = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value.trim() : "Toán";
 
                 rows.forEach(r => {
                     if (currentImportType === 'tkb') {
@@ -912,30 +879,45 @@ window.handleGeneralImport = function(event) {
                         }
                     }
                     else if(currentImportType === 'ppct') {
-                        let targetScope = document.getElementById('add-ppct-scope') ? document.getElementById('add-ppct-scope').value : 'grade';
-                        let targetGrade = document.getElementById('add-ppct-grade') ? document.getElementById('add-ppct-grade').value : (appData.settings.grade || "7");
-                        let targetClass = document.getElementById('add-ppct-class') ? document.getElementById('add-ppct-class').value : "";
-                        let targetSubject = document.getElementById('add-ppct-subject') ? document.getElementById('add-ppct-subject').value : "Chung";
-
                         let pVal = r['Tiết'] || r['Tiet'] || r['Tiết PPCT'] || r['Tiết học'] || r['Period'];
                         if (pVal !== undefined) {
                             let p = parseInt(String(pVal).replace(/\D/g, '')); 
                             let n = String(r['Nội dung'] || r['Noi dung'] || r['Tên bài'] || r['Ten bai'] || r['Tên bài học / Chuyên đề'] || r['Chủ đề'] || r['Bài học'] || '');
                             if(!isNaN(p) && n) {
-                                let rowGrade = r['Khối'] || r['Khoi'] || r['Grade'] || (targetScope === 'grade' ? targetGrade : '');
-                                let rowClass = r['Lớp'] || r['Lop'] || r['Class'] || (targetScope === 'class' ? targetClass : '');
-                                if (!rowGrade && rowClass) rowGrade = window.getGradeOfClass(rowClass);
-                                if (!rowGrade && !rowClass) rowGrade = targetGrade;
-                                let rowSubj = r['Môn'] || r['Mon'] || r['Môn học'] || r['Subject'] || targetSubject;
+                                let rowGrade = r['Khối'] || r['Khoi'] || r['Grade'];
+                                let rowClass = r['Lớp'] || r['Lop'] || r['Class'];
+                                
+                                let finalGrade = formGrade;
+                                if (rowGrade) {
+                                    finalGrade = window.inferGrade(rowGrade);
+                                } else if (rowClass) {
+                                    finalGrade = window.inferGrade(rowClass);
+                                }
 
-                                appData.scheduleSetup.ppct.push({
-                                    grade: String(rowGrade).replace(/\D/g, '') || "7",
-                                    className: String(rowClass).trim(),
-                                    subject: String(rowSubj).trim(),
-                                    ppct: p,
-                                    content: n
+                                let rowSubj = r['Môn'] || r['Mon'] || r['Môn học'] || r['Subject'] || formSubject;
+                                let finalSubj = String(rowSubj || formSubject).trim();
+
+                                let existing = appData.scheduleSetup.ppct.find(item => {
+                                    let ig = (item.grade !== undefined && item.grade !== null && String(item.grade).trim() !== '')
+                                        ? String(item.grade).trim()
+                                        : window.inferGrade(item.className);
+                                    let is = String(item.subject || '').trim().toLowerCase();
+                                    return is === finalSubj.toLowerCase() && String(ig) === String(finalGrade) && parseInt(item.ppct) === p;
                                 });
-                                count++;
+
+                                if (existing) {
+                                    existing.content = n;
+                                    existing.grade = String(finalGrade);
+                                    existing.subject = finalSubj;
+                                } else {
+                                    appData.scheduleSetup.ppct.push({
+                                        grade: String(finalGrade),
+                                        subject: finalSubj,
+                                        ppct: p,
+                                        content: n
+                                    });
+                                    count++;
+                                }
                             }
                         }
                     }
@@ -971,41 +953,24 @@ window.generateAutoSchedule = function() {
 
     const getQueueKey = (cls, sbj) => `${sbj.trim().toLowerCase()}__${cls.trim().toLowerCase()}`;
 
-    // Tạo hàng đợi bài dạy độc lập cho từng lớp (classId + ppctId + tietHienTai)
-    // Hệ thống tự động phân giải: ưu tiên PPCT riêng của lớp -> nếu không có thì dùng PPCT chung của Khối (Year + Grade + Subject)
+    // Tạo hàng đợi bài dạy độc lập cho từng lớp:
+    // Bước 1: Lớp (ví dụ: 7A2, 7/1) -> Khối 7
+    // Bước 2: Tìm PPCT theo Môn + Khối (ví dụ: Toán + 7) qua getPpct(subject, grade)
+    // Bước 3: Gán bản sao cho hàng đợi của lớp để tiến độ từng lớp độc lập
     appData.scheduleSetup.tkb.forEach(tItem => {
         let qKey = getQueueKey(tItem.className, tItem.subject);
         if (!ppctQueues[qKey]) {
             let classGrade = window.getGradeOfClass(tItem.className);
-            
-            // 1. Tìm PPCT được gán đích danh cho lớp này
-            let matched = appData.scheduleSetup.ppct.filter(p => {
-                let pClass = (p.className || '').trim().toLowerCase();
-                let pSubj = (p.subject || '').trim().toLowerCase();
-                return pSubj === tItem.subject.trim().toLowerCase() && pClass === tItem.className.trim().toLowerCase();
-            });
+            let matched = window.getPpct(tItem.subject, classGrade);
 
-            // 2. Nếu không có PPCT riêng, tìm PPCT dùng chung của Khối tương ứng
+            // Dự phòng nếu tên môn có sai lệch nhỏ
             if (matched.length === 0) {
                 matched = appData.scheduleSetup.ppct.filter(p => {
-                    let pSubj = (p.subject || '').trim().toLowerCase();
-                    if (pSubj !== tItem.subject.trim().toLowerCase()) return false;
-                    let pGrade = p.grade || window.inferGrade(p.className) || '';
-                    let isShared = !p.className || p.className.toLowerCase().includes('khối') || p.className.toLowerCase() === 'chung';
-                    return isShared && String(pGrade) === String(classGrade);
+                    return String(p.subject || '').trim().toLowerCase() === String(tItem.subject || '').trim().toLowerCase();
                 });
+                matched.sort((a, b) => parseInt(a.ppct) - parseInt(b.ppct));
             }
 
-            // 3. Dự phòng tìm kiếm theo môn nếu chưa gán khối
-            if (matched.length === 0) {
-                matched = appData.scheduleSetup.ppct.filter(p => {
-                    let pSubj = (p.subject || '').trim().toLowerCase();
-                    return pSubj === tItem.subject.trim().toLowerCase();
-                });
-            }
-
-            // Sắp xếp bài dạy tăng dần theo số tiết PPCT
-            matched.sort((a, b) => parseInt(a.ppct) - parseInt(b.ppct));
             ppctQueues[qKey] = matched.map(x => ({ ...x }));
         }
     });

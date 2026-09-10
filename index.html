@@ -377,41 +377,22 @@
                 <div class="top-bar"><div class="top-bar-title"><h2>⚙️ Cài đặt</h2></div></div>
                 
                 <div class="settings-card mb-20">
-                    <div class="input-group"><label>Tên Giáo Viên</label><input type="text" id="set-teacher" placeholder="VD: Nguyễn Thu Hà" oninput="autoSaveSettingsField('teacherName', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()"></div>
+                    <div class="input-group">
+                        <label>Tên Giáo Viên</label>
+                        <input type="text" id="set-teacher" placeholder="VD: Cô Nhung" oninput="autoSaveSettingsField('teacherName', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()">
+                    </div>
                     
-                    <div class="form-row">
-                        <div class="input-group">
-                            <label>Tên Lớp (Chủ nhiệm)</label>
-                            <input type="text" id="set-class" placeholder="VD: 7/1, 7A, 8A3" oninput="autoSaveSettingsField('className', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()">
-                        </div>
-                        <div class="input-group">
-                            <label>Khối (Độc lập)</label>
-                            <select id="set-grade" onchange="autoSaveSettingsField('grade', this.value); saveSettings();">
-                                <option value="1">Khối 1</option>
-                                <option value="2">Khối 2</option>
-                                <option value="3">Khối 3</option>
-                                <option value="4">Khối 4</option>
-                                <option value="5">Khối 5</option>
-                                <option value="6">Khối 6</option>
-                                <option value="7" selected>Khối 7</option>
-                                <option value="8">Khối 8</option>
-                                <option value="9">Khối 9</option>
-                                <option value="10">Khối 10</option>
-                                <option value="11">Khối 11</option>
-                                <option value="12">Khối 12</option>
-                            </select>
-                        </div>
+                    <div class="input-group">
+                        <label>Tên Lớp (Chủ nhiệm)</label>
+                        <input type="text" id="set-class" placeholder="VD: 8A3, 7/1, 7A1" oninput="autoSaveSettingsField('className', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()">
                     </div>
 
-                    <div class="input-group"><label>Năm học</label><input type="text" id="set-year" placeholder="VD: 2026 - 2027" oninput="autoSaveSettingsField('year', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()"></div>
+                    <div class="input-group">
+                        <label>Năm học</label>
+                        <input type="text" id="set-year" placeholder="VD: 2026 - 2027" oninput="autoSaveSettingsField('year', this.value)" onchange="saveSettings()" onkeydown="if(event.key==='Enter') saveSettings()">
+                    </div>
+                    
                     <button class="btn-primary w-full mt-10" onclick="saveSettings()">Lưu cài đặt</button>
-                </div>
-
-                <!-- QUẢN LÝ KHỐI CHO CÁC LỚP GIẢNG DẠY (DÙNG CHUNG PPCT) -->
-                <div class="section-title"><h3>🏫 Khối của các lớp giảng dạy</h3></div>
-                <div class="settings-card mb-20">
-                    <p class="text-sm text-muted mb-15" style="font-weight: 600;">Hệ thống cho phép Tên lớp (như 7/1, 7A, 7A1) và Khối hoàn toàn độc lập. Các lớp cùng khối sẽ tự động dùng chung PPCT của Khối đó.</p>
-                    <div id="class-grade-management-list"></div>
                 </div>
                 
                 <div class="section-title"><h3>Tự động & Cảnh báo</h3></div>
@@ -596,18 +577,11 @@
         </div>
 
         <div style="background:#eff6ff; border: 1px solid #bfdbfe; border-radius:12px; padding:10px 14px; margin-bottom:14px; font-size:0.85rem; color:#1e40af;">
-            <i class="fas fa-check-circle"></i> <b>PPCT dùng chung:</b> Khi nhập theo Khối (ví dụ Khối 7), tất cả các lớp cùng Khối (như 7A, 7/1, 7A1) sẽ cùng dùng chung PPCT với tiến độ độc lập từng lớp!
+            <i class="fas fa-check-circle"></i> <b>PPCT dùng chung theo Môn + Khối:</b> Mỗi PPCT được xác định bởi <b>Môn + Khối</b>. Tất cả các lớp cùng khối (như 7A1, 7A2, 7/1...) tự động dùng chung PPCT với tiến độ độc lập từng lớp!
         </div>
 
         <div class="form-row">
             <div class="input-group">
-                <label>Phạm vi áp dụng</label>
-                <select id="add-ppct-scope" onchange="togglePpctScopeUI()">
-                    <option value="grade" selected>Dùng chung cả Khối</option>
-                    <option value="class">Chỉ riêng 1 lớp cụ thể</option>
-                </select>
-            </div>
-            <div class="input-group" id="ppct-grade-wrapper">
                 <label>Khối</label>
                 <select id="add-ppct-grade">
                     <option value="1">Khối 1</option>
@@ -624,14 +598,7 @@
                     <option value="12">Khối 12</option>
                 </select>
             </div>
-            <div class="input-group" id="ppct-class-wrapper" style="display:none;">
-                <label>Tên Lớp cụ thể</label>
-                <input type="text" id="add-ppct-class" placeholder="VD: 7A1, 7/1">
-            </div>
-        </div>
-
-        <div class="form-row">
-            <div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject" placeholder="VD: Toán, GDĐP"></div>
+            <div class="input-group"><label>Môn</label><input type="text" id="add-ppct-subject" placeholder="VD: Toán, Ngữ văn, KHTN..."></div>
             <div class="input-group"><label>Tiết PPCT</label><input type="number" id="add-ppct-period" placeholder="VD: 1"></div>
         </div>
         <div class="input-group"><label>Nội dung bài dạy</label><input type="text" id="add-ppct-content" placeholder="VD: Bài 1: Tập hợp các số hữu tỉ"></div>
@@ -658,7 +625,7 @@
                 <button class="btn-outline-action text-red" style="font-size:0.75rem; padding:2px 8px; height:auto; width:auto;" onclick="clearAllPPCT()"><i class="fas fa-trash"></i></button>
             </div>
         </div>
-        <div class="table-responsive"><table class="preview-table"><thead><tr><th>Áp dụng</th><th>Môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div>
+        <div class="table-responsive"><table class="preview-table"><thead><tr><th>Khối</th><th>Môn</th><th>Tiết</th><th>Nội dung</th><th>Xóa</th></tr></thead><tbody id="ppct-tbody"></tbody></table></div>
     </div></div></div>
     
     <div id="modal-setup-holidays" class="modal" style="z-index: 210;"><div class="modal-content" style="height: 90vh;"><div class="modal-header"><h3>🏖️ Ngày nghỉ & Sự kiện</h3><div class="close" onclick="closeModal('modal-setup-holidays')"><i class="fas fa-times"></i></div></div><div class="modal-body"><button class="btn-outline text-red w-full mb-15" onclick="triggerImport('holidays')"><i class="fas fa-file-excel"></i> Import Lịch từ Excel</button><div class="form-row"><div class="input-group"><label>Ngày bắt đầu</label><input type="date" id="add-hol-start"></div><div class="input-group"><label>Ngày kết thúc</label><input type="date" id="add-hol-end"></div></div><div class="input-group"><label>Tên sự kiện / Lễ</label><input type="text" id="add-hol-name" placeholder="VD: Nghỉ Tết Nguyên Đán"></div><button class="btn-primary w-full mb-20" onclick="addHoliday()">Thêm Ngày Nghỉ</button><div class="table-responsive"><table class="preview-table"><thead><tr><th>Từ ngày</th><th>Đến ngày</th><th>Tên sự kiện</th><th>Xóa</th></tr></thead><tbody id="hol-tbody"></tbody></table></div></div></div></div>
