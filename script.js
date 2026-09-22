@@ -1,3 +1,13 @@
+// =========================================================================
+// CẤU HÌNH CHẾ ĐỘ MIỄN PHÍ (FREE MODE SWITCH)
+// - Đặt FREE_MODE = true:  Miễn phí 100% cho mọi người dùng, bypass kiểm tra
+//                          hết hạn, ẩn màn hình khóa và banner/modal gia hạn.
+// - Đặt FREE_MODE = false: BẬT LẠI toàn bộ hệ thống giới hạn 30 ngày, màn hình
+//                          gia hạn, mã QR thanh toán và thông báo hết hạn cũ.
+// =========================================================================
+export const FREE_MODE = true;
+window.FREE_MODE = FREE_MODE;
+
 // ================= FIREBASE AUTH & DATABASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -335,32 +345,51 @@ onAuthStateChanged(auth, async (user) => {
                 let ngayHetHan = new Date();
                 ngayHetHan.setDate(ngayHienTai.getDate() + 30);
                 await setDoc(userRef, { email: user.email, ngay_dang_ky: ngayHienTai.toISOString(), ngay_het_han: ngayHetHan.toISOString() });
-            } else {
-                const duLieu = docUserSnap.data();
-                const ngayHetHan = new Date(duLieu.ngay_het_han);
-                
-                // TÍNH SỐ NGÀY CÒN LẠI
-                const timeDiff = ngayHetHan.getTime() - ngayHienTai.getTime();
-                const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            }
 
-                if (daysLeft <= 0) {
-                    // Đã hết hạn -> Khóa màn hình
-                    hasAccess = false;
-                    document.getElementById('man-hinh-thu-phi').style.display = 'block';
-                    let emailElements = document.getElementsByClassName('email-user');
-                    for (let i = 0; i < emailElements.length; i++) emailElements[i].innerText = user.email.split('@')[0];
-                } else if (daysLeft <= 5) {
-                    // CÒN 5 NGÀY HOẶC ÍT HƠN -> HIỆN BANNER CẢNH BÁO
-                    const banner = document.getElementById('trial-warning-banner');
-                    if (banner) {
-                        banner.style.display = 'flex';
-                        document.getElementById('trial-days-left').innerText = daysLeft;
-                        // Điền sẵn cú pháp chuyển khoản vào Modal
-                        document.getElementById('upgrade-email-prefix').innerText = user.email.split('@')[0];
+            // KIỂM TRA BẢN QUYỀN / THỜI HẠN DÙNG THỬ
+            if (!FREE_MODE) {
+                // [CHẾ ĐỘ THƯƠNG MẠI - FREE_MODE = false]
+                if (docUserSnap.exists()) {
+                    const duLieu = docUserSnap.data();
+                    const ngayHetHan = new Date(duLieu.ngay_het_han);
+                    
+                    // TÍNH SỐ NGÀY CÒN LẠI
+                    const timeDiff = ngayHetHan.getTime() - ngayHienTai.getTime();
+                    const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+                    if (daysLeft <= 0) {
+                        // Đã hết hạn -> Khóa màn hình
+                        hasAccess = false;
+                        const payScreen = document.getElementById('man-hinh-thu-phi');
+                        if (payScreen) payScreen.style.display = 'block';
+                        let emailElements = document.getElementsByClassName('email-user');
+                        for (let i = 0; i < emailElements.length; i++) emailElements[i].innerText = user.email.split('@')[0];
+                    } else if (daysLeft <= 5) {
+                        // CÒN 5 NGÀY HOẶC ÍT HƠN -> HIỆN BANNER CẢNH BÁO
+                        const banner = document.getElementById('trial-warning-banner');
+                        if (banner) {
+                            banner.style.display = 'flex';
+                            document.getElementById('trial-days-left').innerText = daysLeft;
+                            // Điền sẵn cú pháp chuyển khoản vào Modal
+                            const prefixEl = document.getElementById('upgrade-email-prefix');
+                            if (prefixEl) prefixEl.innerText = user.email.split('@')[0];
+                        }
                     }
                 }
+            } else {
+                // [CHẾ ĐỘ MIỄN PHÍ - FREE_MODE = true]
+                // Luôn cho phép truy cập đầy đủ, không khóa tài khoản, ẩn màn hình thu phí và banner
+                hasAccess = true;
+                const payScreen = document.getElementById('man-hinh-thu-phi');
+                if (payScreen) payScreen.style.display = 'none';
+                const banner = document.getElementById('trial-warning-banner');
+                if (banner) banner.style.display = 'none';
             }
-        } catch (error) { console.log("Lỗi kiểm tra bản quyền:", error); }
+        } catch (error) { 
+            console.log("Lỗi kiểm tra bản quyền:", error); 
+            if (FREE_MODE) hasAccess = true;
+        }
 
         if (hasAccess) {
             try {
@@ -583,6 +612,10 @@ window.switchView = function(viewId, navElement = null) {
     if(viewId === 'view-lesson-log') window.initLessonLogView();
 }
 window.openModal = function(id) { 
+    // Khi đang bật FREE_MODE, vô hiệu hóa việc mở modal thanh toán / gia hạn
+    if (FREE_MODE && (id === 'modal-upgrade' || id === 'man-hinh-thu-phi')) {
+        return;
+    }
     const modalEl = document.getElementById(id);
     if (modalEl) {
         modalEl.style.display = 'flex'; 
