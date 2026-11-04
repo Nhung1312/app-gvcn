@@ -11,7 +11,7 @@ window.FREE_MODE = FREE_MODE;
 // ================= FIREBASE AUTH & DATABASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQz-4TAujSNhDV8wQY82-wnCTGJtdxhsM", 
@@ -244,7 +244,19 @@ window.updateRoleUI = function() {
     }
 };
 
+let permissionTestSnapshot = null;
 window.switchTestRole = function(testRole, targetGroup = 1) {
+    if (currentUser && !window.isTeacher() && !window.authRole.isTestRole) {
+        window.showToast("Chỉ giáo viên được thử phân quyền!", "error");
+        return;
+    }
+    if (testRole !== 'teacher' && !permissionTestSnapshot) {
+        permissionTestSnapshot = JSON.stringify(appData);
+    }
+    if (testRole === 'teacher' && permissionTestSnapshot) {
+        appData = JSON.parse(permissionTestSnapshot);
+        permissionTestSnapshot = null;
+    }
     if (testRole === 'teacher') {
         window.authRole = {
             role: 'teacher',
@@ -530,7 +542,8 @@ function initData() {
 let appData = initData();
 let syncTimeout = null;
 
-window.saveData = function(immediateSync = false) { 
+window.saveData = function(immediateSync = false) {
+    if (window.authRole && window.authRole.isTestRole) return Promise.resolve(true);
     appData.lastUpdated = Date.now();
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
     window.updateDashboardInfo(); 
@@ -539,16 +552,15 @@ window.saveData = function(immediateSync = false) {
         const doSync = () => {
             const targetUid = appData.teacherUid || currentUser.uid;
             const docRef = doc(firestoreDb, "DuLieuGVCN", targetUid);
-            setDoc(docRef, appData).then(() => { 
-                console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); 
-            }).catch(e => console.error("Lỗi đồng bộ mây:", e));
+            return setDoc(docRef, appData).then(() => { console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); return true; }).catch(e => { console.error("Lỗi đồng bộ mây:", e); return false; });
         };
         if (immediateSync) {
-            doSync();
+            return doSync();
         } else {
             syncTimeout = setTimeout(doSync, 1000);
         }
     }
+    return Promise.resolve(true);
 };
 
 window.addEventListener('beforeunload', () => {
@@ -2208,6 +2220,7 @@ window.renameFixedGroup = function(groupId) {
 
 // Phân công Tổ trưởng và Tổ phó với đầy đủ quy tắc kiểm tra ràng buộc
 window.setFixedGroupRole = function(groupId, studentId, role) {
+    if (!window.isTeacher() || window.authRole.isTestRole) return window.showToast('Chỉ giáo viên được phân công cán sự tổ!', 'error');
     const grp = appData.fixedGroups.find(g => g.id == groupId);
     if (!grp) return;
 
@@ -2259,6 +2272,7 @@ window.setFixedGroupRole = function(groupId, studentId, role) {
 
 // Rút một học sinh khỏi tổ
 window.removeStudentFromGroup = function(studentId) {
+    if (!window.isTeacher() || window.authRole.isTestRole) return window.showToast('Chỉ giáo viên được chuyển tổ!', 'error');
     const stu = appData.students.find(s => s.id == studentId);
     if (!stu) return;
 
@@ -3091,8 +3105,8 @@ window.onSelectPermStudent = function(studentId) {
     const stu = (appData.students || []).find(s => s.id == studentId);
     if (!stu) return;
 
-    const emailEl = document.getElementById('perm-account-email');
-    const roleEl = document.getElementById('perm-role-select');
+    const emailEl = document.getElementById('perm-student-email');
+    const roleEl = document.getElementById('perm-student-role');
     
     if (emailEl) emailEl.value = stu.accountEmail || '';
     if (roleEl) roleEl.value = stu.accountRole || 'none';
@@ -3101,7 +3115,7 @@ window.onSelectPermStudent = function(studentId) {
 };
 
 window.onPermRoleChanged = function() {
-    const roleEl = document.getElementById('perm-role-select');
+    const roleEl = document.getElementById('perm-student-role');
     const stuSelectEl = document.getElementById('perm-student-select');
     const descEl = document.getElementById('perm-role-desc');
     if (!roleEl || !descEl) return;
@@ -3132,61 +3146,66 @@ window.onPermRoleChanged = function() {
     }
 
     descEl.innerHTML = descText;
+    const hint = document.getElementById("perm-group-hint");
+    const hintText = document.getElementById("perm-group-hint-text");
+    const needsGroup = role === "group_leader" && (!stu || !stu.fixedGroup);
+    if (hint) hint.style.display = needsGroup ? "block" : "none";
+    if (hintText && needsGroup) hintText.textContent = "Vui lòng xếp học sinh vào tổ trước khi cấp quyền Tổ trưởng.";
 };
 
-window.saveStudentPermission = function() {
-    if (!window.isTeacher()) {
-        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền lưu phân quyền!", "error");
-        return;
+window.saveStudentPermission = async function() {
+    if (!window.isTeacher() || window.authRole.isTestRole || !currentUser) {
+        return window.showToast("Hãy đăng nhập bằng tài khoản giáo viên để cấp quyền trên Cloud!", "error");
     }
-
-    const stuSelectEl = document.getElementById('perm-student-select');
-    const emailEl = document.getElementById('perm-account-email');
-    const roleEl = document.getElementById('perm-role-select');
-
-    if (!stuSelectEl || !emailEl || !roleEl) return;
-
-    const stuId = stuSelectEl.value;
-    const stu = (appData.students || []).find(s => s.id == stuId);
+    const stuEl = document.getElementById('perm-student-select');
+    const emailEl = document.getElementById('perm-student-email');
+    const roleEl = document.getElementById('perm-student-role');
+    if (!stuEl || !emailEl || !roleEl) return;
+    const stu = (appData.students || []).find(s => String(s.id) === String(stuEl.value));
     if (!stu) return window.showToast("Chưa chọn học sinh!", "error");
-
     const email = emailEl.value.trim().toLowerCase();
     const role = roleEl.value;
-
-    if (role !== 'none' && !email) {
-        window.showToast("Vui lòng nhập Email Google đăng nhập của học sinh để cấp quyền!", "error");
-        emailEl.focus();
-        return;
+    if (role !== 'none' && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+        return window.showToast("Email học sinh chưa hợp lệ!", "error");
     }
-
-    stu.accountEmail = email;
-    stu.accountRole = role;
-
-    // Đồng bộ Firestore
-    if (currentUser) {
-        if (email) {
-            try {
-                setDoc(doc(firestoreDb, "CanBoLop", email), {
-                    teacherUid: currentUser.uid,
-                    role: role,
-                    studentId: stu.id,
-                    studentName: stu.name,
-                    fixedGroup: stu.fixedGroup || null
-                }).catch(e => console.warn("Lỗi đồng bộ CanBoLop:", e));
-            } catch(e) {}
+    if (role === 'group_leader' && !stu.fixedGroup) {
+        return window.showToast("Hãy xếp học sinh vào tổ trước!", "error");
+    }
+    if (role !== 'none' && (appData.students || []).some(s =>
+        String(s.id) !== String(stu.id) && s.accountRole !== 'none' &&
+        (s.accountEmail || '').toLowerCase().trim() === email)) {
+        return window.showToast("Email đã được gán cho học sinh khác!", "error");
+    }
+    const oldEmail = (stu.accountEmail || '').toLowerCase().trim();
+    const oldRole = stu.accountRole || 'none';
+    const button = document.querySelector('#modal-account-permissions button[onclick="window.saveStudentPermission()"]');
+    if (button) button.disabled = true;
+    try {
+        if (role !== 'none') {
+            await setDoc(doc(firestoreDb, "CanBoLop", email), {
+                teacherUid: currentUser.uid, role, studentId: stu.id,
+                studentName: stu.name, fixedGroup: stu.fixedGroup || null
+            });
         }
+        if (oldEmail && (oldEmail !== email || role === 'none')) {
+            await deleteDoc(doc(firestoreDb, "CanBoLop", oldEmail));
+        }
+        stu.accountEmail = role === 'none' ? '' : email;
+        stu.accountRole = role;
+        const saved = await window.saveData(true);
+        if (saved === false) throw new Error("Không ghi được hồ sơ lớp");
+        window.renderStudents();
+        window.renderAssignedAccountsList();
+        window.onPermRoleChanged();
+        window.showToast(`Đã lưu phân quyền cho ${stu.name}!`);
+    } catch (e) {
+        stu.accountEmail = oldEmail;
+        stu.accountRole = oldRole;
+        console.error("Lỗi lưu phân quyền:", e);
+        window.showToast("Lưu quyền lên Firebase thất bại. Chưa xác nhận cấp quyền.", "error");
+    } finally {
+        if (button) button.disabled = false;
     }
-
-    window.saveData(true);
-    window.renderStudents();
-    window.renderAssignedAccountsList();
-    
-    let roleText = "Học sinh";
-    if (role === 'class_leader') roleText = "Lớp trưởng";
-    else if (role === 'class_vice') roleText = "Lớp phó";
-    else if (role === 'group_leader') roleText = `Tổ trưởng Tổ ${stu.fixedGroup || 1}`;
-
-    window.showToast(`✅ Đã phân quyền cho em ${stu.name}: [${roleText}]!`);
 };
 
 window.revokeStudentPermission = function() {
@@ -3201,43 +3220,35 @@ window.revokeStudentPermission = function() {
     window.revokeStudentPermissionById(stuId);
 };
 
-window.revokeStudentPermissionById = function(stuId) {
-    if (!window.isTeacher()) {
-        window.showToast("Từ chối: Chỉ Giáo viên mới có quyền gỡ phân quyền!", "error");
-        return;
+window.revokeStudentPermissionById = async function(stuId) {
+    if (!window.isTeacher() || window.authRole.isTestRole || !currentUser) {
+        return window.showToast("Chỉ giáo viên đã đăng nhập mới được gỡ phân quyền!", "error");
     }
-
-    const stu = (appData.students || []).find(s => s.id == stuId);
-    if (!stu) return;
-
-    if (confirm(`Bạn có chắc chắn muốn gỡ quyền cán bộ lớp của học sinh ${stu.name}?`)) {
-        const oldEmail = stu.accountEmail;
+    const stu = (appData.students || []).find(s => String(s.id) === String(stuId));
+    if (!stu || !confirm(`Bạn có chắc muốn gỡ quyền của ${stu.name}?`)) return;
+    const oldEmail = (stu.accountEmail || '').toLowerCase().trim();
+    const oldRole = stu.accountRole || 'none';
+    try {
+        if (oldEmail) await deleteDoc(doc(firestoreDb, "CanBoLop", oldEmail));
         stu.accountRole = 'none';
-        
-        if (oldEmail && currentUser) {
-            try {
-                deleteDoc(doc(firestoreDb, "CanBoLop", oldEmail.toLowerCase().trim())).catch(e => {});
-            } catch(e) {}
-        }
-
-        const emailEl = document.getElementById('perm-account-email');
-        const roleEl = document.getElementById('perm-role-select');
-        const selectEl = document.getElementById('perm-student-select');
-
-        if (selectEl && selectEl.value == stuId) {
-            if (roleEl) roleEl.value = 'none';
-            window.onPermRoleChanged();
-        }
-
-        window.saveData(true);
+        stu.accountEmail = '';
+        const saved = await window.saveData(true);
+        if (saved === false) throw new Error("Không ghi được hồ sơ lớp");
+        const selected = document.getElementById('perm-student-select');
+        if (selected && String(selected.value) === String(stuId)) window.onSelectPermStudent(stuId);
         window.renderStudents();
         window.renderAssignedAccountsList();
-        window.showToast(`Đã gỡ quyền cán bộ lớp của em ${stu.name}!`);
+        window.showToast(`Đã gỡ quyền của ${stu.name}!`);
+    } catch (e) {
+        stu.accountRole = oldRole;
+        stu.accountEmail = oldEmail;
+        console.error("Lỗi gỡ phân quyền:", e);
+        window.showToast("Không thể gỡ quyền trên Firebase. Cần kiểm tra lại.", "error");
     }
 };
 
 window.renderAssignedAccountsList = function() {
-    const container = document.getElementById('perm-assigned-list');
+    const container = document.getElementById('assigned-accounts-list');
     if (!container) return;
 
     const assigned = (appData.students || []).filter(s => s.accountRole && s.accountRole !== 'none');
