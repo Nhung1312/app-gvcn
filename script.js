@@ -648,7 +648,13 @@ async function importOfficerActions() {
         if (!Array.isArray(appData.officerAppliedActivityIds)) appData.officerAppliedActivityIds = [];
         const finished = [];
         let changed = false;
-        pending.forEach(snapshot => {
+        // Đảm bảo cập nhật điểm danh theo thời gian gửi, không theo thứ tự ID ngẫu nhiên.
+        const ordered = [...pending.docs].sort((a, b) => {
+            const ta = a.data().createdAt?.toMillis?.() || 0;
+            const tb = b.data().createdAt?.toMillis?.() || 0;
+            return ta - tb || a.id.localeCompare(b.id);
+        });
+        ordered.forEach(snapshot => {
             const action = snapshot.data();
             if (appData.officerAppliedActivityIds.includes(snapshot.id)) {
                 finished.push(snapshot.ref);
@@ -664,10 +670,12 @@ async function importOfficerActions() {
             } else if (action.type === 'behavior') {
                 const tag = (appData.behaviorTags || []).find(t => String(t.id) === String(action.tagId) && t.enabled);
                 if (!tag) return;
+                const submittedAt = action.createdAt?.toDate?.() || new Date();
                 appData.behaviorRecords.push({
                     id: snapshot.id, studentId: student.id, tagId: tag.id, snapshotName: tag.name,
-                    snapshotPoints: tag.currentPoints, type: tag.type, date: new Date().toISOString().slice(0, 10),
-                    time: new Date().toLocaleString('vi-VN'),
+                    snapshotPoints: tag.currentPoints, type: tag.type,
+                    date: [submittedAt.getFullYear(), String(submittedAt.getMonth()+1).padStart(2,'0'), String(submittedAt.getDate()).padStart(2,'0')].join('-'),
+                    time: submittedAt.toLocaleString('vi-VN'),
                     note: String(action.note || '').slice(0, 400)
                 });
             } else return;
