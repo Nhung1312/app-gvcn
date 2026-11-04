@@ -126,3 +126,107 @@ test('GVCN nhận báo cáo khi mở điểm danh hoặc nề nếp', () => {
   assert.match(script, /viewId === 'view-attendance' \|\| viewId === 'view-discipline'/);
   assert.match(script, /void importOfficerActions\(\)/);
 });
+
+function makePermissionFormHarness(overrides = {}) {
+  const js = between('async function commitPermissionChanges(', 'window.renderAssignedAccountsList = function() {');
+  const appData = {
+    students: [{ id: 11, name: 'Học sinh kiểm thử', fixedGroup: 1, accountEmail: 'old@gmail.com', accountRole: 'class_vice' }],
+    lastUpdated: 7, teacherUid: 'teacherUid', teacherEmail: 'teacher@gmail.com'
+  };
+  const writes = [];
+  const toasts = [];
+  const inputs = {
+    'perm-student-select': { value: '11' },
+    'perm-student-email': { value: overrides.email ?? 'new@gmail.com', focus(){} },
+    'perm-student-role': { value: overrides.role ?? 'group_leader' }
+  };
+  const button = { disabled: false };
+  const document = {
+    getElementById(id) { return inputs[id] || null; },
+    querySelector() { return button; }
+  };
+  const window = {
+    authRole: { isTestRole: !!overrides.testMode },
+    isTeacher: () => overrides.isTeacher !== false,
+    showToast(msg) { toasts.push(msg); },
+    renderStudents(){}, renderAssignedAccountsList(){},
+    onPermRoleChanged(){}, onSelectPermStudent(){}, updateDashboardInfo(){}
+  };
+  const batch = {
+    set(ref, payload) { writes.push(['set', ref.path, structuredClone(payload)]); },
+    delete(ref) { writes.push(['delete', ref.path]); },
+    async commit() {
+      if (overrides.failCommit) throw new Error('permission denied');
+      writes.push(['commit']);
+    }
+  };
+  const localStorage = { setItem() {} };
+  const factory = new Function(
+    'window', 'document', 'appData', 'currentUser', 'cloudRoleVerified',
+    'firestoreDb', 'doc', 'writeBatch', 'officerRosterPayload',
+    'localStorage', 'confirm', js +
+    '\nreturn { grant: window.saveStudentPermission, revoke: window.revokeStudentPermissionById };'
+  );
+  const funcs = factory(
+    window, document, appData,
+    overrides.loggedOut ? null : { uid: 'teacherUid' },
+    true, {},
+    (_db, col, id) => ({ path: col + '/' + id }),
+    () => batch, () => ({ students: [] }), localStorage, () => true
+  );
+  return { ...funcs, appData, writes, toasts, button };
+}
+
+test('Cấp quyền cập nhật hồ sơ lớp và chỉ mục bằng một batch', async () => {
+  const h = makePermissionFormHarness();
+  await h.grant();
+  assert.equal(h.appData.students[0].accountRole, 'group_leader');
+  assert.equal(h.appData.students[0].accountEmail, 'new@gmail.com');
+  assert.deepEqual(h.writes.map(w => w[0]), ['set', 'set', 'set', 'delete', 'commit']);
+  assert.ok(h.writes.some(w => w[1] === 'CanBoLop/new@gmail.com'));
+  assert.ok(h.writes.some(w => w[1] === 'CanBoLop/old@gmail.com'));
+  assert.equal(h.button.disabled, false);
+});
+
+test('Email sai định dạng không tạo bất kỳ lượt ghi Firebase nào', async () => {
+  const h = makePermissionFormHarness({ email: 'khong-phai-email' });
+  await h.grant();
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.appData.students[0].accountRole, 'class_vice');
+});
+
+test('Không cấp quyền tổ trưởng cho học sinh chưa được xếp tổ', async () => {
+  const h = makePermissionFormHarness();
+  h.appData.students[0].fixedGroup = 0;
+  await h.grant();
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.appData.students[0].accountRole, 'class_vice');
+});
+
+test('Firebase từ chối thì trả về quyền cũ và không báo cấp thành công', async () => {
+  const h = makePermissionFormHarness({ failCommit: true });
+  await h.grant();
+  assert.equal(h.appData.students[0].accountEmail, 'old@gmail.com');
+  assert.equal(h.appData.students[0].accountRole, 'class_vice');
+  assert.equal(h.appData.lastUpdated, 7);
+  assert.equal(h.button.disabled, false);
+  assert.ok(h.toasts.some(x => x.includes('thất bại') || x.includes('từ chối')));
+});
+
+test('Thu hồi quyền xóa chỉ mục và cập nhật hồ sơ trong một batch', async () => {
+  const h = makePermissionFormHarness();
+  await h.revoke(11);
+  assert.equal(h.appData.students[0].accountRole, 'none');
+  assert.equal(h.appData.students[0].accountEmail, '');
+  assert.ok(h.writes.some(w => w[0] === 'delete' && w[1] === 'CanBoLop/old@gmail.com'));
+  assert.equal(h.writes[h.writes.length-1][0], 'commit');
+});
+
+test('Tài khoản chưa đăng nhập hoặc chế độ thử không được cấp quyền thật', async () => {
+  for (const settings of [{ loggedOut: true }, { testMode: true }, { isTeacher: false }]) {
+    const h = makePermissionFormHarness(settings);
+    await h.grant();
+    assert.equal(h.writes.length, 0);
+  }
+});
+
