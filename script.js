@@ -11,7 +11,7 @@ window.FREE_MODE = FREE_MODE;
 // ================= FIREBASE AUTH & DATABASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, deleteDoc, getDocs, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQz-4TAujSNhDV8wQY82-wnCTGJtdxhsM", 
@@ -69,10 +69,6 @@ window.hasPermission = function(action, target = null) {
     const role = window.authRole.role;
     if (role === 'teacher') return true;
     if (role === 'none') return false;
-    // Chưa có cấu trúc ghi bản ghi riêng an toàn cho cán bộ lớp trên Firestore.
-    // Tạm chặn ghi thực tế; chế độ thử vai trò của giáo viên vẫn thao tác trong bộ nhớ.
-    if (currentUser && delegatedOfficer && !window.authRole.isTestRole &&
-        ['attendance:mark', 'attendance:save', 'behavior:record'].includes(action)) return false;
 
     // Các tác vụ CHỈ DÀNH RIÊNG CHO GIÁO VIÊN CHỦ NHIỆM
     const teacherOnlyActions = [
@@ -168,21 +164,17 @@ window.resolveUserRole = function(user = currentUser) {
         return;
     }
 
-    // 3. Kiểm tra xem có phải học sinh được cấp quyền cán bộ lớp không
-    const assignedStu = (appData.students || []).find(s => 
-        s.accountEmail && s.accountEmail.toLowerCase().trim() === email
-    );
-
-    if (delegatedOfficer && delegatedOfficerIndex && assignedStu && assignedStu.accountRole && assignedStu.accountRole !== 'none' &&
-        String(delegatedOfficerIndex.studentId) === String(assignedStu.id) &&
-        delegatedOfficerIndex.role === assignedStu.accountRole &&
-        delegatedOfficerIndex.teacherUid === appData.teacherUid) {
+    // 3. Cán bộ lớp chỉ nhận danh sách đã lược bỏ thông tin riêng tư.
+    const assignedStu = delegatedOfficer && delegatedOfficerIndex
+        ? (appData.students || []).find(s => String(s.id) === String(delegatedOfficerIndex.studentId))
+        : null;
+    if (assignedStu && delegatedOfficerIndex &&
+        ['class_leader', 'class_vice', 'group_leader'].includes(delegatedOfficerIndex.role) &&
+        (delegatedOfficerIndex.role !== 'group_leader' ||
+            (assignedStu.fixedGroup && String(assignedStu.fixedGroup) === String(delegatedOfficerIndex.fixedGroup)))) {
         window.authRole = {
-            role: assignedStu.accountRole,
-            email: email,
-            studentId: assignedStu.id,
-            studentName: assignedStu.name,
-            fixedGroup: assignedStu.fixedGroup || null,
+            role: delegatedOfficerIndex.role, email, studentId: assignedStu.id,
+            studentName: assignedStu.name, fixedGroup: assignedStu.fixedGroup || null,
             isTestRole: false
         };
         window.updateRoleUI();
@@ -440,48 +432,46 @@ onAuthStateChanged(auth, async (user) => {
                     }
                 } catch(e) {}
 
-                const docRef = doc(firestoreDb, "DuLieuGVCN", targetTeacherUid);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    const cloudData = docSnap.data();
-                    const localUpdated = (appData && appData.lastUpdated) ? appData.lastUpdated : 0;
-                    const cloudUpdated = cloudData.lastUpdated || 0;
-
-                    // Chỉ ghi đè dữ liệu thiết bị nếu dữ liệu đám mây thực sự mới hơn
-                    if (delegatedOfficer || cloudUpdated >= localUpdated || appData.teacherUid !== user.uid) {
+                if (delegatedOfficer) {
+                    // KHÔNG tải tài liệu DuLieuGVCN chứa dữ liệu riêng tư của cả lớp.
+                    const safeRef = doc(firestoreDb, 'GVCNOfficer', targetTeacherUid);
+                    const safeSnap = await getDoc(safeRef);
+                    if (!safeSnap.exists()) throw new Error('Giáo viên chưa đồng bộ danh sách cán bộ lớp');
+                    appData = safeOfficerView(safeSnap.data(), targetTeacherUid);
+                } else {
+                    const docRef = doc(firestoreDb, 'DuLieuGVCN', targetTeacherUid);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const cloudData = docSnap.data();
+                        if (cloudData.teacherUid && cloudData.teacherUid !== user.uid) {
+                            throw new Error('Tài liệu lớp không thuộc người đăng nhập');
+                        }
                         appData = {
                             ...cloudData,
                             settings: { ...defaultSettings, ...(cloudData.settings || {}) }
                         };
-                        localStorage.setItem('gvcnData_v4', JSON.stringify(appData));
                     } else {
-                        console.log("☁️ Dữ liệu thiết bị mới hơn đám mây, tiến hành đồng bộ lên mây...");
+                        if (appData.teacherUid && appData.teacherUid !== user.uid) appData = emptyOfficerView();
+                        appData.teacherEmail = cleanEmail;
+                        appData.teacherUid = user.uid;
                         await setDoc(docRef, appData);
                     }
-                } else {
-                    if (delegatedOfficer) throw new Error("Không tìm thấy dữ liệu lớp đã ủy quyền");
-                    // Tuyệt đối không lấy dữ liệu cũ của một tài khoản khác ghi lên lớp mới.
-                    if (appData.teacherUid && appData.teacherUid !== user.uid) throw new Error("Dữ liệu cục bộ thuộc tài khoản khác");
-                    appData.teacherUid = user.uid;
-                    appData.teacherEmail = (user.email || '').toLowerCase().trim();
-                    await setDoc(docRef, appData);
-                }
-                // Bổ sung định danh chủ lớp cho dữ liệu đời cũ chưa có teacherUid.
-                // Việc đọc từ đúng tài liệu đám mây đã thành công trước bước này.
-                if (delegatedOfficer) {
-                    appData.teacherUid = targetTeacherUid;
-                } else {
                     appData.teacherUid = user.uid;
                     if (!appData.teacherEmail) appData.teacherEmail = cleanEmail;
                 }
                 cloudRoleVerified = true;
             } catch(e) {
-                console.warn("Lỗi tải mây / xác minh quyền:", e);
+                console.warn('Lỗi tải mây / xác minh quyền:', e);
                 cloudRoleVerified = false;
                 delegatedOfficerIndex = null;
-                if (window.showToast) window.showToast("Không xác minh được quyền truy cập Firebase; tài khoản bị khóa thao tác.", "error");
+                appData = emptyOfficerView();
+                if (window.showToast) window.showToast('Không xác minh được quyền tài khoản trên Firebase.', 'error');
             }
             window.resolveUserRole(user);
+            if (cloudRoleVerified && !delegatedOfficer && window.isTeacher()) {
+                try { await syncOfficerRoster(); } catch (e) { console.warn('Chưa tạo được danh sách cán bộ lớp:', e); }
+                await importOfficerActions();
+            }
             window.updateDashboardInfo(); 
             window.renderStudents(); 
             window.loadSettings(); 
@@ -583,6 +573,115 @@ function initData() {
 
 let appData = initData();
 let syncTimeout = null;
+function emptyOfficerView() {
+    return {
+        settings: { ...defaultSettings, teacherName: '', className: '', apiKey: '' },
+        students: [], attendance: {}, behaviorTags: [], behaviorRecords: [],
+        tasks: [], notifications: [], documents: [], scheduleSetup: { week1Start: '', ppct: [], tkb: [], holidays: [] },
+        scheduleRecords: [], fixedGroups: [], flexibleGroups: [], classGradeMap: {},
+        teacherEmail: '', teacherUid: '', lastUpdated: 0
+    };
+}
+function safeOfficerView(roster, teacherUid) {
+    const result = emptyOfficerView();
+    result.teacherUid = teacherUid;
+    result.settings = {
+        ...result.settings,
+        teacherName: String(roster.teacherName || ''),
+        className: String(roster.className || ''),
+        year: String(roster.year || '2026 - 2027')
+    };
+    result.students = Array.isArray(roster.students) ? roster.students.map(s => ({
+        id: s.id, name: s.name, fixedGroup: s.fixedGroup || 0
+    })) : [];
+    result.fixedGroups = Array.isArray(roster.fixedGroups) ? roster.fixedGroups : [];
+    result.behaviorTags = Array.isArray(roster.behaviorTags) ? roster.behaviorTags : [];
+    return result;
+}
+function officerRosterPayload() {
+    const students = (appData.students || []).map(s => ({
+        id: s.id, name: s.name, fixedGroup: s.fixedGroup || 0
+    }));
+    const memberGroups = {};
+    students.forEach(s => { memberGroups[String(s.id)] = s.fixedGroup; });
+    return {
+        teacherName: String(appData.settings?.teacherName || ''),
+        className: String(appData.settings?.className || ''),
+        year: String(appData.settings?.year || ''),
+        students, memberGroups,
+        fixedGroups: (appData.fixedGroups || []).map(g => ({ id: g.id, name: g.name })),
+        behaviorTags: (appData.behaviorTags || []).filter(t => t.enabled).map(t => ({
+            id: t.id, name: t.name, type: t.type, currentPoints: Number(t.currentPoints) || 0,
+            enabled: true, icon: t.icon || '', color: t.color || ''
+        })),
+        updatedAt: serverTimestamp()
+    };
+}
+async function syncOfficerRoster() {
+    if (!currentUser || !cloudRoleVerified || delegatedOfficer || !window.isTeacher()) return false;
+    await setDoc(doc(firestoreDb, 'GVCNOfficer', currentUser.uid), officerRosterPayload());
+    return true;
+}
+async function sendOfficerAction(action) {
+    if (!currentUser || !delegatedOfficer || !cloudRoleVerified || window.authRole.isTestRole ||
+        !['class_leader', 'class_vice', 'group_leader'].includes(window.authRole.role)) {
+        throw new Error('Tài khoản cán bộ lớp chưa được xác minh');
+    }
+    await addDoc(collection(firestoreDb, 'GVCNOfficer', appData.teacherUid, 'activity'), {
+        ...action, actorUid: currentUser.uid, createdAt: serverTimestamp()
+    });
+}
+async function importOfficerActions() {
+    if (!currentUser || !cloudRoleVerified || delegatedOfficer || !window.isTeacher()) return;
+    try {
+        const pending = await getDocs(collection(firestoreDb, 'GVCNOfficer', currentUser.uid, 'activity'));
+        if (pending.empty) return;
+        if (!Array.isArray(appData.officerAppliedActivityIds)) appData.officerAppliedActivityIds = [];
+        const finished = [];
+        let changed = false;
+        pending.forEach(snapshot => {
+            const action = snapshot.data();
+            if (appData.officerAppliedActivityIds.includes(snapshot.id)) {
+                finished.push(snapshot.ref);
+                return;
+            }
+            const student = (appData.students || []).find(s => String(s.id) === String(action.studentId));
+            if (!student) return;
+            if (action.type === 'attendance' &&
+                ['present', 'excused', 'unexcused'].includes(action.status) &&
+                /^\\d{4}-\\d{2}-\\d{2}$/.test(action.date)) {
+                if (!appData.attendance[action.date]) appData.attendance[action.date] = {};
+                appData.attendance[action.date][student.id] = action.status;
+            } else if (action.type === 'behavior') {
+                const tag = (appData.behaviorTags || []).find(t => String(t.id) === String(action.tagId) && t.enabled);
+                if (!tag) return;
+                appData.behaviorRecords.push({
+                    id: snapshot.id, studentId: student.id, tagId: tag.id, snapshotName: tag.name,
+                    snapshotPoints: tag.currentPoints, type: tag.type, date: new Date().toISOString().slice(0, 10),
+                    time: new Date().toLocaleString('vi-VN'),
+                    note: String(action.note || '').slice(0, 400)
+                });
+            } else return;
+            appData.officerAppliedActivityIds.push(snapshot.id);
+            finished.push(snapshot.ref);
+            changed = true;
+        });
+        if (changed) {
+            const saved = await window.saveData(true);
+            if (saved !== true) throw new Error('Không lưu được dữ liệu sau khi nhận báo cáo');
+        }
+        for (const ref of finished) await deleteDoc(ref);
+        if (changed) {
+            window.renderAttendance();
+            window.renderDisciplineStudents();
+            window.showToast('Đã nhận báo cáo điểm danh/nề nếp từ cán bộ lớp.');
+        }
+    } catch (e) {
+        console.warn('Lỗi nhận báo cáo cán bộ lớp:', e);
+        window.showToast('Chưa đồng bộ được báo cáo cán bộ lớp. Sẽ thử lại ở lần mở sau.', 'error');
+    }
+}
+
 
 window.saveData = function(immediateSync = false) {
     if (window.authRole && window.authRole.isTestRole) return Promise.resolve(true);
@@ -599,7 +698,11 @@ window.saveData = function(immediateSync = false) {
         const doSync = () => {
             const targetUid = appData.teacherUid || currentUser.uid;
             const docRef = doc(firestoreDb, "DuLieuGVCN", targetUid);
-            return setDoc(docRef, appData).then(() => { console.log("☁️ Đã đồng bộ nền lên Firebase thành công!"); return true; }).catch(e => { console.error("Lỗi đồng bộ mây:", e); return false; });
+            return setDoc(docRef, appData).then(async () => {
+                console.log('☁️ Đã đồng bộ nền lên Firebase thành công!');
+                try { await syncOfficerRoster(); } catch(e) { console.warn('Chưa đồng bộ danh sách cán bộ lớp:', e); }
+                return true;
+            }).catch(e => { console.error('Lỗi đồng bộ mây:', e); return false; });
         };
         if (immediateSync) {
             return doSync();
@@ -2956,40 +3059,39 @@ window.renderAttendance = function() {
     document.getElementById('attendance-summary').innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> Có mặt: ${stats.present}</span><span style="color:var(--warning)"><i class="fas fa-exclamation-circle"></i> Phép: ${stats.excused}</span><span style="color:var(--danger)"><i class="fas fa-times-circle"></i> K.Phép: ${stats.unexcused}</span>`;
 }
 
-window.setAtt = function(btn, stuId, status) {
+window.setAtt = async function(btn, stuId, status) {
     const stu = (appData.students || []).find(s => s.id == stuId);
     if (!window.hasPermission('attendance:mark', stu)) {
-        if (window.isGroupLeader()) {
-            window.showToast(`Từ chối: Bạn là Tổ trưởng Tổ ${window.authRole.fixedGroup}, không thể điểm danh học sinh Tổ khác!`, "error");
-        } else if (window.authRole.role === 'none') {
-            window.showToast("Từ chối: Tài khoản của bạn chưa được cấp quyền điểm danh!", "error");
-        } else {
-            window.showToast("Từ chối: Bạn không có quyền điểm danh học sinh này!", "error");
+        return window.showToast('Không có quyền điểm danh học sinh này!', 'error');
+    }
+    const date = document.getElementById('attendance-date').value;
+    if (delegatedOfficer && !window.authRole.isTestRole) {
+        try {
+            await sendOfficerAction({ type: 'attendance', studentId: String(stu.id), date, status });
+        } catch(e) {
+            console.error('Lỗi lưu điểm danh cán bộ lớp:', e);
+            return window.showToast('Chưa gửi được điểm danh. Vui lòng kiểm tra kết nối.', 'error');
         }
-        return;
     }
-
-    const parent = btn.parentElement; 
-    parent.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active')); 
-    btn.classList.add('active');
-    
-    const date = document.getElementById('attendance-date').value; 
-    appData.attendance[date][stuId] = status;
-    
-    if(status === 'unexcused' && appData.settings.autoAbsentDisc) { 
-        let tag = appData.behaviorTags.find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng')); 
-        if(tag) window.autoCreateBehavior(stuId, tag, date, "Hệ thống tự ghi nhận vắng không phép"); 
+    if (!appData.attendance[date]) appData.attendance[date] = {};
+    appData.attendance[date][stu.id] = status;
+    if (status === 'unexcused' && appData.settings.autoAbsentDisc && !delegatedOfficer) {
+        const tag = (appData.behaviorTags || []).find(t => t.name.toLowerCase().includes('nội quy') || t.name.toLowerCase().includes('vắng'));
+        if (tag) window.autoCreateBehavior(stuId, tag, date, 'Hệ thống tự ghi nhận vắng không phép');
     }
-    window.renderAttendance(); 
-}
-
+    window.renderAttendance();
+};
 window.saveAttendance = function() { 
     if (!window.hasPermission('attendance:save')) {
         window.showToast("Từ chối: Tài khoản của bạn không có quyền lưu điểm danh!", "error");
         return;
     }
-    window.saveData(); 
-    window.showToast("✅ Đã lưu Điểm danh!"); 
+    if (delegatedOfficer && !window.authRole.isTestRole) {
+        window.showToast('Điểm danh đã được gửi đến giáo viên theo từng thao tác.');
+    } else {
+        window.saveData();
+        window.showToast("✅ Đã lưu Điểm danh!");
+    }
     window.switchView('view-home'); 
 }
 
@@ -3066,17 +3168,34 @@ window.renderQuickTags = function() {
     appData.behaviorTags.filter(t => t.type === currentBehaviorTab && t.enabled).forEach(t => { grid.innerHTML += `<div class="quick-tag-btn ${t.color}" onclick="confirmTagRecord('${t.id}')"><div class="tag-icon"><i class="fas ${t.icon}"></i></div><div class="tag-name">${t.name}</div><div class="tag-pts">${t.currentPoints > 0 ? '+' : ''}${t.currentPoints}</div></div>`; });
 }
 window.confirmTagRecord = function(tagId) { const tag = appData.behaviorTags.find(t => t.id === tagId); if(!tag) return; document.getElementById('conf-tag-id').value = tag.id; document.getElementById('conf-stu-id').value = currentDiscStuId; document.getElementById('conf-tag-display').innerHTML = `<strong>Hành vi:</strong> ${tag.name} (Gốc: ${tag.currentPoints})`; document.getElementById('conf-points').value = tag.currentPoints; document.getElementById('conf-note').value = ''; window.openModal('modal-confirm-tag'); }
-window.submitBehaviorRecord = function() {
-    const stuId = parseInt(document.getElementById('conf-stu-id').value);
+window.submitBehaviorRecord = async function() {
+    const stuId = parseInt(document.getElementById('conf-stu-id').value, 10);
     const stu = (appData.students || []).find(s => s.id == stuId);
     if (!window.hasPermission('behavior:record', stu)) {
-        window.showToast("Từ chối: Bạn không có quyền ghi nhận nề nếp cho học sinh này!", "error");
-        return;
+        return window.showToast('Không có quyền ghi nề nếp cho học sinh này!', 'error');
     }
-    const tag = appData.behaviorTags.find(t => t.id === document.getElementById('conf-tag-id').value);
-    appData.behaviorRecords.push({ id: Date.now(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: parseInt(document.getElementById('conf-points').value), type: tag.type, date: getTodayStr(), time: formatDateTime(), note: document.getElementById('conf-note').value });
-    window.saveData(); window.closeModal('modal-confirm-tag'); window.closeModal('modal-record-behavior'); window.showToast(`✅ Đã ghi nhận: ${tag.name}`); window.renderDisciplineStudents(); 
-}
+    const tag = (appData.behaviorTags || []).find(t => t.id === document.getElementById('conf-tag-id').value);
+    if (!tag) return window.showToast('Không tìm thấy loại hành vi!', 'error');
+    const note = document.getElementById('conf-note').value;
+    if (delegatedOfficer && !window.authRole.isTestRole) {
+        try {
+            await sendOfficerAction({ type: 'behavior', studentId: String(stuId), tagId: String(tag.id), note: note.slice(0, 400) });
+        } catch(e) {
+            console.error('Không lưu được báo cáo nề nếp:', e);
+            return window.showToast('Chưa gửi được báo cáo. Vui lòng thử lại.', 'error');
+        }
+    }
+    appData.behaviorRecords.push({
+        id: Date.now(), studentId: stuId, tagId: tag.id, snapshotName: tag.name,
+        snapshotPoints: delegatedOfficer ? tag.currentPoints : parseInt(document.getElementById('conf-points').value),
+        type: tag.type, date: getTodayStr(), time: formatDateTime(), note
+    });
+    if (!delegatedOfficer || window.authRole.isTestRole) window.saveData();
+    window.closeModal('modal-confirm-tag');
+    window.closeModal('modal-record-behavior');
+    window.showToast(delegatedOfficer ? 'Đã gửi báo cáo nề nếp!' : '✅ Đã ghi nhận: ' + tag.name);
+    window.renderDisciplineStudents();
+};
 window.autoCreateBehavior = function(stuId, tag, date, note) { if(!appData.behaviorRecords.find(r => r.studentId === stuId && r.date === date && r.tagId === tag.id && r.note.includes("Hệ thống"))) { appData.behaviorRecords.push({ id: Date.now() + Math.random(), studentId: stuId, tagId: tag.id, snapshotName: tag.name, snapshotPoints: tag.currentPoints, type: tag.type, date: date, time: formatDateTime(), note: note }); window.saveData(); } }
 
 window.renderManageTags = function() {
@@ -3114,6 +3233,7 @@ window.openAccountPermissionsModal = function() {
         window.showToast("Từ chối: Chỉ Giáo viên mới có quyền mở quản lý phân quyền tài khoản!", "error");
         return;
     }
+    if (currentUser && cloudRoleVerified) importOfficerActions();
 
     const selectEl = document.getElementById('perm-student-select');
     if (!selectEl) return;
