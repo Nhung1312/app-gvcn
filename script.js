@@ -28,6 +28,10 @@ const firestoreDb = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 let currentUser = null;
+// Chỉ xác nhận vai trò sau khi đã đọc được dữ liệu thật từ Firebase.
+let cloudRoleVerified = false;
+let delegatedOfficer = false;
+let delegatedOfficerIndex = null;
 
 // ================= HỆ THỐNG PHÂN QUYỀN CÁN BỘ LỚP (RBAC) =================
 // 4 Vai trò: 'teacher' (Giáo viên), 'class_leader' (Lớp trưởng), 'class_vice' (Lớp phó), 'group_leader' (Tổ trưởng)
@@ -65,6 +69,10 @@ window.hasPermission = function(action, target = null) {
     const role = window.authRole.role;
     if (role === 'teacher') return true;
     if (role === 'none') return false;
+    // Chưa có cấu trúc ghi bản ghi riêng an toàn cho cán bộ lớp trên Firestore.
+    // Tạm chặn ghi thực tế; chế độ thử vai trò của giáo viên vẫn thao tác trong bộ nhớ.
+    if (currentUser && delegatedOfficer && !window.authRole.isTestRole &&
+        ['attendance:mark', 'attendance:save', 'behavior:record'].includes(action)) return false;
 
     // Các tác vụ CHỈ DÀNH RIÊNG CHO GIÁO VIÊN CHỦ NHIỆM
     const teacherOnlyActions = [
@@ -133,16 +141,21 @@ window.resolveUserRole = function(user = currentUser) {
     }
 
     const email = (user.email || '').toLowerCase().trim();
+    if (!cloudRoleVerified) {
+        window.authRole = { role: 'none', email, studentId: null, studentName: user.displayName || email, fixedGroup: null, isTestRole: false };
+        window.updateRoleUI();
+        return;
+    }
 
     // 1. Nếu chưa lưu email giáo viên, lưu email đầu tiên đăng nhập làm Giáo viên
-    if (!appData.teacherEmail) {
+    if (!appData.teacherEmail && !delegatedOfficer && (!appData.teacherUid || appData.teacherUid === user.uid)) {
         appData.teacherEmail = email;
         appData.teacherUid = user.uid;
         window.saveData();
     }
 
     // 2. Nếu là Giáo viên
-    if (appData.teacherEmail && appData.teacherEmail.toLowerCase() === email) {
+    if (!delegatedOfficer && appData.teacherUid === user.uid && appData.teacherEmail && appData.teacherEmail.toLowerCase() === email) {
         window.authRole = {
             role: 'teacher',
             email: email,
@@ -160,7 +173,10 @@ window.resolveUserRole = function(user = currentUser) {
         s.accountEmail && s.accountEmail.toLowerCase().trim() === email
     );
 
-    if (assignedStu && assignedStu.accountRole && assignedStu.accountRole !== 'none') {
+    if (delegatedOfficer && delegatedOfficerIndex && assignedStu && assignedStu.accountRole && assignedStu.accountRole !== 'none' &&
+        String(delegatedOfficerIndex.studentId) === String(assignedStu.id) &&
+        delegatedOfficerIndex.role === assignedStu.accountRole &&
+        delegatedOfficerIndex.teacherUid === appData.teacherUid) {
         window.authRole = {
             role: assignedStu.accountRole,
             email: email,
@@ -344,6 +360,9 @@ if(btnLogin) {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
+        cloudRoleVerified = false;
+        delegatedOfficer = false;
+        delegatedOfficerIndex = null;
         if(loginScreen) loginScreen.style.display = 'none';
 
         const userRef = doc(firestoreDb, 'khach_hang_gvcn', user.uid);
@@ -412,8 +431,11 @@ onAuthStateChanged(auth, async (user) => {
                     const officerSnap = await getDoc(doc(firestoreDb, "CanBoLop", cleanEmail));
                     if (officerSnap.exists()) {
                         const offData = officerSnap.data();
-                        if (offData.teacherUid) {
+                        if (offData.teacherUid && offData.teacherUid !== user.uid &&
+                            ['class_leader', 'class_vice', 'group_leader'].includes(offData.role)) {
                             targetTeacherUid = offData.teacherUid;
+                            delegatedOfficer = true;
+                            delegatedOfficerIndex = offData;
                         }
                     }
                 } catch(e) {}
@@ -426,7 +448,7 @@ onAuthStateChanged(auth, async (user) => {
                     const cloudUpdated = cloudData.lastUpdated || 0;
 
                     // Chỉ ghi đè dữ liệu thiết bị nếu dữ liệu đám mây thực sự mới hơn
-                    if (cloudUpdated >= localUpdated) {
+                    if (delegatedOfficer || cloudUpdated >= localUpdated || appData.teacherUid !== user.uid) {
                         appData = {
                             ...cloudData,
                             settings: { ...defaultSettings, ...(cloudData.settings || {}) }
@@ -437,10 +459,19 @@ onAuthStateChanged(auth, async (user) => {
                         await setDoc(docRef, appData);
                     }
                 } else {
-                    await setDoc(docRef, appData); 
+                    if (delegatedOfficer) throw new Error("Không tìm thấy dữ liệu lớp đã ủy quyền");
+                    // Tuyệt đối không lấy dữ liệu cũ của một tài khoản khác ghi lên lớp mới.
+                    if (appData.teacherUid && appData.teacherUid !== user.uid) throw new Error("Dữ liệu cục bộ thuộc tài khoản khác");
+                    appData.teacherUid = user.uid;
+                    appData.teacherEmail = (user.email || '').toLowerCase().trim();
+                    await setDoc(docRef, appData);
                 }
+                cloudRoleVerified = true;
             } catch(e) {
-                console.warn("Lỗi tải mây:", e);
+                console.warn("Lỗi tải mây / xác minh quyền:", e);
+                cloudRoleVerified = false;
+                delegatedOfficerIndex = null;
+                if (window.showToast) window.showToast("Không xác minh được quyền truy cập Firebase; tài khoản bị khóa thao tác.", "error");
             }
             window.resolveUserRole(user);
             window.updateDashboardInfo(); 
@@ -452,6 +483,9 @@ onAuthStateChanged(auth, async (user) => {
         }
     } else {
         currentUser = null;
+        cloudRoleVerified = false;
+        delegatedOfficer = false;
+        delegatedOfficerIndex = null;
         const isGuest = localStorage.getItem('gvcn_guest_mode') === 'true';
         if(loginScreen) loginScreen.style.display = isGuest ? 'none' : 'flex';
         window.resolveUserRole(null);
@@ -544,6 +578,11 @@ let syncTimeout = null;
 
 window.saveData = function(immediateSync = false) {
     if (window.authRole && window.authRole.isTestRole) return Promise.resolve(true);
+    if (currentUser && (!cloudRoleVerified || delegatedOfficer || !window.isTeacher() ||
+        appData.teacherUid !== currentUser.uid)) {
+        console.warn("Từ chối ghi toàn bộ dữ liệu lớp từ tài khoản không phải GVCN đã xác minh.");
+        return Promise.resolve(false);
+    }
     appData.lastUpdated = Date.now();
     localStorage.setItem('gvcnData_v4', JSON.stringify(appData)); 
     window.updateDashboardInfo(); 
@@ -564,7 +603,7 @@ window.saveData = function(immediateSync = false) {
 };
 
 window.addEventListener('beforeunload', () => {
-    if (currentUser && syncTimeout) {
+    if (currentUser && syncTimeout && cloudRoleVerified && !delegatedOfficer && window.isTeacher() && appData.teacherUid === currentUser.uid) {
         clearTimeout(syncTimeout);
         try {
             const targetUid = appData.teacherUid || currentUser.uid;
