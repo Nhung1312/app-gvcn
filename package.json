@@ -8,10 +8,17 @@
     "dev": "node server.js",
     "build": "echo 'Build complete'",
     "start": "node server.js",
-    "lint": "echo 'Lint passed'"
+    "lint": "node --check script.js && node --check server.js",
+    "test": "node --test tests/rbac.test.mjs",
+    "test:rules": "firebase emulators:exec --project demo-gvcn-rbac-tests --only firestore \"node --test tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "@google/genai": "*",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.0",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^14.0.0"
   }
 }
