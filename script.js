@@ -788,7 +788,15 @@ window.switchView = function(viewId, navElement = null) {
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     document.getElementById(viewId).classList.add('active'); window.scrollTo(0, 0);
     if (navElement) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); navElement.classList.add('active'); }
-    if(viewId === 'view-settings') window.loadSettings(); if(viewId === 'view-attendance') window.renderAttendance(); if(viewId === 'view-discipline') window.renderDisciplineStudents();
+    if(viewId === 'view-settings') window.loadSettings();
+    if(viewId === 'view-attendance') window.renderAttendance();
+    if(viewId === 'view-discipline') window.renderDisciplineStudents();
+    // Nhận báo cáo cán bộ lớp khi GVCN mở mục điểm danh hoặc nề nếp.
+    // Chạy bất đồng bộ; importOfficerActions có khóa tránh nhập trùng song song.
+    if ((viewId === 'view-attendance' || viewId === 'view-discipline')
+        && currentUser && cloudRoleVerified && !delegatedOfficer && window.isTeacher()) {
+        void importOfficerActions();
+    }
     if(viewId === 'view-announcements') window.renderNotifies(); if(viewId === 'view-plans') window.renderKanban(); if(viewId === 'view-docs') window.renderDocs();
     if(viewId === 'view-lesson-log') window.initLessonLogView();
 }
