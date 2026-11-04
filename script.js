@@ -3456,6 +3456,8 @@ window.renderAssignedAccountsList = function() {
     if (!container) return;
 
     const assigned = (appData.students || []).filter(s => s.accountRole && s.accountRole !== 'none');
+    const counter = document.getElementById('perm-count-badge');
+    if (counter) counter.textContent = `${assigned.length} tài khoản`;
     if (assigned.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:18px; color:#94a3b8; font-size:0.88rem; font-style:italic;">Chưa có cán bộ lớp nào được cấp quyền tài khoản.</div>`;
         return;

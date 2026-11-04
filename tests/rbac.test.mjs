@@ -230,3 +230,25 @@ test('Tài khoản chưa đăng nhập hoặc chế độ thử không được 
   }
 });
 
+test('Bộ đếm tài khoản cập nhật sau cấp và thu hồi quyền', () => {
+  const listMarkup = between('window.renderAssignedAccountsList = function() {', 'window.applyNotifyTemplate = function() {');
+  const list = { innerHTML: '' };
+  const badge = { textContent: '0 tài khoản' };
+  const document = { getElementById(id) {
+    if (id === 'assigned-accounts-list') return list;
+    if (id === 'perm-count-badge') return badge;
+    return null;
+  }};
+  const appData = { students: [] };
+  const window = {};
+  new Function('window', 'document', 'appData', listMarkup)(window, document, appData);
+  window.renderAssignedAccountsList();
+  assert.equal(badge.textContent, '0 tài khoản');
+  appData.students.push({ id: 1, name: 'Học sinh giả', accountRole: 'class_leader', accountEmail: 'test@example.com', fixedGroup: 1 });
+  window.renderAssignedAccountsList();
+  assert.equal(badge.textContent, '1 tài khoản');
+  assert.match(list.innerHTML, /Lớp trưởng/);
+  appData.students[0].accountRole = 'none';
+  window.renderAssignedAccountsList();
+  assert.equal(badge.textContent, '0 tài khoản');
+});
