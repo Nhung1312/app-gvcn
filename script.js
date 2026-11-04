@@ -3212,7 +3212,7 @@ window.saveStudentPermission = async function() {
     if (!stu) return window.showToast("Chưa chọn học sinh!", "error");
     const email = emailEl.value.trim().toLowerCase();
     const role = roleEl.value;
-    if (role !== 'none' && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (role !== 'none' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return window.showToast("Email học sinh chưa hợp lệ!", "error");
     }
     if (role === 'group_leader' && !stu.fixedGroup) {
