@@ -466,6 +466,14 @@ onAuthStateChanged(auth, async (user) => {
                     appData.teacherEmail = (user.email || '').toLowerCase().trim();
                     await setDoc(docRef, appData);
                 }
+                // Bổ sung định danh chủ lớp cho dữ liệu đời cũ chưa có teacherUid.
+                // Việc đọc từ đúng tài liệu đám mây đã thành công trước bước này.
+                if (delegatedOfficer) {
+                    appData.teacherUid = targetTeacherUid;
+                } else {
+                    appData.teacherUid = user.uid;
+                    if (!appData.teacherEmail) appData.teacherEmail = cleanEmail;
+                }
                 cloudRoleVerified = true;
             } catch(e) {
                 console.warn("Lỗi tải mây / xác minh quyền:", e);
