@@ -1,9 +1,9 @@
 name: GVCN RBAC security checks
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/gvcn-rbac-ui-revoke-20261104
+      - main
   workflow_dispatch:
 
 permissions:
