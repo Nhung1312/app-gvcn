@@ -446,10 +446,17 @@ onAuthStateChanged(auth, async (user) => {
                         if (cloudData.teacherUid && cloudData.teacherUid !== user.uid) {
                             throw new Error('Tài liệu lớp không thuộc người đăng nhập');
                         }
-                        appData = {
-                            ...cloudData,
-                            settings: { ...defaultSettings, ...(cloudData.settings || {}) }
-                        };
+                        const localIsOwned = appData.teacherUid === user.uid;
+                        const localNewer = localIsOwned && (appData.lastUpdated || 0) > (cloudData.lastUpdated || 0);
+                        if (localNewer) {
+                            // Chỉ khôi phục dữ liệu chưa đồng bộ của đúng chủ lớp.
+                            await setDoc(docRef, appData);
+                        } else {
+                            appData = {
+                                ...cloudData,
+                                settings: { ...defaultSettings, ...(cloudData.settings || {}) }
+                            };
+                        }
                     } else {
                         if (appData.teacherUid && appData.teacherUid !== user.uid) appData = emptyOfficerView();
                         appData.teacherEmail = cleanEmail;
@@ -457,7 +464,7 @@ onAuthStateChanged(auth, async (user) => {
                         await setDoc(docRef, appData);
                     }
                     appData.teacherUid = user.uid;
-                    if (!appData.teacherEmail) appData.teacherEmail = cleanEmail;
+                    appData.teacherEmail = cleanEmail;
                 }
                 cloudRoleVerified = true;
             } catch(e) {
@@ -631,8 +638,10 @@ async function sendOfficerAction(action) {
         ...action, actorUid: currentUser.uid, createdAt: serverTimestamp()
     });
 }
+let officerImportInProgress = false;
 async function importOfficerActions() {
-    if (!currentUser || !cloudRoleVerified || delegatedOfficer || !window.isTeacher()) return;
+    if (!currentUser || !cloudRoleVerified || delegatedOfficer || !window.isTeacher() || officerImportInProgress) return;
+    officerImportInProgress = true;
     try {
         const pending = await getDocs(collection(firestoreDb, 'GVCNOfficer', currentUser.uid, 'activity'));
         if (pending.empty) return;
@@ -649,7 +658,7 @@ async function importOfficerActions() {
             if (!student) return;
             if (action.type === 'attendance' &&
                 ['present', 'excused', 'unexcused'].includes(action.status) &&
-                /^\\d{4}-\\d{2}-\\d{2}$/.test(action.date)) {
+                /^\d{4}-\d{2}-\d{2}$/.test(action.date)) {
                 if (!appData.attendance[action.date]) appData.attendance[action.date] = {};
                 appData.attendance[action.date][student.id] = action.status;
             } else if (action.type === 'behavior') {
@@ -679,6 +688,8 @@ async function importOfficerActions() {
     } catch (e) {
         console.warn('Lỗi nhận báo cáo cán bộ lớp:', e);
         window.showToast('Chưa đồng bộ được báo cáo cán bộ lớp. Sẽ thử lại ở lần mở sau.', 'error');
+    } finally {
+        officerImportInProgress = false;
     }
 }
 
