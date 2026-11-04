@@ -1,0 +1,33 @@
+name: GVCN RBAC security checks
+
+on:
+  push:
+    branches:
+      - fix/gvcn-rbac-ui-revoke-20261104
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rbac-emulator:
+    name: RBAC and Firestore Emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install test dependencies (no production credentials)
+        run: npm install --no-audit --no-fund
+      - name: JavaScript syntax
+        run: npm run lint
+      - name: RBAC logic and UI (synthetic students)
+        run: npm test
+      - name: Firestore security rules emulator (demo project only)
+        run: npm run test:rules
