@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===== CAC RULES APP DAY THEM: GIU NGUYEN =====
+    function standardLicenseActive(userId) {
+      let license = get(/databases/$(database)/documents/ban_quyen_thuong/$(userId)).data;
+      let paidUntil = license.get('paid_until', timestamp.date(1970, 1, 1));
+      return license.trial_started_at is timestamp
+        && (request.time < license.trial_started_at + duration.value(30, 'd')
+            || (paidUntil is timestamp && request.time < paidUntil));
+    }
+
+    function canWriteStandardTuition(userId) {
+      return request.time < timestamp.date(2026, 11, 17)
+        || standardLicenseActive(userId);
+    }
+
+    // Helpers chi cho GVCN.
+    function officerPath() {
+      return /databases/$(database)/documents/CanBoLop/$(request.auth.token.email);
+    }
+
+    function officerFor(teacherUid) {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && exists(officerPath())
+        && get(officerPath()).data.teacherUid == teacherUid
+        && get(officerPath()).data.role in ['class_leader', 'class_vice', 'group_leader'];
+    }
+
+    // 1. APP QUAN LY DAY THEM BAN THUONG -- GIU NGUYEN
+    match /DuLieuDayThem/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if request.auth != null
+        && request.auth.uid == userId
+        && canWriteStandardTuition(userId);
+    }
+
+    match /nguoi_dung/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['ngay_het_han_thuong']);
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['ngay_het_han', 'ngay_het_han_thuong']);
+    }
+
+    match /ban_quyen_thuong/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['trial_started_at'])
+        && request.resource.data.keys().hasAll(['trial_started_at'])
+        && request.resource.data.trial_started_at is timestamp
+        && request.resource.data.trial_started_at == request.time;
+      allow update, delete: if false;
+    }
+
+    // 2. APP TRO LY GVCN -- THAY THE PHAN DU LIEU LOP CU QUA RONG
+    match /DuLieuGVCN/{userId} {
+      allow get, create, update, delete: if request.auth != null
+        && request.auth.uid == userId;
+      allow list: if false;
+    }
+
+    match /CanBoLop/{email} {
+      allow get: if request.auth != null
+        && (resource.data.teacherUid == request.auth.uid
+          || (request.auth.token.email_verified == true
+            && request.auth.token.email == email));
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.teacherUid == request.auth.uid
+        && exists(/databases/$(database)/documents/DuLieuGVCN/$(request.auth.uid))
+        && request.resource.data.keys().hasAll(['teacherUid','role','studentId','studentName','fixedGroup'])
+        && request.resource.data.keys().hasOnly(['teacherUid','role','studentId','studentName','fixedGroup'])
+        && request.resource.data.role in ['class_leader','class_vice','group_leader']
+        && request.resource.data.studentName is string
+        && (request.resource.data.studentId is int || request.resource.data.studentId is string)
+        && (request.resource.data.fixedGroup == null || request.resource.data.fixedGroup is int);
+      allow update: if request.auth != null
+        && resource.data.teacherUid == request.auth.uid
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.keys().hasAll(['teacherUid','role','studentId','studentName','fixedGroup'])
+        && request.resource.data.keys().hasOnly(['teacherUid','role','studentId','studentName','fixedGroup'])
+        && request.resource.data.role in ['class_leader','class_vice','group_leader']
+        && request.resource.data.studentName is string
+        && (request.resource.data.studentId is int || request.resource.data.studentId is string)
+        && (request.resource.data.fixedGroup == null || request.resource.data.fixedGroup is int);
+      allow delete: if request.auth != null
+        && resource.data.teacherUid == request.auth.uid;
+    }
+
+    match /GVCNOfficer/{teacherUid} {
+      // Bien che: chi GVCN va can bo lop hop le duoc doc danh sach toi thieu.
+      allow get: if request.auth != null
+        && (request.auth.uid == teacherUid || officerFor(teacherUid));
+      allow list: if false;
+      allow create, update, delete: if request.auth != null
+        && request.auth.uid == teacherUid;
+
+      match /activity/{actionId} {
+        allow get, list, delete: if request.auth != null
+          && request.auth.uid == teacherUid;
+        allow update: if false;
+        allow create: if officerFor(teacherUid)
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.studentId is string
+          && exists(/databases/$(database)/documents/GVCNOfficer/$(teacherUid))
+          && get(/databases/$(database)/documents/GVCNOfficer/$(teacherUid))
+            .data.memberGroups.get(request.resource.data.studentId, -1) != -1
+          && (
+            get(officerPath()).data.role in ['class_leader', 'class_vice']
+            || (get(officerPath()).data.role == 'group_leader'
+              && get(officerPath()).data.fixedGroup is int
+              && get(officerPath()).data.fixedGroup > 0
+              && get(/databases/$(database)/documents/GVCNOfficer/$(teacherUid))
+                .data.memberGroups.get(request.resource.data.studentId, -1)
+                == get(officerPath()).data.fixedGroup)
+          )
+          && (
+            (request.resource.data.type == 'attendance'
+              && request.resource.data.keys().hasOnly(['actorUid','createdAt','studentId','type','date','status'])
+              && request.resource.data.keys().hasAll(['actorUid','createdAt','studentId','type','date','status'])
+              && request.resource.data.date is string
+              && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+              && request.resource.data.status in ['present','excused','unexcused'])
+            || (request.resource.data.type == 'behavior'
+              && request.resource.data.keys().hasOnly(['actorUid','createdAt','studentId','type','tagId','note'])
+              && request.resource.data.keys().hasAll(['actorUid','createdAt','studentId','type','tagId','note'])
+              && request.resource.data.tagId is string
+              && request.resource.data.tagId.size() <= 100
+              && request.resource.data.note is string
+              && request.resource.data.note.size() <= 400)
+          );
+      }
+    }
+
+    match /khach_hang_gvcn/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ngay_het_han']);
+    }
+
+    // HAI MATCH DUOI DAY CHUA SIET: co the duoc app khac su dung.
+    // KHONG SU DUNG DE LUU THONG TIN NHAY CAM CHO DEN KHI KIEM THU PHU THUOC.
+    match /class_members/{memberId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    match /classes/{teacherUid}/activityLogs/{logId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == teacherUid;
+    }
+
+    // 3. APP TRO LY GVBM -- GIU NGUYEN
+    match /DuLieuGVBM/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /khach_hang_gvbm/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ngay_het_han']);
+    }
+  }
+}
