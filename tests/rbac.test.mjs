@@ -164,7 +164,7 @@ function makePermissionFormHarness(overrides = {}) {
   const factory = new Function(
     'window', 'document', 'appData', 'currentUser', 'cloudRoleVerified',
     'firestoreDb', 'doc', 'writeBatch', 'officerRosterPayload',
-    'localStorage', 'confirm', js +
+    'localStorage', 'confirm', 'console', js +
     '\nreturn { grant: window.saveStudentPermission, revoke: window.revokeStudentPermissionById };'
   );
   const funcs = factory(
@@ -172,7 +172,7 @@ function makePermissionFormHarness(overrides = {}) {
     overrides.loggedOut ? null : { uid: 'teacherUid' },
     true, {},
     (_db, col, id) => ({ path: col + '/' + id }),
-    () => batch, () => ({ students: [] }), localStorage, () => true
+    () => batch, () => ({ students: [] }), localStorage, () => true, { error(){} }
   );
   return { ...funcs, appData, writes, toasts, button };
 }
