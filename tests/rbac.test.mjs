@@ -318,3 +318,13 @@ test('Chế độ thử không thể biến tài khoản lớp trưởng thành 
   const src = between('window.switchTestRole = function(testRole, targetGroup = 1) {', 'const loginScreen = document.getElementById(');
   assert.match(src, /if \(currentUser && \(!cloudRoleVerified \|\| delegatedOfficer \|\| appData\.teacherUid !== currentUser\.uid\)\)/);
 });
+
+test('Giao diện nhận biết rõ bước lỗi xác minh quyền thay vì hiện lớp trống', () => {
+  assert.match(html, /id="gvcn-role-diagnostic"/);
+  const verification = between('onAuthStateChanged(auth, async (user) => {', 'window.logoutApp = function() {');
+  assert.match(verification, /setRoleVerificationNotice\('Đang xác minh quyền/);
+  assert.match(verification, /accessStage = 'đọc danh sách GVCNOfficer'/);
+  assert.match(verification, /accessStage = 'đọc dữ liệu lớp chính chủ'/);
+  assert.match(verification, /if \(cloudRoleVerified && window\.authRole\.role === 'none'\)/);
+  assert.match(verification, /setRoleVerificationNotice\('Không xác minh được quyền \('/);
+});
