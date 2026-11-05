@@ -11,7 +11,7 @@ window.FREE_MODE = FREE_MODE;
 // ================= FIREBASE AUTH & DATABASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, deleteDoc, getDocs, addDoc, collection, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocFromServer, deleteDoc, getDocs, addDoc, collection, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQz-4TAujSNhDV8wQY82-wnCTGJtdxhsM", 
@@ -254,6 +254,11 @@ window.updateRoleUI = function() {
 
 let permissionTestSnapshot = null;
 window.switchTestRole = function(testRole, targetGroup = 1) {
+    // Chế độ xem thử không được dùng để nâng quyền một tài khoản cán bộ lớp.
+    if (currentUser && (!cloudRoleVerified || delegatedOfficer || appData.teacherUid !== currentUser.uid)) {
+        window.showToast("Chỉ tài khoản GVCN chính chủ mới được mở chế độ thử!", "error");
+        return;
+    }
     if (currentUser && !window.isTeacher() && !window.authRole.isTestRole) {
         window.showToast("Chỉ giáo viên được thử phân quyền!", "error");
         return;
@@ -349,12 +354,45 @@ if(btnLogin) {
     });
 }
 
+// Tra quyền cán bộ lớp từ máy chủ, không lấy từ bộ nhớ đệm.
+async function readVerifiedGvcnRole(user) {
+    const cleanEmail = (user?.email || '').toLowerCase().trim();
+    if (!user?.uid || !cleanEmail) throw new Error('Thiếu định danh Google để xác minh quyền.');
+    // Bắt buộc kiểm tra từ server trước khi quyết định chế độ Giáo viên.
+    // Firestore lỗi/mất mạng: ném lỗi để không tự quay về quyền Giáo viên.
+    const snap = await getDocFromServer(doc(firestoreDb, 'CanBoLop', cleanEmail));
+    if (!snap.exists()) {
+        return { teacherUid: user.uid, delegated: false, officerIndex: null };
+    }
+    const index = snap.data();
+    if (!index || typeof index.teacherUid !== 'string' ||
+        !index.teacherUid || !['class_leader', 'class_vice', 'group_leader'].includes(index.role)) {
+        throw new Error('Phân quyền cán bộ lớp không hợp lệ.');
+    }
+    if (index.teacherUid === user.uid) {
+        throw new Error('Không thể tự cấp quyền cán bộ lớp cho tài khoản chủ lớp.');
+    }
+    return {
+        teacherUid: index.teacherUid,
+        delegated: true,
+        officerIndex: index
+    };
+}
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         cloudRoleVerified = false;
         delegatedOfficer = false;
         delegatedOfficerIndex = null;
+        // Tài khoản Google mới không được kế thừa vai trò/màn hình thử từ phiên cũ.
+        permissionTestSnapshot = null;
+        window.authRole = {
+            role: 'none', email: (user.email || '').toLowerCase().trim(),
+            studentId: null, studentName: user.displayName || 'Đang xác minh quyền',
+            fixedGroup: null, isTestRole: false
+        };
+        window.updateRoleUI();
         if(loginScreen) loginScreen.style.display = 'none';
 
         const userRef = doc(firestoreDb, 'khach_hang_gvcn', user.uid);
@@ -417,25 +455,18 @@ onAuthStateChanged(auth, async (user) => {
         if (hasAccess) {
             try {
                 // Kiểm tra xem đây có phải tài khoản cán bộ lớp được giáo viên ủy quyền không
-                let targetTeacherUid = user.uid;
                 const cleanEmail = (user.email || '').toLowerCase().trim();
-                try {
-                    const officerSnap = await getDoc(doc(firestoreDb, "CanBoLop", cleanEmail));
-                    if (officerSnap.exists()) {
-                        const offData = officerSnap.data();
-                        if (offData.teacherUid && offData.teacherUid !== user.uid &&
-                            ['class_leader', 'class_vice', 'group_leader'].includes(offData.role)) {
-                            targetTeacherUid = offData.teacherUid;
-                            delegatedOfficer = true;
-                            delegatedOfficerIndex = offData;
-                        }
-                    }
-                } catch(e) {}
+                // Ưu tiên phân quyền lớp được giáo viên ủy quyền, kể cả khi Gmail
+                // từng có DuLieuGVCN riêng. Không bỏ qua lỗi tra cứu quyền!
+                const verifiedAccount = await readVerifiedGvcnRole(user);
+                const targetTeacherUid = verifiedAccount.teacherUid;
+                delegatedOfficer = verifiedAccount.delegated;
+                delegatedOfficerIndex = verifiedAccount.officerIndex;
 
                 if (delegatedOfficer) {
                     // KHÔNG tải tài liệu DuLieuGVCN chứa dữ liệu riêng tư của cả lớp.
                     const safeRef = doc(firestoreDb, 'GVCNOfficer', targetTeacherUid);
-                    const safeSnap = await getDoc(safeRef);
+                    const safeSnap = await getDocFromServer(safeRef);
                     if (!safeSnap.exists()) throw new Error('Giáo viên chưa đồng bộ danh sách cán bộ lớp');
                     appData = safeOfficerView(safeSnap.data(), targetTeacherUid);
                 } else {
@@ -470,11 +501,16 @@ onAuthStateChanged(auth, async (user) => {
             } catch(e) {
                 console.warn('Lỗi tải mây / xác minh quyền:', e);
                 cloudRoleVerified = false;
+                delegatedOfficer = false;
                 delegatedOfficerIndex = null;
                 appData = emptyOfficerView();
-                if (window.showToast) window.showToast('Không xác minh được quyền tài khoản trên Firebase.', 'error');
+                if (window.showToast) window.showToast('Không xác minh được quyền từ Firebase. Đã khóa quyền quản lý; hãy kiểm tra kết nối và tài khoản Google.', 'error');
             }
             window.resolveUserRole(user);
+            if (cloudRoleVerified && delegatedOfficer && window.authRole.role !== 'none') {
+                window.showToast('Đã đăng nhập với quyền ' + (window.authRole.role === 'class_leader' ? 'Lớp trưởng' :
+                    window.authRole.role === 'class_vice' ? 'Lớp phó' : 'Tổ trưởng') + '.');
+            }
             if (cloudRoleVerified && !delegatedOfficer && window.isTeacher()) {
                 try { await syncOfficerRoster(); } catch (e) { console.warn('Chưa tạo được danh sách cán bộ lớp:', e); }
                 await importOfficerActions();

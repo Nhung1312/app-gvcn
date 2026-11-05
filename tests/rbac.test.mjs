@@ -252,3 +252,69 @@ test('Bộ đếm tài khoản cập nhật sau cấp và thu hồi quyền', ()
   window.renderAssignedAccountsList();
   assert.equal(badge.textContent, '0 tài khoản');
 });
+
+
+function makeRoleLookup(docResult, options = {}) {
+  const js = between('// Tra quyền cán bộ lớp từ máy chủ, không lấy từ bộ nhớ đệm.', 'onAuthStateChanged(auth, async (user) => {');
+  const reads = [];
+  const doc = (_db, collection, email) => ({ collection, email });
+  const getDocFromServer = async ref => {
+    reads.push(ref);
+    if (options.networkError) throw new Error('offline');
+    return {
+      exists: () => docResult !== null,
+      data: () => docResult
+    };
+  };
+  const lookup = new Function('doc', 'firestoreDb', 'getDocFromServer', js +
+    '\nreturn readVerifiedGvcnRole;')(doc, {}, getDocFromServer);
+  return { lookup, reads };
+}
+
+test('Gmail từng làm giáo viên nhưng được cấp Lớp trưởng phải ưu tiên ủy quyền', async () => {
+  const h = makeRoleLookup({
+    teacherUid: 'teacher-main-uid', role: 'class_leader',
+    studentId: 12, studentName: 'Học sinh kiểm thử', fixedGroup: 1
+  });
+  const result = await h.lookup({ uid: 'old-teacher-account-uid', email: 'CLASSLEADER@gmail.com' });
+  assert.equal(result.delegated, true);
+  assert.equal(result.teacherUid, 'teacher-main-uid');
+  assert.equal(result.officerIndex.role, 'class_leader');
+  assert.equal(h.reads[0].email, 'classleader@gmail.com');
+});
+
+test('Không tìm thấy chỉ mục mới được mở lớp chính chủ cũ', async () => {
+  const h = makeRoleLookup(null);
+  const result = await h.lookup({ uid: 'old-teacher-account-uid', email: 'old@gmail.com' });
+  assert.deepEqual(result, { teacherUid: 'old-teacher-account-uid', delegated: false, officerIndex: null });
+});
+
+test('Không thể mở quyền giáo viên khi Firebase lỗi tra cứu cán bộ lớp', async () => {
+  const h = makeRoleLookup(null, { networkError: true });
+  await assert.rejects(() => h.lookup({ uid: 'old-teacher-account-uid', email: 'old@gmail.com' }), /offline/);
+  assert.match(script, /const verifiedAccount = await readVerifiedGvcnRole\(user\)/);
+  assert.doesNotMatch(
+    between('// Ưu tiên phân quyền lớp được giáo viên ủy quyền', 'if (delegatedOfficer) {'),
+    /catch\s*\(e\)\s*\{\s*\}/
+  );
+});
+
+test('Không chấp nhận chỉ mục vai trò sai hoặc tự cấp lớp trưởng cho chủ lớp', async () => {
+  const h = makeRoleLookup({ teacherUid: 'teacher-main-uid', role: 'teacher' });
+  await assert.rejects(() => h.lookup({ uid: 'old-account', email: 'old@gmail.com' }), /không hợp lệ/);
+  const self = makeRoleLookup({ teacherUid: 'self-uid', role: 'class_leader' });
+  await assert.rejects(() => self.lookup({ uid: 'self-uid', email: 'self@gmail.com' }), /Không thể tự cấp/);
+});
+
+test('Lần đăng nhập mới không kế thừa vai trò test và ưu tiên server', () => {
+  const auth = between('onAuthStateChanged(auth, async (user) => {', 'window.logoutApp = function() {');
+  assert.match(auth, /permissionTestSnapshot = null/);
+  assert.match(auth, /role: 'none'/);
+  assert.match(auth, /getDocFromServer\(safeRef\)/);
+  assert.match(auth, /if \(cloudRoleVerified && delegatedOfficer/);
+});
+
+test('Chế độ thử không thể biến tài khoản lớp trưởng thành giáo viên', () => {
+  const src = between('window.switchTestRole = function(testRole, targetGroup = 1) {', 'const loginScreen = document.getElementById(');
+  assert.match(src, /if \(currentUser && \(!cloudRoleVerified \|\| delegatedOfficer \|\| appData\.teacherUid !== currentUser\.uid\)\)/);
+});
