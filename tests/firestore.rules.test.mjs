@@ -160,3 +160,21 @@ test('Không thay quyền đọc app Dạy thêm bản thường', async () => {
   await assertSucceeds(getDoc(doc(teacher, 'DuLieuDayThem', teacherUid)));
   await assertFails(getDoc(doc(other, 'DuLieuDayThem', teacherUid)));
 });
+
+test('Cán bộ lớp đăng nhập đọc được chính chỉ mục CanBoLop theo email đã xác minh', async () => {
+  const leader = ctx('officer-uid', 'leader@gmail.com');
+  const index = await assertSucceeds(getDoc(doc(leader, 'CanBoLop', 'leader@gmail.com')));
+  if (!index.exists() || index.data().role !== 'class_leader') {
+    throw new Error('Không đọc được vai trò lớp trưởng đã được cấp.');
+  }
+  const unrelated = ctx('unrelated-uid', 'other@gmail.com');
+  await assertFails(getDoc(doc(unrelated, 'CanBoLop', 'leader@gmail.com')));
+});
+
+test('Chỉ chủ lớp và cán bộ có quyền xem danh sách GVCNOfficer', async () => {
+  const leader = ctx('officer-uid', 'leader@gmail.com');
+  const roster = await assertSucceeds(getDoc(doc(leader, 'GVCNOfficer', teacherUid)));
+  if (!roster.exists() || !roster.data().students.some(s => s.id === 1)) {
+    throw new Error('Chưa tạo danh sách cán bộ lớp.');
+  }
+});
